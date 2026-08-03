@@ -10,3 +10,4 @@ assets/generated/
 *.db 
 .DS_Store 
 Thumbs.db 
+*.egg-info/
