@@ -1,0 +1,41 @@
+[project]
+name = "creatoros"
+version = "0.1.0"
+description = "AI-powered gaming content factory for YouTube Shorts and other platforms."
+readme = "README.md"
+requires-python = ">=3.12"
+authors = [
+    { name = "KC" }
+]
+
+dependencies = [
+    "pydantic>=2.11",
+    "pydantic-settings>=2.11",
+    "typer>=0.17",
+    "sqlalchemy>=2.0",
+    "alembic>=1.18",
+    "structlog>=25.4",
+    "tenacity>=9.1",
+    "httpx>=0.28"
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.4",
+    "ruff>=0.12",
+    "mypy>=1.17"
+]
+
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+
+[tool.mypy]
+python_version = "3.12"
+strict = false
