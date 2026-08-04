@@ -1,0 +1,591 @@
+"""Command-line interface foundation for CreatorOS."""
+
+from __future__ import annotations
+
+import argparse
+import asyncio
+import logging
+import sys
+from contextlib import redirect_stderr, redirect_stdout
+from dataclasses import dataclass
+from typing import TextIO
+from urllib.parse import urlsplit
+
+from pydantic import ValidationError
+
+from creatoros import __version__
+from creatoros.config import get_settings
+from creatoros.core import (
+    ConfigurationError,
+    CreatorOSError,
+    CreatorOSValidationError,
+    ProviderNotFoundError,
+    ProviderUnavailableError,
+)
+from creatoros.domain import ContentPlatform
+from creatoros.observability import configure_logging, get_logger
+from creatoros.orchestrator import GamingWorkflowInput, run_demo_gaming_workflow
+from creatoros.providers import get_provider_registry
+from creatoros.providers.mock import create_mock_provider_registry
+from creatoros.workflows import (
+    WorkflowExecution,
+    WorkflowExecutionStatus,
+    WorkflowRuntime,
+    get_allowed_transitions,
+)
+
+EXIT_SUCCESS = 0
+EXIT_UNEXPECTED_FAILURE = 1
+EXIT_USAGE_ERROR = 2
+EXIT_CONFIGURATION_ERROR = 3
+EXIT_RESOURCE_UNAVAILABLE = 4
+
+
+class _FallbackLogger:
+    """Minimal no-op logger used when structured logging cannot be configured."""
+
+    def info(self, event: str, **kwargs: object) -> None:
+        """Ignore info log calls when structured logging is unavailable."""
+
+        del event, kwargs
+
+    def error(self, event: str, **kwargs: object) -> None:
+        """Ignore error log calls when structured logging is unavailable."""
+
+        del event, kwargs
+
+    def exception(self, event: str, **kwargs: object) -> None:
+        """Ignore exception log calls when structured logging is unavailable."""
+
+        del event, kwargs
+
+
+@dataclass(slots=True)
+class DatabaseSummary:
+    """Safe database summary fields extracted from a database URL."""
+
+    driver: str = "unknown"
+    host: str = "unknown"
+    name: str = "unknown"
+
+
+def main(argv: list[str] | None = None) -> int:
+    """Parse CLI arguments, execute the requested command, and return an exit code."""
+
+    return _run_cli(argv=argv, stdout=sys.stdout, stderr=sys.stderr)
+
+
+def _run_cli(
+    *,
+    argv: list[str] | None,
+    stdout: TextIO,
+    stderr: TextIO,
+) -> int:
+    """Execute the CLI using explicit output streams."""
+
+    parser = _build_parser()
+
+    try:
+        with redirect_stdout(stdout), redirect_stderr(stderr):
+            args = parser.parse_args(argv)
+    except SystemExit as error:
+        return _normalize_system_exit_code(error.code)
+
+    if args.command_group is None:
+        _write_output(stdout, parser.format_help().rstrip())
+        return EXIT_SUCCESS
+
+    logger: object
+    try:
+        configure_logging()
+        if args.debug:
+            logging.getLogger("creatoros").setLevel(logging.DEBUG)
+        logger = get_logger("cli")
+    except (ConfigurationError, CreatorOSValidationError, ValidationError):
+        logger = _FallbackLogger()
+        if args.command_group == "config":
+            pass
+
+    logger.info(
+        "cli_command_started",
+        command_group=args.command_group,
+        command_name=args.command_name,
+    )
+
+    try:
+        exit_code = args.handler(args, stdout=stdout, stderr=stderr)
+        logger.info(
+            "cli_command_completed",
+            command_group=args.command_group,
+            command_name=args.command_name,
+            exit_code=exit_code,
+        )
+        return exit_code
+    except (ProviderNotFoundError, ProviderUnavailableError) as error:
+        logger.error(
+            "cli_command_failed",
+            command_group=args.command_group,
+            command_name=args.command_name,
+            exit_code=EXIT_RESOURCE_UNAVAILABLE,
+            error_type=type(error).__name__,
+            error_code=error.code,
+        )
+        _write_error(stderr, f"Error: {error}")
+        return EXIT_RESOURCE_UNAVAILABLE
+    except (ConfigurationError, CreatorOSValidationError, ValidationError) as error:
+        logger.error(
+            "cli_command_failed",
+            command_group=args.command_group,
+            command_name=args.command_name,
+            exit_code=EXIT_CONFIGURATION_ERROR,
+            error_type=type(error).__name__,
+            error_code=getattr(error, "code", None),
+        )
+        if isinstance(error, ValidationError):
+            _write_error(stderr, "Error: Configuration is invalid.")
+        else:
+            _write_error(stderr, f"Error: {error}")
+        return EXIT_CONFIGURATION_ERROR
+    except CreatorOSError as error:
+        logger.error(
+            "cli_command_failed",
+            command_group=args.command_group,
+            command_name=args.command_name,
+            exit_code=EXIT_UNEXPECTED_FAILURE,
+            error_type=type(error).__name__,
+            error_code=error.code,
+        )
+        _write_error(stderr, f"Error: {error}")
+        return EXIT_UNEXPECTED_FAILURE
+    except Exception:
+        if args.debug:
+            logger.exception(
+                "cli_command_failed",
+                command_group=args.command_group,
+                command_name=args.command_name,
+                exit_code=EXIT_UNEXPECTED_FAILURE,
+                error_type="unexpected_exception",
+                error_code=None,
+            )
+        else:
+            logger.error(
+                "cli_command_failed",
+                command_group=args.command_group,
+                command_name=args.command_name,
+                exit_code=EXIT_UNEXPECTED_FAILURE,
+                error_type="unexpected_exception",
+                error_code=None,
+            )
+        _write_error(stderr, "Error: An unexpected application failure occurred.")
+        return EXIT_UNEXPECTED_FAILURE
+
+
+def _build_parser() -> argparse.ArgumentParser:
+    """Create the top-level argparse parser and its command tree."""
+
+    parser = argparse.ArgumentParser(
+        prog="creatoros",
+        description="CreatorOS command-line interface.",
+    )
+    parser.add_argument("--debug", action="store_true", help="Enable debug logging for this invocation.")
+    parser.add_argument("--version", action="version", version=f"CreatorOS {__version__}")
+    parser.set_defaults(command_group=None, command_name=None, handler=None)
+
+    subparsers = parser.add_subparsers(dest="command_group")
+
+    config_parser = subparsers.add_parser("config", help="Inspect and validate configuration.")
+    config_subparsers = config_parser.add_subparsers(dest="command_name")
+
+    config_validate = config_subparsers.add_parser("validate", help="Validate the current configuration.")
+    config_validate.set_defaults(
+        command_group="config",
+        command_name="validate",
+        handler=_handle_config_validate,
+    )
+
+    config_show = config_subparsers.add_parser("show", help="Show a safe configuration summary.")
+    config_show.set_defaults(
+        command_group="config",
+        command_name="show",
+        handler=_handle_config_show,
+    )
+
+    providers_parser = subparsers.add_parser("providers", help="Inspect registered providers.")
+    providers_subparsers = providers_parser.add_subparsers(dest="command_name")
+
+    providers_list = providers_subparsers.add_parser("list", help="List registered providers.")
+    providers_list.add_argument("--mock", action="store_true", help="Use a fresh mock provider registry.")
+    providers_list.set_defaults(
+        command_group="providers",
+        command_name="list",
+        handler=_handle_providers_list,
+    )
+
+    providers_health = providers_subparsers.add_parser("health", help="Run provider health checks.")
+    providers_health.add_argument("--mock", action="store_true", help="Use a fresh mock provider registry.")
+    providers_health.set_defaults(
+        command_group="providers",
+        command_name="health",
+        handler=_handle_providers_health,
+    )
+
+    workflows_parser = subparsers.add_parser("workflows", help="Inspect workflow foundations.")
+    workflows_subparsers = workflows_parser.add_subparsers(dest="command_name")
+
+    workflows_transitions = workflows_subparsers.add_parser(
+        "transitions",
+        help="Show allowed transitions for a workflow execution status.",
+    )
+    workflows_transitions.add_argument(
+        "status",
+        choices=sorted(status.value for status in WorkflowExecutionStatus),
+        help="Workflow execution status to inspect.",
+    )
+    workflows_transitions.set_defaults(
+        command_group="workflows",
+        command_name="transitions",
+        handler=_handle_workflow_transitions,
+    )
+
+    workflows_demo = workflows_subparsers.add_parser(
+        "demo-state",
+        help="Demonstrate workflow state management only.",
+    )
+    workflows_demo.set_defaults(
+        command_group="workflows",
+        command_name="demo-state",
+        handler=_handle_workflow_demo_state,
+    )
+
+    run_parser = subparsers.add_parser("run", help="Run deterministic local demo workflows.")
+    run_subparsers = run_parser.add_subparsers(dest="command_name")
+
+    run_gaming = run_subparsers.add_parser(
+        "gaming",
+        help="Run the first executable deterministic demo gaming workflow.",
+    )
+    run_gaming.add_argument("--game", default="Minecraft", help="Game name for the local demo workflow.")
+    run_gaming.add_argument("--topic", default="gaming facts", help="Topic for the local demo workflow.")
+    run_gaming.add_argument(
+        "--platform",
+        default=ContentPlatform.YOUTUBE_SHORTS.value,
+        choices=sorted(platform.value for platform in ContentPlatform),
+        help="Publishing platform for the local demo workflow.",
+    )
+    run_gaming.add_argument(
+        "--approve",
+        action="store_true",
+        help="Approve mock publishing so the local demo completes publishing.",
+    )
+    run_gaming.set_defaults(
+        command_group="run",
+        command_name="gaming",
+        handler=_handle_run_gaming,
+    )
+
+    return parser
+
+
+def _handle_config_validate(
+    args: argparse.Namespace,
+    *,
+    stdout: TextIO,
+    stderr: TextIO,
+) -> int:
+    """Validate configuration without touching external systems."""
+
+    del args, stderr
+    settings = get_settings()
+    _write_output(stdout, "Configuration is valid.")
+    _write_rows(
+        stdout,
+        [
+            ("application_name", settings.app_name),
+            ("environment", settings.app_env),
+            ("log_level", settings.log_level),
+            ("default_llm_provider", settings.default_llm_provider),
+        ],
+    )
+    return EXIT_SUCCESS
+
+
+def _handle_config_show(
+    args: argparse.Namespace,
+    *,
+    stdout: TextIO,
+    stderr: TextIO,
+) -> int:
+    """Display a safe configuration summary without exposing secrets."""
+
+    del args, stderr
+    summary = build_safe_config_summary()
+    _write_rows(stdout, list(summary.items()))
+    return EXIT_SUCCESS
+
+
+def _handle_providers_list(
+    args: argparse.Namespace,
+    *,
+    stdout: TextIO,
+    stderr: TextIO,
+) -> int:
+    """List registered providers from the selected registry."""
+
+    del stderr
+    registry = _resolve_registry(use_mock=args.mock)
+    providers = registry.list_providers()
+    if not providers:
+        _write_output(stdout, "No providers registered.")
+        return EXIT_SUCCESS
+
+    _write_output(stdout, "provider_type | name | version | capabilities")
+    for provider in providers:
+        _write_provider_row(stdout, provider_type=provider.provider_type, name=provider.name, version=provider.version or "unknown", capabilities=sorted(capability.value for capability in provider.capabilities))
+    return EXIT_SUCCESS
+
+
+def _handle_providers_health(
+    args: argparse.Namespace,
+    *,
+    stdout: TextIO,
+    stderr: TextIO,
+) -> int:
+    """Run health checks for all providers in the selected registry."""
+
+    del stderr
+    registry = _resolve_registry(use_mock=args.mock)
+    providers = registry.list_providers()
+    if not providers:
+        _write_output(stdout, "No providers registered.")
+        return EXIT_SUCCESS
+
+    results = asyncio.run(_collect_provider_health(registry))
+    all_healthy = True
+    for provider_type, name, status in results:
+        _write_output(stdout, f"{provider_type}/{name}: {status}")
+        if status != "healthy":
+            all_healthy = False
+
+    return EXIT_SUCCESS if all_healthy else EXIT_RESOURCE_UNAVAILABLE
+
+
+async def _collect_provider_health(
+    registry,
+) -> list[tuple[str, str, str]]:
+    """Collect provider health states from a registry without exposing raw errors."""
+
+    results: list[tuple[str, str, str]] = []
+    for provider_info in registry.list_providers():
+        provider = registry.get(provider_info.provider_type, provider_info.name)
+        try:
+            is_healthy = await provider.health_check()
+        except CreatorOSError:
+            status = "error"
+        except Exception:  # noqa: BLE001
+            status = "error"
+        else:
+            status = "healthy" if is_healthy else "unhealthy"
+        results.append((provider_info.provider_type, provider_info.name, status))
+    return results
+
+
+def _handle_workflow_transitions(
+    args: argparse.Namespace,
+    *,
+    stdout: TextIO,
+    stderr: TextIO,
+) -> int:
+    """Display allowed next workflow statuses for the supplied status."""
+
+    del stderr
+    status = WorkflowExecutionStatus(args.status)
+    transitions = sorted(target.value for target in get_allowed_transitions(status))
+    if not transitions:
+        _write_output(stdout, "No transitions allowed.")
+        return EXIT_SUCCESS
+
+    _write_output(stdout, f"Allowed transitions for {status.value}:")
+    for transition in transitions:
+        _write_output(stdout, transition)
+    return EXIT_SUCCESS
+
+
+def _handle_workflow_demo_state(
+    args: argparse.Namespace,
+    *,
+    stdout: TextIO,
+    stderr: TextIO,
+) -> int:
+    """Demonstrate workflow runtime state changes only."""
+
+    del args, stderr
+    execution = WorkflowExecution(workflow_id="demo_workflow", workflow_version=1, job_id="demo_job")
+    runtime = WorkflowRuntime(execution)
+    runtime.start()
+    runtime.record_step_started("demo_step")
+    runtime.record_step_completed("demo_step")
+    final_execution = runtime.complete()
+
+    _write_rows(
+        stdout,
+        [
+            ("execution_id", final_execution.id),
+            ("final_status", final_execution.status.value),
+            ("recorded_events", len(runtime.events)),
+        ],
+    )
+    return EXIT_SUCCESS
+
+
+def _handle_run_gaming(
+    args: argparse.Namespace,
+    *,
+    stdout: TextIO,
+    stderr: TextIO,
+) -> int:
+    """Run the deterministic local demo gaming workflow with mock providers only."""
+
+    del stderr
+    workflow_input = GamingWorkflowInput(
+        game=args.game,
+        topic=args.topic,
+        platform=ContentPlatform(args.platform),
+        approve_publish=args.approve,
+    )
+    result = asyncio.run(
+        run_demo_gaming_workflow(
+            workflow_input,
+            provider_registry=create_mock_provider_registry(),
+        )
+    )
+
+    rows: list[tuple[str, object]] = [
+        ("workflow", "local deterministic demo"),
+        ("execution_id", result.execution.id),
+        ("final_status", result.execution.status.value),
+        ("selected_opportunity", result.opportunity.title),
+        ("script_title", result.script.title),
+        ("storyboard_scenes", len(result.storyboard.scenes)),
+        ("generated_assets", len(result.generated_assets)),
+    ]
+
+    if result.approval_request is not None and not workflow_input.approve_publish:
+        rows.append(("approval_request_id", result.approval_request.id))
+        rows.append(("published", False))
+    else:
+        rows.append(("published", result.published_post is not None))
+        if result.published_post is not None:
+            rows.append(("published_post_id", result.published_post.id))
+            rows.append(("published_url", result.published_post.url))
+
+    _write_rows(stdout, rows)
+    return EXIT_SUCCESS
+
+
+def build_safe_config_summary() -> dict[str, object]:
+    """Return a safe configuration summary without secrets or raw connection strings."""
+
+    settings = get_settings()
+    database_summary = _parse_database_summary(settings.database_url)
+    return {
+        "app_name": settings.app_name,
+        "app_env": settings.app_env,
+        "debug": settings.debug,
+        "log_level": settings.log_level,
+        "database_driver": database_summary.driver,
+        "database_host": database_summary.host,
+        "database_name": database_summary.name,
+        "default_llm_provider": settings.default_llm_provider,
+        "provider_timeout_seconds": settings.provider_timeout_seconds,
+        "provider_max_retries": settings.provider_max_retries,
+        "assets_dir": str(settings.assets_dir),
+        "logs_dir": str(settings.logs_dir),
+        "prompts_dir": str(settings.prompts_dir),
+        "openai_configured": _is_configured(settings.openai_api_key),
+        "anthropic_configured": _is_configured(settings.anthropic_api_key),
+        "youtube_configured": _is_configured(settings.youtube_client_id) and _is_configured(settings.youtube_client_secret),
+    }
+
+
+def _parse_database_summary(database_url: str) -> DatabaseSummary:
+    """Extract safe database driver, host, and database name values from a URL."""
+
+    try:
+        parsed = urlsplit(database_url)
+    except ValueError:
+        return DatabaseSummary()
+
+    if not parsed.scheme:
+        return DatabaseSummary()
+
+    database_name = parsed.path.lstrip("/").split("/")[-1] if parsed.path else "unknown"
+    if not database_name:
+        database_name = "unknown"
+
+    host = parsed.hostname or "unknown"
+    return DatabaseSummary(driver=parsed.scheme, host=host, name=database_name)
+
+
+def _is_configured(value: str | None) -> bool:
+    """Return whether an optional credential value is configured."""
+
+    return value is not None and bool(value.strip())
+
+
+def _resolve_registry(*, use_mock: bool):
+    """Return the requested provider registry without mutating cached application state."""
+
+    if use_mock:
+        return create_mock_provider_registry()
+    return get_provider_registry()
+
+
+def _write_output(stream: TextIO, text: str) -> None:
+    """Write a single line of normal CLI output."""
+
+    stream.write(f"{text}\n")
+
+
+def _write_error(stream: TextIO, text: str) -> None:
+    """Write a single line of CLI error output."""
+
+    stream.write(f"{text}\n")
+
+
+def _write_rows(stream: TextIO, rows: list[tuple[str, object]]) -> None:
+    """Render a plain-text list of key-value rows."""
+
+    for key, value in rows:
+        _write_output(stream, f"{key}: {_format_value(value)}")
+
+
+def _write_provider_row(
+    stream: TextIO,
+    *,
+    provider_type: str,
+    name: str,
+    version: str,
+    capabilities: list[str],
+) -> None:
+    """Render one provider row in a predictable plain-text layout."""
+
+    capability_text = ", ".join(capabilities)
+    _write_output(stream, f"{provider_type} | {name} | {version} | {capability_text}")
+
+
+def _format_value(value: object) -> str:
+    """Render a value safely for plain-text CLI output."""
+
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    return str(value)
+
+
+def _normalize_system_exit_code(code: object) -> int:
+    """Normalize argparse/SystemExit codes to a stable integer exit code."""
+
+    if code is None:
+        return EXIT_SUCCESS
+    if isinstance(code, int):
+        return code
+    return EXIT_USAGE_ERROR

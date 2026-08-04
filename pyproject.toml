@@ -19,6 +19,9 @@ dependencies = [
     "httpx>=0.28"
 ]
 
+[project.scripts]
+creatoros = "creatoros.cli:main"
+
 [project.optional-dependencies]
 dev = [
     "pytest>=8.4",

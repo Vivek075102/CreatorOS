@@ -1,0 +1,265 @@
+"""Unit tests for CreatorOS provider protocols."""
+
+from __future__ import annotations
+
+from pydantic import BaseModel
+
+from creatoros.domain import (
+    AssetType,
+    ContentPlatform,
+    GeneratedAsset,
+    NarrationTrack,
+    PerformanceReport,
+    PublishedPost,
+    PublishingPackage,
+)
+from creatoros.providers import (
+    AnalyticsProvider,
+    ImageProvider,
+    LLMProvider,
+    Provider,
+    ProviderCapability,
+    ProviderInfo,
+    ProviderResult,
+    PublishingProvider,
+    SearchProvider,
+    StorageProvider,
+    TrendProvider,
+    VideoProvider,
+    VoiceProvider,
+)
+
+
+def build_provider_info(capability: ProviderCapability) -> ProviderInfo:
+    """Create provider metadata for protocol fakes."""
+
+    return ProviderInfo(name="Fake Provider", provider_type="test", capabilities={capability})
+
+
+class StructuredOutput(BaseModel):
+    """Structured response model used for protocol compatibility tests."""
+
+    summary: str
+
+
+class FakeProvider:
+    """Minimal fake object satisfying the base Provider protocol."""
+
+    @property
+    def info(self) -> ProviderInfo:
+        return build_provider_info(ProviderCapability.TEXT_GENERATION)
+
+    async def health_check(self) -> bool:
+        return True
+
+
+class FakeLLMProvider(FakeProvider):
+    """Minimal fake object satisfying the LLMProvider protocol."""
+
+    async def generate_text(self, prompt: str, *, context=None) -> ProviderResult[str]:
+        return ProviderResult[str](data=prompt, provider=self.info)
+
+    async def generate_structured(
+        self,
+        prompt: str,
+        *,
+        response_model: type[StructuredOutput],
+        context=None,
+    ) -> ProviderResult[StructuredOutput]:
+        return ProviderResult[StructuredOutput](
+            data=response_model(summary=prompt),
+            provider=self.info,
+        )
+
+
+class FakeTrendProvider(FakeProvider):
+    """Minimal fake object satisfying the TrendProvider protocol."""
+
+    @property
+    def info(self) -> ProviderInfo:
+        return build_provider_info(ProviderCapability.TREND_RESEARCH)
+
+    async def research_trends(self, query: str, *, context=None) -> ProviderResult[list[dict[str, object]]]:
+        return ProviderResult[list[dict[str, object]]](data=[{"query": query}], provider=self.info)
+
+
+class FakeSearchProvider(FakeProvider):
+    """Minimal fake object satisfying the SearchProvider protocol."""
+
+    @property
+    def info(self) -> ProviderInfo:
+        return build_provider_info(ProviderCapability.WEB_SEARCH)
+
+    async def search(
+        self,
+        query: str,
+        *,
+        limit: int = 10,
+        context=None,
+    ) -> ProviderResult[list[dict[str, object]]]:
+        return ProviderResult[list[dict[str, object]]](data=[{"query": query, "limit": limit}], provider=self.info)
+
+
+class FakeImageProvider(FakeProvider):
+    """Minimal fake object satisfying the ImageProvider protocol."""
+
+    @property
+    def info(self) -> ProviderInfo:
+        return build_provider_info(ProviderCapability.IMAGE_GENERATION)
+
+    async def generate_image(self, prompt: str, *, context=None) -> ProviderResult[GeneratedAsset]:
+        return ProviderResult[GeneratedAsset](
+            data=GeneratedAsset(asset_type=AssetType.IMAGE, uri=f"https://example.com/{prompt}.png"),
+            provider=self.info,
+        )
+
+
+class FakeVideoProvider(FakeProvider):
+    """Minimal fake object satisfying the VideoProvider protocol."""
+
+    @property
+    def info(self) -> ProviderInfo:
+        return build_provider_info(ProviderCapability.VIDEO_GENERATION)
+
+    async def generate_video(self, prompt: str, *, context=None) -> ProviderResult[GeneratedAsset]:
+        return ProviderResult[GeneratedAsset](
+            data=GeneratedAsset(asset_type=AssetType.VIDEO, uri=f"https://example.com/{prompt}.mp4"),
+            provider=self.info,
+        )
+
+
+class FakeVoiceProvider(FakeProvider):
+    """Minimal fake object satisfying the VoiceProvider protocol."""
+
+    @property
+    def info(self) -> ProviderInfo:
+        return build_provider_info(ProviderCapability.VOICE_GENERATION)
+
+    async def generate_voice(self, text: str, *, context=None) -> ProviderResult[NarrationTrack]:
+        return ProviderResult[NarrationTrack](
+            data=NarrationTrack(uri="https://example.com/audio.mp3", duration_seconds=5.0),
+            provider=self.info,
+        )
+
+
+class FakeStorageProvider(FakeProvider):
+    """Minimal fake object satisfying the StorageProvider protocol."""
+
+    @property
+    def info(self) -> ProviderInfo:
+        return build_provider_info(ProviderCapability.STORAGE)
+
+    async def store(self, asset: GeneratedAsset, *, context=None) -> ProviderResult[GeneratedAsset]:
+        return ProviderResult[GeneratedAsset](data=asset, provider=self.info)
+
+    async def delete(self, asset_id: str, *, context=None) -> ProviderResult[bool]:
+        return ProviderResult[bool](data=bool(asset_id), provider=self.info)
+
+
+class FakePublishingProvider(FakeProvider):
+    """Minimal fake object satisfying the PublishingProvider protocol."""
+
+    @property
+    def info(self) -> ProviderInfo:
+        return build_provider_info(ProviderCapability.PUBLISHING)
+
+    async def publish(self, package: PublishingPackage, *, context=None) -> ProviderResult[PublishedPost]:
+        return ProviderResult[PublishedPost](
+            data=PublishedPost(
+                platform=package.platform,
+                external_id="external_123",
+                url="https://example.com/post/external_123",
+            ),
+            provider=self.info,
+        )
+
+    async def get_status(self, external_id: str, *, context=None) -> ProviderResult[str]:
+        return ProviderResult[str](data=f"status:{external_id}", provider=self.info)
+
+
+class FakeAnalyticsProvider(FakeProvider):
+    """Minimal fake object satisfying the AnalyticsProvider protocol."""
+
+    @property
+    def info(self) -> ProviderInfo:
+        return build_provider_info(ProviderCapability.ANALYTICS)
+
+    async def fetch_performance(self, post: PublishedPost, *, context=None) -> ProviderResult[PerformanceReport]:
+        return ProviderResult[PerformanceReport](
+            data=PerformanceReport(post_id=post.id, metrics={"views": 100}),
+            provider=self.info,
+        )
+
+
+def test_provider_protocol_is_runtime_checkable() -> None:
+    """A minimal structural provider should satisfy the Provider protocol."""
+
+    assert isinstance(FakeProvider(), Provider)
+
+
+def test_llm_provider_protocol_accepts_minimal_fake() -> None:
+    """A minimal structural LLM provider should satisfy the protocol."""
+
+    assert isinstance(FakeLLMProvider(), LLMProvider)
+
+
+def test_trend_provider_protocol_accepts_minimal_fake() -> None:
+    """A minimal structural trend provider should satisfy the protocol."""
+
+    assert isinstance(FakeTrendProvider(), TrendProvider)
+
+
+def test_search_provider_protocol_accepts_minimal_fake() -> None:
+    """A minimal structural search provider should satisfy the protocol."""
+
+    assert isinstance(FakeSearchProvider(), SearchProvider)
+
+
+def test_image_provider_protocol_accepts_minimal_fake() -> None:
+    """A minimal structural image provider should satisfy the protocol."""
+
+    assert isinstance(FakeImageProvider(), ImageProvider)
+
+
+def test_video_provider_protocol_accepts_minimal_fake() -> None:
+    """A minimal structural video provider should satisfy the protocol."""
+
+    assert isinstance(FakeVideoProvider(), VideoProvider)
+
+
+def test_voice_provider_protocol_accepts_minimal_fake() -> None:
+    """A minimal structural voice provider should satisfy the protocol."""
+
+    assert isinstance(FakeVoiceProvider(), VoiceProvider)
+
+
+def test_storage_provider_protocol_accepts_minimal_fake() -> None:
+    """A minimal structural storage provider should satisfy the protocol."""
+
+    assert isinstance(FakeStorageProvider(), StorageProvider)
+
+
+def test_publishing_provider_protocol_accepts_minimal_fake() -> None:
+    """A minimal structural publishing provider should satisfy the protocol."""
+
+    assert isinstance(FakePublishingProvider(), PublishingProvider)
+
+
+def test_analytics_provider_protocol_accepts_minimal_fake() -> None:
+    """A minimal structural analytics provider should satisfy the protocol."""
+
+    assert isinstance(FakeAnalyticsProvider(), AnalyticsProvider)
+
+
+def test_protocols_do_not_require_vendor_sdk_types() -> None:
+    """Provider protocols should remain satisfiable with plain Python and project types."""
+
+    package = PublishingPackage(
+        platform=ContentPlatform.YOUTUBE_SHORTS,
+        title="Boss Guide",
+        description="Fast strategy breakdown.",
+    )
+
+    assert isinstance(FakeLLMProvider(), Provider)
+    assert isinstance(FakePublishingProvider(), Provider)
+    assert package.platform is ContentPlatform.YOUTUBE_SHORTS
