@@ -86,3 +86,4 @@ Describe how the decision may evolve, what would trigger reconsideration, and wh
 | ADR-003 | Provider Pattern | Accepted | Requires provider abstractions instead of direct vendor coupling to preserve replaceability, testing flexibility, and long-term maintainability. |
 | ADR-004 | Human Approval and Level 4 Automation | Accepted | Selects Level 4 automation as the target operating model to preserve human oversight and controlled publishing. |
 | ADR-005 | Python Platform Stack | Accepted | Selects Python, PostgreSQL, SQLAlchemy, Alembic, and Pydantic as the foundational implementation stack for CreatorOS. |
+| ADR-006 | Prompt Assets and Registry | Accepted | Treats prompts as versioned, provider-independent application assets loaded through validated contracts and resolved through a registry. |

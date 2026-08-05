@@ -178,6 +178,20 @@ Generates titles, descriptions, hashtags, thumbnail concepts, and publishing met
 
 Evaluates generated outputs against configurable content, safety, branding, and production standards.
 
+### Prompt Assets
+
+Prompt definitions are version-controlled application assets rather than hidden strings inside provider adapters. They should be organized by engine and purpose, validated through typed contracts, and rendered through a dedicated prompt subsystem before any provider request is made.
+
+The prompt subsystem is responsible for:
+
+- Prompt definition contracts
+- Prompt variable validation
+- Prompt rendering
+- Prompt registration and lookup
+- Prompt asset loading
+
+Prompt rendering belongs above the provider layer. Providers may adapt the rendered output to vendor-specific request formats, but they must not own the underlying task definition or prompt asset lifecycle.
+
 An engine may internally coordinate focused agents, helper modules, or provider calls. External components should interact with the engine through a stable interface rather than reaching into its internal implementation details.
 
 ## 8. Content Domain Layer
@@ -285,6 +299,8 @@ Stable internal interfaces should include types such as:
 - `AnalyticsProvider`
 
 Providers translate between CreatorOS domain contracts and external APIs. No domain engine should depend directly on OpenAI, Anthropic, Google, YouTube, ElevenLabs, or any other concrete service.
+
+Prompts must remain provider-independent at the architecture level. A rendered prompt may later be passed to an `LLMProvider`, but prompt definitions, validation rules, and asset organization belong to CreatorOS rather than to any vendor SDK or provider implementation.
 
 ## 13. Provider Selection and Routing
 
@@ -482,6 +498,7 @@ creatoros/
     config/
     core/
     domain/
+    prompts/
     application/
     agents/
     engines/
@@ -506,6 +523,8 @@ workflows/
 Existing top-level prototype folders may be consolidated gradually and safely rather than moved without a migration plan. Architectural clarity matters, but stability during refactoring matters as well.
 
 The intended persistence stack for CreatorOS is PostgreSQL, SQLAlchemy 2.x, Alembic, and Pydantic models at validation boundaries. This describes the selected architectural direction, not a claim that the full persistence schema or migration system is already implemented in the current repository.
+
+The initial prompt foundation should treat prompt definitions as validated JSON assets loaded from the configured prompts directory, registered through a platform-owned registry, and rendered through explicit typed variables. Broader asset formats or remote prompt management may be considered later only if they preserve the same architectural boundaries.
 
 ## 24. Testing Architecture
 

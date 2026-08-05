@@ -139,6 +139,7 @@ Build the Research Engine and Opportunity Engine capabilities required to gather
 - Research Engine foundation
 - Trend and research provider adapters
 - Normalized research signal models
+- Prompt system foundation with provider-independent prompt contracts, validation, rendering, registry, and loader components
 - Opportunity scoring rules and ranking pipeline
 - Research result persistence
 - Approval-ready content opportunity outputs
@@ -162,6 +163,7 @@ Build the Research Engine and Opportunity Engine capabilities required to gather
 
 - CreatorOS can ingest research data from one or more providers through abstractions
 - Research signals are normalized into platform-owned domain contracts
+- Prompt assets can be loaded, validated, registered, and rendered through platform-owned contracts
 - Content opportunities can be ranked using explicit rules
 - Research workflows produce auditable structured outputs that can feed downstream content generation
 

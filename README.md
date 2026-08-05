@@ -49,3 +49,14 @@ This workflow uses local deterministic mock providers only.
 It performs no real trend research, creates no real media, and publishes only to a mock publishing provider.
 Without `--approve`, it stops at the publishing approval gate.
 Real provider integrations belong to later milestones.
+
+## Prompt Foundation
+
+CreatorOS now includes a provider-independent prompt-system foundation under `creatoros/prompts`.
+
+- Prompt definitions are validated through typed Pydantic contracts.
+- Prompt rendering uses explicit variables rather than ad hoc string assembly.
+- Prompt definitions can be registered and resolved through a platform-owned registry.
+- Prompt assets can be loaded from the configured prompts directory as validated JSON files.
+
+This foundation does not claim that production prompt catalogs, real LLM workflows, or remote prompt management are already complete. It establishes the architectural base for those later milestones.

@@ -176,6 +176,7 @@ Additional mandatory rules:
 - `print` statements are prohibited in production modules.
 - Secrets must never appear in logs.
 - Full provider payloads must not be logged unless explicitly sanitized.
+- Full rendered prompt contents should not be logged by default.
 - Exceptions should preserve useful context.
 - Logging failures must not hide the original error.
 
@@ -269,6 +270,7 @@ The following rules are mandatory:
 
 - Prompts must be stored outside provider adapters.
 - Prompt templates must be organized by engine and purpose.
+- Prompt definitions must remain provider-independent.
 - Required inputs must be clear.
 - Expected outputs should be structured.
 - Behavior-changing prompt revisions should have versioning or change history.
@@ -277,6 +279,8 @@ The following rules are mandatory:
 - Provider-specific formatting must remain isolated from the underlying task definition.
 - Prompt changes must be reviewed like code changes.
 - Production prompts must not be silently rewritten by analytics.
+- Prompt assets loaded from disk must be validated before use.
+- Initial prompt asset loading should use JSON files through the platform prompt loader unless a later ADR defines an expanded format strategy.
 
 Prompt engineering is part of system design and must be handled with the same care as source code.
 

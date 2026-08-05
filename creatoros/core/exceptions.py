@@ -216,6 +216,63 @@ class AssetError(ApplicationError):
     """Raised for asset-related failures."""
 
 
+class PromptError(ApplicationError):
+    """Raised for prompt-system execution failures."""
+
+
+class PromptRegistryError(PromptError):
+    """Raised when prompt registry operations fail."""
+
+
+class PromptAlreadyRegisteredError(PromptRegistryError):
+    """Raised when a prompt definition is already registered."""
+
+    def __init__(self, name: str, version: int) -> None:
+        super().__init__(
+            f"Prompt '{name}' is already registered for version '{version}'",
+            code="prompt_already_registered",
+            details={"prompt_name": name.strip(), "prompt_version": version},
+        )
+
+
+class PromptNotFoundError(PromptRegistryError):
+    """Raised when a requested prompt definition cannot be found."""
+
+    def __init__(
+        self,
+        name: str,
+        version: int | None,
+        *,
+        active_only: bool = False,
+    ) -> None:
+        if version is None and active_only:
+            message = f"No active prompt was found for name '{name}'"
+        elif version is None:
+            message = f"Prompt '{name}' was not found"
+        else:
+            message = f"Prompt '{name}' was not found for version '{version}'"
+
+        details: dict[str, object] = {"prompt_name": name.strip()}
+        if version is not None:
+            details["prompt_version"] = version
+        if active_only:
+            details["active_only"] = True
+
+        super().__init__(
+            message,
+            code="prompt_not_found",
+            details=details,
+        )
+
+
+class PromptLoadError(PromptError):
+    """Raised when loading prompt definitions from the filesystem fails."""
+
+
+class PromptRenderError(PromptError):
+    """Raised when prompt rendering fails for non-validation reasons."""
+
+
 def wrap_exception(
     error: Exception,
     *,
