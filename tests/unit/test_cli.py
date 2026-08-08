@@ -4,13 +4,21 @@ from __future__ import annotations
 
 import io
 import runpy
+import shutil
 from dataclasses import dataclass
+from pathlib import Path
 
 import pytest
 
 from creatoros import __version__, cli
 from creatoros.config import get_settings
 from creatoros.core import ConfigurationError, ProviderNotFoundError
+from creatoros.prompts import (
+    PromptAssetDiscovery,
+    PromptAssetManifest,
+    PromptManifestLoader,
+    create_builtin_prompt_registry,
+)
 from creatoros.providers import create_provider_registry
 
 
@@ -111,6 +119,16 @@ def test_help_displays_run_command(cli_module) -> None:
 
     assert exit_code == 0
     assert "run" in stdout
+    assert stderr == ""
+
+
+def test_help_displays_prompts_command(cli_module) -> None:
+    """Top-level help should include prompt asset commands."""
+
+    exit_code, stdout, stderr = run_cli(cli_module, ["--help"])
+
+    assert exit_code == 0
+    assert "prompts" in stdout
     assert stderr == ""
 
 
@@ -430,6 +448,333 @@ def test_run_gaming_accepts_explicit_game_and_topic(cli_module) -> None:
     assert "Elden Ring" not in stdout
 
 
+def test_prompts_manifest_show_reports_schema_version_and_zero_entries(
+    cli_module,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Prompt manifest show should report schema version and entry count."""
+
+    _create_empty_prompt_structure(tmp_path)
+    monkeypatch.setattr(cli_module, "PromptManifestLoader", lambda: PromptManifestLoader(base_dir=tmp_path))
+
+    exit_code, stdout, stderr = run_cli(cli_module, ["prompts", "manifest", "show"])
+
+    assert exit_code == 0
+    assert "schema_version: 1" in stdout
+    assert "entries: 0" in stdout
+    assert stderr == ""
+
+
+def test_prompts_manifest_validate_succeeds_for_initial_empty_structure(
+    cli_module,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Prompt manifest validation should succeed for the empty initial structure."""
+
+    _create_empty_prompt_structure(tmp_path)
+    monkeypatch.setattr(cli_module, "PromptManifestLoader", lambda: PromptManifestLoader(base_dir=tmp_path))
+    monkeypatch.setattr(cli_module, "PromptAssetDiscovery", lambda: PromptAssetDiscovery(base_dir=tmp_path))
+
+    exit_code, stdout, stderr = run_cli(cli_module, ["prompts", "manifest", "validate"])
+
+    assert exit_code == 0
+    assert "Prompt manifest is valid." in stdout
+    assert "entries: 0" in stdout
+    assert stderr == ""
+
+
+def test_prompts_discover_reports_zero_assets_initially(
+    cli_module,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Prompt discovery should succeed with zero assets in the initial structure."""
+
+    _create_empty_prompt_structure(tmp_path)
+    monkeypatch.setattr(cli_module, "PromptAssetDiscovery", lambda: PromptAssetDiscovery(base_dir=tmp_path))
+
+    exit_code, stdout, stderr = run_cli(cli_module, ["prompts", "discover"])
+
+    assert exit_code == 0
+    assert stdout.strip() == "Discovered prompt assets: 0"
+    assert stderr == ""
+
+
+def test_prompts_cli_does_not_print_prompt_contents(
+    cli_module,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Prompt CLI commands should avoid printing prompt bodies."""
+
+    _create_empty_prompt_structure(tmp_path)
+    monkeypatch.setattr(cli_module, "PromptManifestLoader", lambda: PromptManifestLoader(base_dir=tmp_path))
+
+    exit_code, stdout, stderr = run_cli(cli_module, ["prompts", "manifest", "show"])
+
+    assert exit_code == 0
+    assert "You are a prompt." not in stdout
+    assert "sha256" not in stdout.casefold()
+    assert stderr == ""
+
+
+def test_prompts_list_shows_all_three_prompt_names(
+    cli_module,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Builtin prompt listing should show the three research prompt names."""
+
+    _copy_repo_prompt_structure(tmp_path)
+    monkeypatch.setattr(
+        cli_module,
+        "create_builtin_prompt_registry",
+        lambda: create_builtin_prompt_registry(base_dir=tmp_path),
+    )
+    monkeypatch.setattr(cli_module, "PromptManifestLoader", lambda: PromptManifestLoader(base_dir=tmp_path))
+
+    exit_code, stdout, stderr = run_cli(cli_module, ["prompts", "list"])
+
+    assert exit_code == 0
+    for prompt_name in [
+        "gaming_discover_trends",
+        "gaming_evaluate_opportunity",
+        "gaming_expand_keywords",
+    ]:
+        assert prompt_name in stdout
+    assert stderr == ""
+
+
+def test_prompts_list_does_not_print_prompt_contents(
+    cli_module,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Prompt listing should stay high-level and avoid body output."""
+
+    _copy_repo_prompt_structure(tmp_path)
+    monkeypatch.setattr(
+        cli_module,
+        "create_builtin_prompt_registry",
+        lambda: create_builtin_prompt_registry(base_dir=tmp_path),
+    )
+    monkeypatch.setattr(cli_module, "PromptManifestLoader", lambda: PromptManifestLoader(base_dir=tmp_path))
+
+    exit_code, stdout, _ = run_cli(cli_module, ["prompts", "list"])
+
+    assert exit_code == 0
+    assert "You are a gaming content research analyst." not in stdout
+    assert "OUTPUT FORMAT" not in stdout
+
+
+def test_prompts_render_gaming_discover_trends_succeeds(
+    cli_module,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Local prompt rendering should succeed for gaming_discover_trends."""
+
+    _copy_repo_prompt_structure(tmp_path)
+    monkeypatch.setattr(
+        cli_module,
+        "create_builtin_prompt_registry",
+        lambda: create_builtin_prompt_registry(base_dir=tmp_path),
+    )
+
+    exit_code, stdout, stderr = run_cli(cli_module, ["prompts", "render", "gaming_discover_trends"])
+
+    assert exit_code == 0
+    assert "prompt_name: gaming_discover_trends" in stdout
+    assert "prompt_version: 1" in stdout
+    assert "message_count:" in stdout
+    assert "variable_names:" in stdout
+    assert stderr == ""
+
+
+def test_default_render_does_not_print_full_content(
+    cli_module,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Default local rendering should avoid printing full prompt content."""
+
+    _copy_repo_prompt_structure(tmp_path)
+    monkeypatch.setattr(
+        cli_module,
+        "create_builtin_prompt_registry",
+        lambda: create_builtin_prompt_registry(base_dir=tmp_path),
+    )
+
+    exit_code, stdout, _ = run_cli(cli_module, ["prompts", "render", "gaming_discover_trends"])
+
+    assert exit_code == 0
+    assert "Rendered locally only." not in stdout
+    assert "RESEARCH_SIGNALS:" not in stdout
+    assert "WHY_NOW:" not in stdout
+
+
+def test_show_content_prints_rendered_content(
+    cli_module,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Explicit content display should print rendered prompt text."""
+
+    _copy_repo_prompt_structure(tmp_path)
+    monkeypatch.setattr(
+        cli_module,
+        "create_builtin_prompt_registry",
+        lambda: create_builtin_prompt_registry(base_dir=tmp_path),
+    )
+
+    exit_code, stdout, _ = run_cli(
+        cli_module,
+        ["prompts", "render", "gaming_discover_trends", "--show-content"],
+    )
+
+    assert exit_code == 0
+    assert "Rendered locally only. No provider call occurred." in stdout
+    assert "RESEARCH_SIGNALS:" in stdout
+    assert "WHY_NOW:" in stdout
+
+
+def test_custom_game_and_topic_values_are_reflected_when_content_is_shown(
+    cli_module,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Shown prompt content should reflect custom render inputs."""
+
+    _copy_repo_prompt_structure(tmp_path)
+    monkeypatch.setattr(
+        cli_module,
+        "create_builtin_prompt_registry",
+        lambda: create_builtin_prompt_registry(base_dir=tmp_path),
+    )
+
+    exit_code, stdout, _ = run_cli(
+        cli_module,
+        [
+            "prompts",
+            "render",
+            "gaming_discover_trends",
+            "--game",
+            "Roblox",
+            "--topic",
+            "funny myths",
+            "--signals",
+            "Players are discussing recurring myths about game mechanics.",
+            "--show-content",
+        ],
+    )
+
+    assert exit_code == 0
+    assert "GAME: Roblox" in stdout
+    assert "TOPIC: funny myths" in stdout
+    assert "Players are discussing recurring myths about game mechanics." in stdout
+
+
+def test_render_command_does_not_call_providers(
+    cli_module,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Prompt rendering should not resolve or call providers."""
+
+    _copy_repo_prompt_structure(tmp_path)
+    monkeypatch.setattr(
+        cli_module,
+        "create_builtin_prompt_registry",
+        lambda: create_builtin_prompt_registry(base_dir=tmp_path),
+    )
+    monkeypatch.setattr(cli_module, "get_provider_registry", lambda: (_ for _ in ()).throw(RuntimeError("should not be called")))
+
+    exit_code, stdout, _ = run_cli(cli_module, ["prompts", "render", "gaming_discover_trends"])
+
+    assert exit_code == 0
+    assert "prompt_name: gaming_discover_trends" in stdout
+
+
+def test_invalid_prompt_name_returns_safe_non_zero_exit_code(
+    cli_module,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Unsupported prompt names should fail safely."""
+
+    _copy_repo_prompt_structure(tmp_path)
+    monkeypatch.setattr(
+        cli_module,
+        "create_builtin_prompt_registry",
+        lambda: create_builtin_prompt_registry(base_dir=tmp_path),
+    )
+
+    exit_code, _, stderr = run_cli(cli_module, ["prompts", "render", "unknown_prompt"])
+
+    assert exit_code == 3
+    assert "only gaming_discover_trends is supported" in stderr
+
+
+def test_prompt_cli_does_not_expose_secrets(
+    cli_module,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Prompt commands should not expose secrets through normal output."""
+
+    _copy_repo_prompt_structure(tmp_path)
+    monkeypatch.setattr(
+        cli_module,
+        "create_builtin_prompt_registry",
+        lambda: create_builtin_prompt_registry(base_dir=tmp_path),
+    )
+    monkeypatch.setattr(cli_module, "PromptManifestLoader", lambda: PromptManifestLoader(base_dir=tmp_path))
+
+    exit_code, stdout, stderr = run_cli(cli_module, ["prompts", "list"])
+
+    assert exit_code == 0
+    combined = f"{stdout}\n{stderr}".casefold()
+    assert "openai-secret" not in combined
+    assert "anthropic-secret" not in combined
+    assert "youtube-secret" not in combined
+
+
+def test_missing_manifest_maps_to_safe_non_zero_exit_code(
+    cli_module,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Missing prompt manifests should return a safe resource-unavailable exit code."""
+
+    monkeypatch.setattr(cli_module, "PromptManifestLoader", lambda: PromptManifestLoader(base_dir=tmp_path))
+
+    exit_code, _, stderr = run_cli(cli_module, ["prompts", "manifest", "show"])
+
+    assert exit_code == 4
+    assert "Error: prompt manifest file was not found" in stderr
+
+
+def test_invalid_manifest_does_not_expose_file_contents(
+    cli_module,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Invalid prompt manifest content should not expose file contents through the CLI."""
+
+    (tmp_path / "manifest.json").write_text(
+        '{"schema_version": 2, "entries": [], "metadata": {"description": "SECRET MANIFEST"}}',
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(cli_module, "PromptManifestLoader", lambda: PromptManifestLoader(base_dir=tmp_path))
+
+    exit_code, _, stderr = run_cli(cli_module, ["prompts", "manifest", "show"])
+
+    assert exit_code == 3
+    assert "SECRET MANIFEST" not in stderr
+
+
 def test_expected_configuration_errors_return_exit_code_3(cli_module, monkeypatch: pytest.MonkeyPatch) -> None:
     """Configuration errors should map to exit code 3."""
 
@@ -532,3 +877,37 @@ def test_pyproject_contains_console_entry_point_if_required() -> None:
         contents = file.read()
 
     assert 'creatoros = "creatoros.cli:main"' in contents
+
+
+def _create_empty_prompt_structure(base_dir: Path) -> None:
+    """Create the initial prompt directory structure for CLI tests."""
+
+    for category in [
+        "research",
+        "script",
+        "storyboard",
+        "narration",
+        "thumbnail",
+        "metadata",
+        "review",
+        "publishing",
+    ]:
+        (base_dir / category).mkdir(parents=True, exist_ok=True)
+        (base_dir / category / ".gitkeep").write_text("", encoding="utf-8")
+    (base_dir / "research" / "gaming").mkdir(parents=True, exist_ok=True)
+    (base_dir / "research" / "common").mkdir(parents=True, exist_ok=True)
+    (base_dir / "research" / "gaming" / ".gitkeep").write_text("", encoding="utf-8")
+    (base_dir / "research" / "common" / ".gitkeep").write_text("", encoding="utf-8")
+
+    PromptManifestLoader(base_dir=base_dir).write(
+        PromptAssetManifest(
+            metadata={"description": "CreatorOS version-controlled prompt asset manifest."}
+        )
+    )
+
+
+def _copy_repo_prompt_structure(base_dir: Path) -> None:
+    """Copy the repository prompt structure into a temporary test directory."""
+
+    repo_prompts_dir = Path(__file__).resolve().parents[2] / "prompts"
+    shutil.copytree(repo_prompts_dir, base_dir, dirs_exist_ok=True)

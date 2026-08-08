@@ -22,8 +22,10 @@ That subsystem will include:
 - A deterministic prompt renderer
 - A prompt registry with explicit name and version resolution
 - A prompt loader for validated prompt assets stored on disk
+- A manifest for describing versioned prompt assets
+- Discovery rules for prompt asset categories, filenames, and checksums
 
-The initial asset format will be validated JSON files loaded from the configured prompts directory. Prompt rendering will occur before provider invocation, and provider adapters may transform rendered prompt output into vendor-specific request structures only at the integration boundary.
+The initial asset format will be validated JSON files loaded from the configured prompts directory. Prompt assets will remain outside the Python package in a version-controlled repository directory structure organized by category. A validated manifest may describe those assets for verification and inventory purposes, but it is not a persistence layer or runtime database. Prompt rendering will occur before provider invocation, and provider adapters may transform rendered prompt output into vendor-specific request structures only at the integration boundary.
 
 ## Rationale
 
@@ -32,6 +34,8 @@ This decision preserves architecture boundaries by keeping task definitions insi
 Typed prompt contracts improve testability and safety. Required variables, supported value types, message structure, and version metadata can all be validated before a provider call is attempted. This reduces runtime ambiguity and makes failures easier to diagnose.
 
 A registry-based design also supports long-term maintainability. Prompt lookup by name and version creates a stable pattern for controlled evolution, while keeping the implementation simple enough for current needs. Starting with validated JSON assets avoids premature complexity such as database-backed prompt management or dynamic remote prompt editing before those capabilities are operationally justified.
+
+The first concrete implementation of this decision is a small set of built-in gaming research prompt assets that can be validated from the manifest, loaded into a fresh registry, and rendered locally through explicit helper functions and CLI commands. This keeps the initial scope aligned with the current roadmap while proving the subsystem against real assets instead of placeholder structure alone.
 
 ## Consequences
 

@@ -19,12 +19,20 @@ from creatoros.core import (
     ConfigurationError,
     CreatorOSError,
     CreatorOSValidationError,
+    PromptLoadError,
+    PromptManifestError,
     ProviderNotFoundError,
     ProviderUnavailableError,
 )
 from creatoros.domain import ContentPlatform
 from creatoros.observability import configure_logging, get_logger
 from creatoros.orchestrator import GamingWorkflowInput, run_demo_gaming_workflow
+from creatoros.prompts import (
+    PromptAssetDiscovery,
+    PromptManifestLoader,
+    create_builtin_prompt_registry,
+    render_gaming_discover_trends,
+)
 from creatoros.providers import get_provider_registry
 from creatoros.providers.mock import create_mock_provider_registry
 from creatoros.workflows import (
@@ -132,6 +140,18 @@ def _run_cli(
         )
         _write_error(stderr, f"Error: {error}")
         return EXIT_RESOURCE_UNAVAILABLE
+    except (PromptLoadError, PromptManifestError) as error:
+        exit_code = _classify_prompt_error_exit_code(error)
+        logger.error(
+            "cli_command_failed",
+            command_group=args.command_group,
+            command_name=args.command_name,
+            exit_code=exit_code,
+            error_type=type(error).__name__,
+            error_code=error.code,
+        )
+        _write_error(stderr, f"Error: {error}")
+        return exit_code
     except (ConfigurationError, CreatorOSValidationError, ValidationError) as error:
         logger.error(
             "cli_command_failed",
@@ -255,6 +275,74 @@ def _build_parser() -> argparse.ArgumentParser:
         command_group="workflows",
         command_name="demo-state",
         handler=_handle_workflow_demo_state,
+    )
+
+    prompts_parser = subparsers.add_parser("prompts", help="Inspect prompt assets and the prompt manifest.")
+    prompts_subparsers = prompts_parser.add_subparsers(dest="command_name")
+
+    prompts_manifest = prompts_subparsers.add_parser("manifest", help="Inspect the prompt asset manifest.")
+    prompts_manifest_subparsers = prompts_manifest.add_subparsers(dest="prompt_manifest_command")
+
+    prompts_manifest_show = prompts_manifest_subparsers.add_parser("show", help="Show the prompt asset manifest.")
+    prompts_manifest_show.set_defaults(
+        command_group="prompts",
+        command_name="manifest_show",
+        handler=_handle_prompts_manifest_show,
+    )
+
+    prompts_manifest_validate = prompts_manifest_subparsers.add_parser(
+        "validate",
+        help="Validate the prompt asset manifest against discovered assets.",
+    )
+    prompts_manifest_validate.set_defaults(
+        command_group="prompts",
+        command_name="manifest_validate",
+        handler=_handle_prompts_manifest_validate,
+    )
+
+    prompts_discover = prompts_subparsers.add_parser("discover", help="Discover prompt assets on disk.")
+    prompts_discover.set_defaults(
+        command_group="prompts",
+        command_name="discover",
+        handler=_handle_prompts_discover,
+    )
+
+    prompts_list = prompts_subparsers.add_parser("list", help="List builtin prompt definitions.")
+    prompts_list.set_defaults(
+        command_group="prompts",
+        command_name="list",
+        handler=_handle_prompts_list,
+    )
+
+    prompts_render = prompts_subparsers.add_parser("render", help="Render a builtin prompt locally.")
+    prompts_render.add_argument("prompt_name", help="Stable logical prompt name to render.")
+    prompts_render.add_argument("--game", default="Minecraft", help="Game input for the render helper.")
+    prompts_render.add_argument("--topic", default="gaming facts", help="Topic input for the render helper.")
+    prompts_render.add_argument(
+        "--signals",
+        default="No live research supplied; deterministic local demonstration signal.",
+        help="Supplied research signals for the render helper.",
+    )
+    prompts_render.add_argument(
+        "--platform",
+        default="youtube_shorts",
+        help="Platform identifier for the render helper.",
+    )
+    prompts_render.add_argument(
+        "--duration",
+        default=30,
+        type=int,
+        help="Target duration in seconds for the render helper.",
+    )
+    prompts_render.add_argument(
+        "--show-content",
+        action="store_true",
+        help="Display the rendered prompt text. No provider call occurs.",
+    )
+    prompts_render.set_defaults(
+        command_group="prompts",
+        command_name="render",
+        handler=_handle_prompts_render,
     )
 
     run_parser = subparsers.add_parser("run", help="Run deterministic local demo workflows.")
@@ -437,6 +525,134 @@ def _handle_workflow_demo_state(
     return EXIT_SUCCESS
 
 
+def _handle_prompts_manifest_show(
+    args: argparse.Namespace,
+    *,
+    stdout: TextIO,
+    stderr: TextIO,
+) -> int:
+    """Display a safe summary of the prompt asset manifest."""
+
+    del args, stderr
+    manifest = PromptManifestLoader().load()
+    _write_rows(
+        stdout,
+        [
+            ("schema_version", manifest.schema_version),
+            ("entries", len(manifest.entries)),
+        ],
+    )
+    for entry in manifest.list_entries():
+        _write_output(
+            stdout,
+            f"{entry.category.value} | {entry.name} | v{entry.version} | {entry.status.value} | {entry.path}",
+        )
+    return EXIT_SUCCESS
+
+
+def _handle_prompts_manifest_validate(
+    args: argparse.Namespace,
+    *,
+    stdout: TextIO,
+    stderr: TextIO,
+) -> int:
+    """Validate the prompt asset manifest against discovered prompt assets."""
+
+    del args, stderr
+    manifest = PromptManifestLoader().load()
+    PromptAssetDiscovery().validate_manifest(manifest)
+    _write_output(stdout, "Prompt manifest is valid.")
+    _write_output(stdout, f"entries: {len(manifest.entries)}")
+    return EXIT_SUCCESS
+
+
+def _handle_prompts_discover(
+    args: argparse.Namespace,
+    *,
+    stdout: TextIO,
+    stderr: TextIO,
+) -> int:
+    """Discover prompt assets and print a safe summary."""
+
+    del args, stderr
+    records = PromptAssetDiscovery().discover()
+    _write_output(stdout, f"Discovered prompt assets: {len(records)}")
+    for record in records:
+        _write_output(
+            stdout,
+            f"{record.category.value} | {record.definition.name} | v{record.definition.version} | {record.relative_path}",
+        )
+    return EXIT_SUCCESS
+
+
+def _handle_prompts_list(
+    args: argparse.Namespace,
+    *,
+    stdout: TextIO,
+    stderr: TextIO,
+) -> int:
+    """List builtin prompts without printing prompt contents."""
+
+    del args, stderr
+    registry = create_builtin_prompt_registry()
+    manifest = PromptManifestLoader().load()
+    category_by_identity = {
+        (entry.name.casefold(), entry.version): entry.category.value for entry in manifest.list_entries()
+    }
+
+    _write_output(stdout, "name | version | status | category")
+    for definition in registry.list_prompts():
+        category = category_by_identity.get((definition.name.casefold(), definition.version), "unknown")
+        _write_output(
+            stdout,
+            f"{definition.name} | v{definition.version} | {definition.status.value} | {category}",
+        )
+    return EXIT_SUCCESS
+
+
+def _handle_prompts_render(
+    args: argparse.Namespace,
+    *,
+    stdout: TextIO,
+    stderr: TextIO,
+) -> int:
+    """Render one supported builtin prompt locally without provider calls."""
+
+    del stderr
+    if args.prompt_name != "gaming_discover_trends":
+        raise CreatorOSValidationError(
+            "only gaming_discover_trends is supported by the render command currently",
+            code="prompt_render_cli_unsupported_prompt",
+            details={"prompt_name": args.prompt_name},
+        )
+
+    registry = create_builtin_prompt_registry()
+    rendered = render_gaming_discover_trends(
+        registry,
+        game=args.game,
+        topic=args.topic,
+        research_signals=args.signals,
+        platform=args.platform,
+        target_duration_seconds=args.duration,
+    )
+
+    _write_rows(
+        stdout,
+        [
+            ("prompt_name", rendered.prompt_name),
+            ("prompt_version", rendered.prompt_version),
+            ("message_count", len(rendered.messages)),
+            ("variable_names", ", ".join(sorted(rendered.variables))),
+        ],
+    )
+
+    if args.show_content:
+        _write_output(stdout, "Rendered locally only. No provider call occurred.")
+        _write_output(stdout, rendered.text)
+
+    return EXIT_SUCCESS
+
+
 def _handle_run_gaming(
     args: argparse.Namespace,
     *,
@@ -579,6 +795,19 @@ def _format_value(value: object) -> str:
     if isinstance(value, bool):
         return "true" if value else "false"
     return str(value)
+
+
+def _classify_prompt_error_exit_code(error: PromptLoadError | PromptManifestError) -> int:
+    """Map prompt manifest and discovery failures to stable CLI exit codes."""
+
+    resource_unavailable_codes = {
+        "prompt_load_file_not_found",
+        "prompt_manifest_file_not_found",
+        "prompt_manifest_mismatch",
+    }
+    if error.code in resource_unavailable_codes:
+        return EXIT_RESOURCE_UNAVAILABLE
+    return EXIT_CONFIGURATION_ERROR
 
 
 def _normalize_system_exit_code(code: object) -> int:

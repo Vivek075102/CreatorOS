@@ -1,0 +1,71 @@
+{
+  "schema_version": 1,
+  "entries": [
+    {
+      "name": "gaming_discover_trends",
+      "version": 1,
+      "category": "research",
+      "path": "research/gaming/gaming_discover_trends.v1.json",
+      "status": "active",
+      "description": "Convert supplied gaming research signals into candidate short-form content opportunities.",
+      "tags": [
+        "gaming",
+        "research",
+        "trend",
+        "opportunity"
+      ],
+      "checksum": "2882f6608476a8b0e7f9b42cc6b5dc2d39e960c67deff4008a52fe190025f5d1",
+      "metadata": {
+        "domain": "gaming",
+        "stage": "research",
+        "owner": "creatoros",
+        "provider_independent": true
+      }
+    },
+    {
+      "name": "gaming_evaluate_opportunity",
+      "version": 1,
+      "category": "research",
+      "path": "research/gaming/gaming_evaluate_opportunity.v1.json",
+      "status": "active",
+      "description": "Evaluate a candidate gaming content opportunity using supplied evidence and short-form criteria.",
+      "tags": [
+        "gaming",
+        "research",
+        "opportunity",
+        "evaluation"
+      ],
+      "checksum": "3a868c7d2f2d9af097f78ffd7b89f9fcc3dcfddfa2a3e0c4a02c14b619832862",
+      "metadata": {
+        "domain": "gaming",
+        "stage": "research",
+        "owner": "creatoros",
+        "provider_independent": true
+      }
+    },
+    {
+      "name": "gaming_expand_keywords",
+      "version": 1,
+      "category": "research",
+      "path": "research/gaming/gaming_expand_keywords.v1.json",
+      "status": "active",
+      "description": "Expand a gaming topic into useful research phrases for downstream trend and search providers.",
+      "tags": [
+        "gaming",
+        "research",
+        "keywords",
+        "trend"
+      ],
+      "checksum": "3bb4823e8091c7a12ba9116a8ad36395152cb1de18a2dfa0cc45120abfc9ca7a",
+      "metadata": {
+        "domain": "gaming",
+        "stage": "research",
+        "owner": "creatoros",
+        "provider_independent": true
+      }
+    }
+  ],
+  "metadata": {
+    "description": "CreatorOS version-controlled prompt asset manifest."
+  }
+}

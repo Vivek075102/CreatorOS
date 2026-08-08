@@ -1,0 +1,55 @@
+{
+  "name": "gaming_expand_keywords",
+  "version": 1,
+  "status": "active",
+  "description": "Expand a gaming topic into useful research phrases for downstream trend and search providers.",
+  "format": "text",
+  "messages": [
+    {
+      "role": "system",
+      "content": "You create research terms for gaming content discovery. You are not performing web research and you do not have live internet access. Produce concise, provider-independent phrases that another research system could investigate."
+    },
+    {
+      "role": "user",
+      "content": "INPUTS\\nGAME: {game}\\nTOPIC: {topic}\\nSEED_KEYWORDS: {seed_keywords}\\nPLATFORM: {platform}\\n\\nTASK\\nExpand the supplied topic into useful research terms for later investigation by a research provider. Keep the output relevant to the supplied game, topic, and platform context. Prefer practical phrases that could help with search or trend discovery.\\n\\nRULES\\n- Do not invent factual claims.\\n- Avoid generic unrelated gaming terms.\\n- Keep the output concise and deterministic in style.\\n- Stay relevant to the supplied game and topic.\\n\\nOUTPUT FORMAT\\nPRIMARY:\\n- ...\\n\\nRELATED:\\n- ...\\n\\nQUESTIONS:\\n- ...\\n\\nENTITIES:\\n- ..."
+    }
+  ],
+  "variables": [
+    {
+      "name": "game",
+      "variable_type": "string",
+      "required": true,
+      "description": "The game context for the keyword expansion."
+    },
+    {
+      "name": "topic",
+      "variable_type": "string",
+      "required": true,
+      "description": "The main research topic."
+    },
+    {
+      "name": "seed_keywords",
+      "variable_type": "string",
+      "required": true,
+      "description": "Starting keyword phrases supplied by the caller."
+    },
+    {
+      "name": "platform",
+      "variable_type": "string",
+      "required": true,
+      "description": "The target platform identifier."
+    }
+  ],
+  "tags": [
+    "gaming",
+    "research",
+    "keywords",
+    "trend"
+  ],
+  "metadata": {
+    "domain": "gaming",
+    "stage": "research",
+    "owner": "creatoros",
+    "provider_independent": true
+  }
+}

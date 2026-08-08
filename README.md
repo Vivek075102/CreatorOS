@@ -58,5 +58,53 @@ CreatorOS now includes a provider-independent prompt-system foundation under `cr
 - Prompt rendering uses explicit variables rather than ad hoc string assembly.
 - Prompt definitions can be registered and resolved through a platform-owned registry.
 - Prompt assets can be loaded from the configured prompts directory as validated JSON files.
+- Prompt assets are organized under the repository `prompts/` directory by category.
+- Prompt asset filenames use the format `<name>.v<version>.json`.
+- `prompts/manifest.json` is a descriptive, validated manifest for discovery and verification rather than a runtime database.
+- Prompt discovery calculates SHA-256 checksums from exact file bytes.
 
 This foundation does not claim that production prompt catalogs, real LLM workflows, or remote prompt management are already complete. It establishes the architectural base for those later milestones.
+
+## Prompt Asset Structure
+
+The current prompt repository structure is:
+
+```text
+prompts/
+    manifest.json
+    research/
+        gaming/
+        common/
+    script/
+    storyboard/
+    narration/
+    thumbnail/
+    metadata/
+    review/
+    publishing/
+```
+
+Prompt names are global logical identifiers and should be unique enough to avoid collisions without relying on folder prefixes. The manifest supports validation and inventory, but CreatorOS does not automatically register prompt assets from the manifest at runtime yet.
+
+## Built-In Research Prompts
+
+CreatorOS now includes a first set of built-in provider-independent research prompt assets for gaming workflows:
+
+- `gaming_discover_trends`
+- `gaming_evaluate_opportunity`
+- `gaming_expand_keywords`
+
+These prompts are stored as validated JSON assets under `prompts/research/gaming/`, represented in `prompts/manifest.json`, and loadable through the platform prompt registry without provider calls.
+
+Use the CLI to inspect the manifest, discover assets, list registered prompts, and render the deterministic research prompt locally:
+
+```bash
+python -m creatoros prompts manifest show
+python -m creatoros prompts manifest validate
+python -m creatoros prompts discover
+python -m creatoros prompts list
+python -m creatoros prompts render gaming_discover_trends
+python -m creatoros prompts render gaming_discover_trends --game Roblox --topic "funny myths" --signals "Players are discussing recurring myths about game mechanics." --show-content
+```
+
+By default, `prompts render` shows prompt metadata only. Full rendered prompt content is shown only when `--show-content` is provided. These commands render locally and do not call an LLM provider.

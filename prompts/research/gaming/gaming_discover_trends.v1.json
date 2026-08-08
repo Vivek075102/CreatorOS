@@ -1,0 +1,61 @@
+{
+  "name": "gaming_discover_trends",
+  "version": 1,
+  "status": "active",
+  "description": "Convert supplied gaming research signals into candidate short-form content opportunities.",
+  "format": "text",
+  "messages": [
+    {
+      "role": "system",
+      "content": "You are a gaming content research analyst. Work only from supplied evidence. You do not have live internet access, browsing, or hidden data sources. Distinguish clearly between what the supplied signals show and what you infer from them. Do not invent statistics, sources, platform policy details, or current events that are not present in the input."
+    },
+    {
+      "role": "user",
+      "content": "INPUTS\\nGAME: {game}\\nTOPIC: {topic}\\nPLATFORM: {platform}\\nTARGET_DURATION_SECONDS: {target_duration_seconds}\\nRESEARCH_SIGNALS:\\n{research_signals}\\n\\nTASK\\nUse only the supplied research signals to identify one promising short-form gaming content opportunity. Prefer specific, curiosity-driven concepts that could work well in a concise video. Avoid repetitive, generic, or weakly supported ideas.\\n\\nRULES\\n- Use only the supplied research signals.\\n- Do not invent trend statistics.\\n- Do not invent sources.\\n- Prefer concepts suitable for short-form content.\\n- Keep evidence separate from inference.\\n- Avoid exaggerated claims.\\n- If the evidence is weak, reflect that in confidence and reasoning.\\n\\nOUTPUT FORMAT\\nTITLE:\\n...\\n\\nGAME:\\n...\\n\\nTOPIC:\\n...\\n\\nANGLE:\\n...\\n\\nWHY_NOW:\\n...\\n\\nSOURCE_SUMMARY:\\n...\\n\\nCONFIDENCE:\\nlow | medium | high"
+    }
+  ],
+  "variables": [
+    {
+      "name": "game",
+      "variable_type": "string",
+      "required": true,
+      "description": "The game the research opportunity should focus on."
+    },
+    {
+      "name": "topic",
+      "variable_type": "string",
+      "required": true,
+      "description": "The user-supplied research topic or direction."
+    },
+    {
+      "name": "research_signals",
+      "variable_type": "string",
+      "required": true,
+      "description": "Normalized research evidence supplied by research providers."
+    },
+    {
+      "name": "platform",
+      "variable_type": "string",
+      "required": true,
+      "description": "The target publishing platform identifier."
+    },
+    {
+      "name": "target_duration_seconds",
+      "variable_type": "integer",
+      "required": true,
+      "description": "The intended approximate runtime for the resulting content."
+    }
+  ],
+  "tags": [
+    "gaming",
+    "research",
+    "trend",
+    "opportunity"
+  ],
+  "metadata": {
+    "domain": "gaming",
+    "stage": "research",
+    "owner": "creatoros",
+    "provider_independent": true
+  }
+}

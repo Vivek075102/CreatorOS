@@ -271,3 +271,36 @@ def test_loader_errors_do_not_expose_file_contents(tmp_path: Path) -> None:
         loader.load_file(prompt_path)
 
     assert "SECRET PROMPT BODY" not in str(exc_info.value)
+
+
+def test_root_load_directory_ignores_manifest_json(tmp_path: Path) -> None:
+    """Root directory loading should ignore the prompt manifest file."""
+
+    (tmp_path / "manifest.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "entries": [],
+                "metadata": {"description": "CreatorOS version-controlled prompt asset manifest."},
+            }
+        ),
+        encoding="utf-8",
+    )
+    write_prompt_file(tmp_path / "research" / "gaming" / "gaming_script.v1.json", name="gaming_script")
+    loader = PromptLoader(base_dir=tmp_path)
+
+    prompts = loader.load_directory()
+
+    assert [prompt.name for prompt in prompts] == ["gaming_script"]
+
+
+def test_existing_category_prompt_files_still_load(tmp_path: Path) -> None:
+    """Category directories should continue to load prompt definitions normally."""
+
+    write_prompt_file(tmp_path / "script" / "youtube_shorts_script.v2.json", name="youtube_shorts_script", version=2)
+    loader = PromptLoader(base_dir=tmp_path)
+
+    prompts = loader.load_directory(path=Path("script"))
+
+    assert len(prompts) == 1
+    assert prompts[0].qualified_name == "youtube_shorts_script:v2"

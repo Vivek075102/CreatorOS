@@ -189,8 +189,14 @@ The prompt subsystem is responsible for:
 - Prompt rendering
 - Prompt registration and lookup
 - Prompt asset loading
+- Prompt asset discovery
+- Prompt manifest validation
 
 Prompt rendering belongs above the provider layer. Providers may adapt the rendered output to vendor-specific request formats, but they must not own the underlying task definition or prompt asset lifecycle.
+
+Prompt assets remain outside the Python package in the repository `prompts/` directory. They are organized by category, use canonical versioned filenames, and may be described by a validated manifest that supports discovery and verification without becoming a persistence system or runtime database.
+
+The initial real prompt catalog begins with research prompt assets for gaming workflows. Those assets are built into the repository, represented in the prompt manifest, and loadable into a fresh registry through platform-owned bootstrap functions rather than through provider adapters.
 
 An engine may internally coordinate focused agents, helper modules, or provider calls. External components should interact with the engine through a stable interface rather than reaching into its internal implementation details.
 
@@ -524,7 +530,9 @@ Existing top-level prototype folders may be consolidated gradually and safely ra
 
 The intended persistence stack for CreatorOS is PostgreSQL, SQLAlchemy 2.x, Alembic, and Pydantic models at validation boundaries. This describes the selected architectural direction, not a claim that the full persistence schema or migration system is already implemented in the current repository.
 
-The initial prompt foundation should treat prompt definitions as validated JSON assets loaded from the configured prompts directory, registered through a platform-owned registry, and rendered through explicit typed variables. Broader asset formats or remote prompt management may be considered later only if they preserve the same architectural boundaries.
+The initial prompt foundation should treat prompt definitions as validated JSON assets loaded from the configured prompts directory, registered through a platform-owned registry, rendered through explicit typed variables, and discoverable through a manifest-aware asset structure. Broader asset formats or remote prompt management may be considered later only if they preserve the same architectural boundaries.
+
+The current built-in prompt catalog is intentionally narrow. It covers the first provider-independent research prompt assets and local rendering support, not a complete prompt inventory for every engine or workflow.
 
 ## 24. Testing Architecture
 

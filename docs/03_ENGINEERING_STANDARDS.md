@@ -271,6 +271,9 @@ The following rules are mandatory:
 - Prompts must be stored outside provider adapters.
 - Prompt templates must be organized by engine and purpose.
 - Prompt definitions must remain provider-independent.
+- Prompt asset directories must use lowercase snake_case category names.
+- Prompt asset filenames must use the format `<name>.v<version>.json`.
+- Prompt names should be globally unique enough to avoid registry collisions without relying on folder prefixes.
 - Required inputs must be clear.
 - Expected outputs should be structured.
 - Behavior-changing prompt revisions should have versioning or change history.
@@ -281,6 +284,10 @@ The following rules are mandatory:
 - Production prompts must not be silently rewritten by analytics.
 - Prompt assets loaded from disk must be validated before use.
 - Initial prompt asset loading should use JSON files through the platform prompt loader unless a later ADR defines an expanded format strategy.
+- The prompt manifest is descriptive and validated, not a runtime database.
+- Prompt discovery checksums should be calculated from exact file bytes.
+- Built-in prompt registration should occur through platform-owned bootstrap functions that validate the manifest before loading assets.
+- CLI prompt inspection commands may expose prompt metadata safely, but full rendered prompt content should require an explicit operator action such as a dedicated flag.
 
 Prompt engineering is part of system design and must be handled with the same care as source code.
 

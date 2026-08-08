@@ -269,6 +269,10 @@ class PromptLoadError(PromptError):
     """Raised when loading prompt definitions from the filesystem fails."""
 
 
+class PromptManifestError(PromptError):
+    """Raised when a prompt manifest is invalid or mismatched."""
+
+
 class PromptRenderError(PromptError):
     """Raised when prompt rendering fails for non-validation reasons."""
 

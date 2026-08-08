@@ -1,0 +1,73 @@
+{
+  "name": "gaming_evaluate_opportunity",
+  "version": 1,
+  "status": "active",
+  "description": "Evaluate a candidate gaming content opportunity using supplied evidence and short-form criteria.",
+  "format": "text",
+  "messages": [
+    {
+      "role": "system",
+      "content": "You are evaluating one gaming content opportunity for responsible short-form production. Work only from the supplied information. Do not invent missing evidence, hidden trend data, or unsupported claims. Keep the evaluation concise, evidence-aware, and decision-oriented."
+    },
+    {
+      "role": "user",
+      "content": "INPUTS\\nGAME: {game}\\nTITLE: {title}\\nTOPIC: {topic}\\nANGLE: {angle}\\nSOURCE_SUMMARY: {source_summary}\\nPLATFORM: {platform}\\nTARGET_DURATION_SECONDS: {target_duration_seconds}\\n\\nTASK\\nEvaluate whether this opportunity should be accepted, revised, or rejected for short-form gaming content. Consider relevance, curiosity, clarity, short-form suitability, evidence strength, and differentiation. Weak evidence should reduce the score and confidence of the recommendation. Reject topics that cannot be responsibly supported from the supplied information.\\n\\nRULES\\n- Do not request or reveal hidden chain-of-thought.\\n- Keep the reasoning concise.\\n- Do not treat speculation as fact.\\n- Avoid exaggerated claims.\\n- Make the score evidence-aware.\\n\\nOUTPUT FORMAT\\nDECISION:\\naccept | revise | reject\\n\\nSCORE:\\n0-100\\n\\nSTRENGTHS:\\n...\\n\\nRISKS:\\n...\\n\\nRECOMMENDED_ANGLE:\\n...\\n\\nHOOK_DIRECTION:\\n...\\n\\nREASON:\\n..."
+    }
+  ],
+  "variables": [
+    {
+      "name": "game",
+      "variable_type": "string",
+      "required": true,
+      "description": "The game associated with the opportunity."
+    },
+    {
+      "name": "title",
+      "variable_type": "string",
+      "required": true,
+      "description": "The candidate opportunity title."
+    },
+    {
+      "name": "topic",
+      "variable_type": "string",
+      "required": true,
+      "description": "The topic associated with the opportunity."
+    },
+    {
+      "name": "angle",
+      "variable_type": "string",
+      "required": true,
+      "description": "The proposed content angle."
+    },
+    {
+      "name": "source_summary",
+      "variable_type": "string",
+      "required": true,
+      "description": "A concise evidence summary supporting the opportunity."
+    },
+    {
+      "name": "platform",
+      "variable_type": "string",
+      "required": true,
+      "description": "The target platform identifier."
+    },
+    {
+      "name": "target_duration_seconds",
+      "variable_type": "integer",
+      "required": true,
+      "description": "The intended short-form duration target."
+    }
+  ],
+  "tags": [
+    "gaming",
+    "research",
+    "opportunity",
+    "evaluation"
+  ],
+  "metadata": {
+    "domain": "gaming",
+    "stage": "research",
+    "owner": "creatoros",
+    "provider_independent": true
+  }
+}

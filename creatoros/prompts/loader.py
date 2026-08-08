@@ -88,7 +88,13 @@ class PromptLoader:
 
         pattern = "**/*.json" if recursive else "*.json"
         file_paths = sorted(
-            (candidate for candidate in resolved_directory.glob(pattern) if candidate.is_file()),
+            (
+                candidate
+                for candidate in resolved_directory.glob(pattern)
+                if candidate.is_file()
+                and not self._should_ignore_file(candidate)
+                and not self._is_root_manifest(candidate)
+            ),
             key=lambda candidate: self._safe_path_display(candidate),
         )
 
@@ -146,6 +152,20 @@ class PromptLoader:
             return path.resolve().relative_to(self.base_dir).as_posix()
         except ValueError:
             return path.name
+
+    def _is_root_manifest(self, path: Path) -> bool:
+        """Return whether a candidate file is the prompt root manifest."""
+
+        return path.resolve() == (self.base_dir / "manifest.json").resolve()
+
+    def _should_ignore_file(self, path: Path) -> bool:
+        """Return whether a file should be ignored during directory loading."""
+
+        try:
+            relative_parts = path.resolve().relative_to(self.base_dir).parts
+        except ValueError:
+            return False
+        return any(part.startswith(".") for part in relative_parts)
 
 
 __all__ = ["PromptLoader"]
