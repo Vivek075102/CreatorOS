@@ -1,6 +1,13 @@
 """Base agent framework exports for CreatorOS."""
 
 from creatoros.agents.base import BaseAgent
+from creatoros.agents.media import (
+    GamingMediaAgent,
+    GamingNarrationDirectionRequest,
+    GamingSceneMotionPromptRequest,
+    GamingSceneVisualPromptRequest,
+    GamingThumbnailConceptRequest,
+)
 from creatoros.agents.models import AgentExecutionContext, AgentResult
 from creatoros.agents.research import (
     GamingKeywordExpansionRequest,
@@ -29,14 +36,19 @@ __all__ = [
     "GamingCTAGenerationRequest",
     "GamingHookGenerationRequest",
     "GamingKeywordExpansionRequest",
+    "GamingMediaAgent",
+    "GamingNarrationDirectionRequest",
     "GamingOpportunityEvaluationRequest",
     "GamingResearchAgent",
+    "GamingSceneMotionPromptRequest",
+    "GamingSceneVisualPromptRequest",
     "GamingScriptAgent",
     "GamingScriptGenerationRequest",
     "GamingStoryboardAgent",
     "GamingStoryboardSceneBreakdownRequest",
     "GamingStoryboardTimingReviewRequest",
     "GamingStoryboardVisualDirectionRequest",
+    "GamingThumbnailConceptRequest",
     "GamingTrendDiscoveryRequest",
     "ResearchExecutionOptions",
 ]

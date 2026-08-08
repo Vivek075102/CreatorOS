@@ -155,6 +155,7 @@ Build the Research Engine and Opportunity Engine capabilities required to gather
 - First migrated application research agent using `LLMExecutionService` for typed trend discovery, opportunity evaluation, and keyword expansion
 - First migrated application script agent using `LLMExecutionService` for typed full-script, hook, and CTA generation
 - First migrated application storyboard agent using `LLMExecutionService` for typed scene breakdown, timing review, and visual direction generation
+- First migrated application media-planning agent using `LLMExecutionService` for typed thumbnail-concept, scene-visual, scene-motion, and narration-direction planning
 - Opportunity scoring rules and ranking pipeline
 - Research result persistence
 - Approval-ready content opportunity outputs
@@ -192,6 +193,8 @@ Build the Research Engine and Opportunity Engine capabilities required to gather
 - A provider-independent research agent can execute built-in research prompts through the application service boundary without direct provider, parser, or prompt-file coupling
 - A provider-independent script agent can execute built-in script prompts through the same application service boundary and return typed parser outputs without direct provider, parser, or prompt-file coupling
 - A provider-independent storyboard agent can execute built-in storyboard prompts through the same application service boundary and return typed parser outputs without direct provider, parser, or prompt-file coupling
+- A provider-independent media-planning agent can execute built-in media prompts through the same application service boundary and return typed planning outputs without direct provider, parser, or prompt-file coupling
+- Media-agent completion in this milestone means planning integration only. It does not mean image generation, video generation, narration synthesis, editing, rendering, storage upload, or publishing are complete
 - Content opportunities can be ranked using explicit rules
 - Research workflows produce auditable structured outputs that can feed downstream content generation
 
@@ -206,6 +209,7 @@ Build the Research Engine and Opportunity Engine capabilities required to gather
 - Real search, trend-provider integration, and broader orchestrator migration after the research-agent pattern proves stable
 - Script-agent output mapping into domain entities and broader orchestrator migration after the script-agent pattern proves stable
 - Storyboard-agent output mapping into domain storyboard entities, media-planning contracts, and broader orchestrator migration after the storyboard-agent pattern proves stable
+- Media-agent output mapping into concrete image, video, narration, storage, and rendering providers only when the later media-provider milestone is intentionally started
 - Broader live-provider diagnostics only after the guarded smoke-test path proves operationally safe
 - Usage persistence, monetary cost estimation, and analytics storage only when later milestones justify them
 - Retry, repair, fallback, streaming, and workflow-state integration only when later milestones justify them

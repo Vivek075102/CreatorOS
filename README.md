@@ -120,6 +120,20 @@ CreatorOS now also includes a provider-independent application storyboard agent:
 - The storyboard agent is not yet wired into the production workflow or orchestrator path.
 - Media-generation, asset-production, and review-agent integration remain later milestones.
 
+## Media Agent Integration
+
+CreatorOS now also includes a provider-independent application media-planning agent:
+
+- `GamingMediaAgent` depends on `LLMExecutionService` rather than calling providers, parsers, prompt registries, or prompt files directly.
+- It currently supports typed media-planning operations for `gaming_thumbnail_concept`, `gaming_scene_visual_prompt`, `gaming_scene_motion_prompt`, and `gaming_narration_direction`.
+- The agent returns typed planning outputs such as `GamingThumbnailConceptOutput`, `GamingSceneVisualOutput`, `GamingSceneMotionOutput`, and `GamingNarrationDirectionOutput`.
+- These outputs are planning instructions only. They are not generated images, videos, narration files, uploaded assets, or published media.
+- Mock remains the default provider path for normal execution and tests.
+- Fake OpenAI media-agent tests prove that the same agent works unchanged through the OpenAI adapter without live API calls.
+- The existing deterministic `DemoAssetAgent` remains in place for the demo workflow and still uses mock media providers to produce demo asset contracts.
+- `GamingMediaAgent` is not yet wired into the production workflow or orchestrator path.
+- Real image, video, narration, storage, and publishing provider integration remain later milestones.
+
 ## Controlled OpenAI Smoke Test
 
 CreatorOS now includes one explicit opt-in CLI path for a controlled live OpenAI smoke test:

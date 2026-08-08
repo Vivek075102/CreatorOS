@@ -290,6 +290,8 @@ The same rule now also applies to script-agent integration. Script-agent code ma
 
 The same rule now also applies to storyboard-agent integration. Storyboard-agent code may call `LLMExecutionService`, but it must not call providers directly, must not invoke parser implementations directly, must not access `PromptRegistry` or `PromptRenderer` directly, and must not couple prompt execution to workflow state, asset generation, or publishing behavior.
 
+The same rule now also applies to media-agent integration. Media-agent code may call `LLMExecutionService`, but it must not call image, video, voice, storage, or publishing providers directly, must not invoke parser implementations directly, must not access `PromptRegistry` or `PromptRenderer` directly, and must not turn planning outputs into generated assets inside the agent layer.
+
 ## 17. Prompt Engineering Standards
 
 Prompts are version-controlled product assets.
@@ -331,6 +333,8 @@ When an application agent is migrated to typed prompt execution, it should accep
 When script-generation agents are migrated, they should return typed parser output contracts first rather than collapsing directly into domain entities unless a separate explicit mapping layer is clearly owned at the application level. This keeps prompt-output contracts, domain entities, and workflow integration concerns decoupled while the migration pattern stabilizes.
 
 When storyboard agents are migrated, they should return typed parser output contracts first rather than directly constructing media assets, edited timelines, or publishing-ready artifacts. Scene breakdown, timing review, and visual direction should remain explicit typed boundaries until a later application layer owns the mapping into storyboard domain entities or asset-production workflows.
+
+When media-planning agents are migrated, they should return typed planning output contracts first rather than directly constructing generated assets, file paths, URLs, uploaded objects, or published media. Thumbnail concepts, scene visuals, scene motion, and narration direction should remain explicit typed planning boundaries until a later application layer owns the mapping into concrete media providers.
 
 When a prompt output has a typed parser, it should be registered through a provider-independent parser registry using the same stable logical prompt name used by the prompt registry. Parser registration must declare the expected output model type explicitly, and builtin prompt/parser alignment should be validated through deterministic contract checks rather than informal assumptions.
 
