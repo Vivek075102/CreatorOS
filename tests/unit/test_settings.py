@@ -50,6 +50,7 @@ def test_default_media_providers_are_mock() -> None:
     assert settings.default_image_provider == "mock"
     assert settings.default_tts_provider == "mock"
     assert settings.default_video_provider == "mock"
+    assert settings.default_render_provider == "mock"
 
 
 def test_default_image_model_is_unset() -> None:
@@ -164,6 +165,7 @@ def test_environment_variables_override_defaults() -> None:
             "DEFAULT_TTS_PROVIDER": "custom-tts",
             "DEFAULT_TTS_MODEL": "gpt-4o-mini-tts",
             "DEFAULT_VIDEO_PROVIDER": "custom-video",
+            "DEFAULT_RENDER_PROVIDER": "custom-render",
             "PROVIDER_TIMEOUT_SECONDS": "45",
             "PROVIDER_MAX_RETRIES": "5",
             "ASSETS_DIR": "custom_assets",
@@ -184,6 +186,7 @@ def test_environment_variables_override_defaults() -> None:
     assert settings.default_tts_provider == "custom-tts"
     assert settings.default_tts_model == "gpt-4o-mini-tts"
     assert settings.default_video_provider == "custom-video"
+    assert settings.default_render_provider == "custom-render"
     assert settings.provider_timeout_seconds == 45.0
     assert settings.provider_max_retries == 5
     assert settings.assets_dir == PROJECT_ROOT / Path("custom_assets")

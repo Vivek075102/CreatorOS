@@ -17,6 +17,7 @@ from creatoros.providers.contracts import (
     LLMProvider,
     Provider,
     PublishingProvider,
+    RenderProvider,
     SearchProvider,
     StorageProvider,
     TrendProvider,
@@ -51,8 +52,15 @@ from creatoros.providers.registry import (
     get_provider_registry,
     resolve_default_image_provider,
     resolve_default_llm_provider,
+    resolve_default_render_provider,
     resolve_default_tts_provider,
     resolve_default_video_provider,
+)
+from creatoros.providers.render import (
+    RenderedVideo,
+    RenderScene,
+    RenderTransition,
+    ShortRenderRequest,
 )
 
 __all__ = [
@@ -83,7 +91,12 @@ __all__ = [
     "ProviderResult",
     "ProviderUsage",
     "PublishingProvider",
+    "RenderProvider",
+    "RenderScene",
+    "RenderTransition",
+    "RenderedVideo",
     "SearchProvider",
+    "ShortRenderRequest",
     "StorageProvider",
     "TTSGenerationRequest",
     "TTSProvider",
@@ -98,6 +111,7 @@ __all__ = [
     "register_openai_tts_provider",
     "resolve_default_image_provider",
     "resolve_default_llm_provider",
+    "resolve_default_render_provider",
     "resolve_default_tts_provider",
     "resolve_default_video_provider",
 ]

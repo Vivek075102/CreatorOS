@@ -17,6 +17,7 @@ from creatoros.providers.contracts import (
     ImageProvider,
     LLMProvider,
     Provider,
+    RenderProvider,
     TTSProvider,
     VideoProvider,
 )
@@ -199,12 +200,27 @@ def resolve_default_video_provider(registry: ProviderRegistry) -> VideoProvider:
     return provider
 
 
+def resolve_default_render_provider(registry: ProviderRegistry) -> RenderProvider:
+    """Resolve the configured default render provider from the supplied registry."""
+
+    settings = get_settings()
+    provider = registry.get("render", settings.default_render_provider)
+    if not isinstance(provider, RenderProvider):
+        raise ProviderTypeMismatchError(
+            "render",
+            settings.default_render_provider.strip().lower(),
+            "RenderProvider",
+        )
+    return provider
+
+
 __all__ = [
     "ProviderRegistry",
     "create_provider_registry",
     "get_provider_registry",
     "resolve_default_image_provider",
     "resolve_default_llm_provider",
+    "resolve_default_render_provider",
     "resolve_default_tts_provider",
     "resolve_default_video_provider",
 ]

@@ -27,6 +27,7 @@ from creatoros.providers.media import (
     TTSGenerationRequest,
     VideoGenerationRequest,
 )
+from creatoros.providers.render import RenderedVideo, ShortRenderRequest
 
 TStructured = TypeVar("TStructured")
 
@@ -160,6 +161,19 @@ class TTSProvider(Provider, Protocol):
 
 
 @runtime_checkable
+class RenderProvider(Provider, Protocol):
+    """Provider contract for final Short composition and rendering."""
+
+    async def render(
+        self,
+        request: ShortRenderRequest,
+        *,
+        context: ProviderRequestContext | None = None,
+    ) -> ProviderResult[RenderedVideo]:
+        """Render a composed Short from provider-neutral planning inputs."""
+
+
+@runtime_checkable
 class VoiceProvider(TTSProvider, Protocol):
     """Backward-compatible provider contract for narration generation."""
 
@@ -233,6 +247,7 @@ __all__ = [
     "LLMProvider",
     "Provider",
     "PublishingProvider",
+    "RenderProvider",
     "SearchProvider",
     "StorageProvider",
     "TTSProvider",

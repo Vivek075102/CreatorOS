@@ -278,7 +278,18 @@ def test_providers_list_mock_displays_every_expected_provider_type(cli_module) -
     exit_code, stdout, _ = run_cli(cli_module, ["providers", "list", "--mock"])
 
     assert exit_code == 0
-    for provider_type in ["analytics", "image", "llm", "publishing", "search", "storage", "trend", "video", "voice"]:
+    for provider_type in [
+        "analytics",
+        "image",
+        "llm",
+        "publishing",
+        "render",
+        "search",
+        "storage",
+        "trend",
+        "video",
+        "voice",
+    ]:
         assert f"{provider_type} | mock" in stdout
 
 
@@ -293,6 +304,7 @@ def test_providers_list_output_is_predictably_sorted(cli_module) -> None:
         "image | mock | 1.0 | image_generation",
         "llm | mock | 1.0 | structured_generation, text_generation",
         "publishing | mock | 1.0 | publishing",
+        "render | mock | 1.0 | rendering",
         "search | mock | 1.0 | web_search",
         "storage | mock | 1.0 | storage",
         "trend | mock | 1.0 | trend_research",

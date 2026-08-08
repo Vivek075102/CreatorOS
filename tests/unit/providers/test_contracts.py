@@ -29,7 +29,10 @@ from creatoros.providers import (
     ProviderInfo,
     ProviderResult,
     PublishingProvider,
+    RenderedVideo,
+    RenderProvider,
     SearchProvider,
+    ShortRenderRequest,
     StorageProvider,
     TrendProvider,
     TTSGenerationRequest,
@@ -216,6 +219,28 @@ class FakeVoiceProvider(FakeProvider):
         )
 
 
+class FakeRenderProvider(FakeProvider):
+    """Minimal fake object satisfying the RenderProvider protocol."""
+
+    @property
+    def info(self) -> ProviderInfo:
+        return build_provider_info(ProviderCapability.RENDERING)
+
+    async def render(self, request: ShortRenderRequest, *, context=None) -> ProviderResult[RenderedVideo]:
+        return ProviderResult[RenderedVideo](
+            data=RenderedVideo(
+                artifact=GeneratedAsset(asset_type=AssetType.VIDEO, uri="https://example.com/final.mp4"),
+                provider_name=self.info.name,
+                mime_type="video/mp4",
+                duration_seconds=request.total_duration_seconds,
+                width=request.width,
+                height=request.height,
+                fps=request.fps,
+            ),
+            provider=self.info,
+        )
+
+
 class FakeStorageProvider(FakeProvider):
     """Minimal fake object satisfying the StorageProvider protocol."""
 
@@ -311,6 +336,12 @@ def test_tts_provider_protocol_accepts_minimal_fake() -> None:
     """A minimal structural TTS provider should satisfy the protocol."""
 
     assert isinstance(FakeVoiceProvider(), TTSProvider)
+
+
+def test_render_provider_protocol_accepts_minimal_fake() -> None:
+    """A minimal structural render provider should satisfy the protocol."""
+
+    assert isinstance(FakeRenderProvider(), RenderProvider)
 
 
 def test_storage_provider_protocol_accepts_minimal_fake() -> None:

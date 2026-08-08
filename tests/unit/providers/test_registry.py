@@ -18,12 +18,14 @@ from creatoros.providers import (
     LLMResponse,
     ProviderCapability,
     ProviderInfo,
+    RenderProvider,
     TTSProvider,
     VideoProvider,
     create_provider_registry,
     get_provider_registry,
     resolve_default_image_provider,
     resolve_default_llm_provider,
+    resolve_default_render_provider,
     resolve_default_tts_provider,
     resolve_default_video_provider,
 )
@@ -176,6 +178,27 @@ class FakeVideoProvider:
         raise NotImplementedError
 
     async def generate_video(self, prompt: str, *, context=None):
+        raise NotImplementedError
+
+
+class FakeRenderProvider:
+    """Minimal fake render provider for default-resolution registry tests."""
+
+    def __init__(self, *, name: str, provider_type: str = "render") -> None:
+        self._info = build_provider_info(
+            name=name,
+            provider_type=provider_type,
+            capability=ProviderCapability.RENDERING,
+        )
+
+    @property
+    def info(self) -> ProviderInfo:
+        return self._info
+
+    async def health_check(self) -> bool:
+        return True
+
+    async def render(self, request, *, context=None):
         raise NotImplementedError
 
 
@@ -496,6 +519,25 @@ def test_resolve_default_video_provider_uses_settings_and_returns_configured_pro
 
     assert resolved is provider
     assert isinstance(resolved, VideoProvider)
+
+
+def test_resolve_default_render_provider_uses_settings_and_returns_configured_provider(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Default render resolution should respect the configured provider name."""
+
+    class StubSettings:
+        default_render_provider = "mock"
+
+    registry = create_provider_registry()
+    provider = FakeRenderProvider(name="Mock")
+    registry.register(provider)
+    monkeypatch.setattr("creatoros.providers.registry.get_settings", lambda: StubSettings())
+
+    resolved = resolve_default_render_provider(registry)
+
+    assert resolved is provider
+    assert isinstance(resolved, RenderProvider)
 
 
 def test_error_details_contain_only_safe_provider_identifiers() -> None:

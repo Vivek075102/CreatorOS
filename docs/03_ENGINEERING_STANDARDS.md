@@ -300,6 +300,8 @@ The same separation now also applies to future media execution. Media-generation
 
 The same rule applies to real speech adapters. `OpenAITTSProvider` may use the OpenAI speech SDK internally, but it must keep SDK objects, binary audio payloads, and transport details inside the adapter boundary, must not write files opportunistically, and must not misrepresent an estimated duration as provider-reported audio duration.
 
+The same separation applies to rendering and composition work. Future `VideoProvider` implementations may generate clips, but final edited-output assembly belongs behind a separate render or composition boundary such as `RenderProvider`. Render providers must accept typed platform-owned composition contracts, must not embed workflow or publishing logic, and must not silently invoke FFmpeg, MoviePy, local file creation, or other heavyweight rendering side effects outside an explicitly approved milestone.
+
 ## 17. Prompt Engineering Standards
 
 Prompts are version-controlled product assets.
@@ -353,6 +355,8 @@ When media-provider foundations are added, they should reuse the shared provider
 When a real image provider is added before storage or materialization services exist, the adapter must normalize results into safe provider-owned references rather than writing files opportunistically, exposing temporary signed URLs broadly, or retaining large base64 payloads in ordinary metadata.
 
 When a real TTS provider is added before storage or materialization services exist, the adapter must normalize results into safe provider-owned references rather than writing audio files opportunistically, exposing raw binary payloads broadly, or retaining large audio blobs in ordinary metadata.
+
+When a render-provider foundation is added before real rendering infrastructure exists, the initial implementation should stay contract-first. Deterministic mock rendering is acceptable for validating provider boundaries, request contracts, registry behavior, and service composition, but documentation and tests must state clearly that no binary video output, no FFmpeg execution, and no production render pipeline exist yet.
 
 When a prompt output has a typed parser, it should be registered through a provider-independent parser registry using the same stable logical prompt name used by the prompt registry. Parser registration must declare the expected output model type explicitly, and builtin prompt/parser alignment should be validated through deterministic contract checks rather than informal assumptions.
 

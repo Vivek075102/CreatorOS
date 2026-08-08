@@ -33,6 +33,7 @@ class Settings(BaseSettings):
     default_tts_provider: str = Field(default="mock", alias="DEFAULT_TTS_PROVIDER")
     default_tts_model: str | None = Field(default=None, alias="DEFAULT_TTS_MODEL")
     default_video_provider: str = Field(default="mock", alias="DEFAULT_VIDEO_PROVIDER")
+    default_render_provider: str = Field(default="mock", alias="DEFAULT_RENDER_PROVIDER")
     openai_api_key: str | None = Field(default=None, alias="OPENAI_API_KEY")
     anthropic_api_key: str | None = Field(default=None, alias="ANTHROPIC_API_KEY")
     youtube_client_id: str | None = Field(default=None, alias="YOUTUBE_CLIENT_ID")
@@ -58,6 +59,7 @@ class Settings(BaseSettings):
         "default_llm_model",
         "default_tts_provider",
         "default_video_provider",
+        "default_render_provider",
         "database_url",
     )
     @classmethod

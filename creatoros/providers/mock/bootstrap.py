@@ -11,6 +11,7 @@ from creatoros.providers.mock.media import (
     MockVoiceProvider,
 )
 from creatoros.providers.mock.publishing import MockPublishingProvider
+from creatoros.providers.mock.render import MockRenderProvider
 from creatoros.providers.mock.search import MockSearchProvider
 from creatoros.providers.mock.storage import MockStorageProvider
 from creatoros.providers.mock.trends import MockTrendProvider
@@ -30,6 +31,7 @@ def register_mock_providers(
         MockSearchProvider(),
         MockImageProvider(),
         MockVideoProvider(),
+        MockRenderProvider(),
         MockVoiceProvider(),
         MockStorageProvider(),
         MockPublishingProvider(),
@@ -70,9 +72,18 @@ def create_mock_video_provider_registry() -> ProviderRegistry:
     return registry
 
 
+def create_mock_render_provider_registry() -> ProviderRegistry:
+    """Return a fresh registry containing only the deterministic mock render provider."""
+
+    registry = create_provider_registry()
+    registry.register(MockRenderProvider())
+    return registry
+
+
 __all__ = [
     "create_mock_image_provider_registry",
     "create_mock_provider_registry",
+    "create_mock_render_provider_registry",
     "create_mock_tts_provider_registry",
     "create_mock_video_provider_registry",
     "register_mock_providers",

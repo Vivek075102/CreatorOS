@@ -183,6 +183,20 @@ CreatorOS now also includes a provider-independent media provider foundation for
 - `GamingContentPipeline` remains unchanged in responsibility and still stops at the pre-publication human-review boundary.
 - Real video providers remain later milestones, and guarded live image or TTS smoke commands are still deferred.
 
+## Video / Rendering Foundation
+
+CreatorOS now also includes a separate provider-independent rendering foundation for final Short composition:
+
+- `VideoProvider` remains the future contract for prompt-to-generated video clips.
+- Final Short composition now uses a separate `RenderProvider` boundary so clip generation and edited-output rendering do not blur together.
+- The render contracts are `RenderScene`, `ShortRenderRequest`, `RenderTransition`, and `RenderedVideo`.
+- `ShortRenderRequest` validates sequential scene numbering, positive scene durations, positive dimensions and FPS, and computes deterministic total duration from scenes.
+- Narration remains optional. If a narration duration estimate is present, it must not exceed total scene duration by more than one second.
+- `MockRenderProvider` returns deterministic mock rendered-video references without network calls, FFmpeg, MoviePy, binary output, or local file creation.
+- `MediaRenderService` can resolve the configured default render provider and execute one composition request, but it does not generate images, generate speech, upload assets, or mutate workflow state.
+- `GamingMediaAgent` remains planning-only, and `GamingContentPipeline` remains pre-publication only.
+- No actual MP4 rendering, caption burn-in, subtitle timing, audio mixing, transition rendering, or publishing integration exists in this milestone.
+
 ## Controlled OpenAI Smoke Test
 
 CreatorOS now includes one explicit opt-in CLI path for a controlled live OpenAI smoke test:

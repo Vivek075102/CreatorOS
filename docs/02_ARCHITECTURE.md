@@ -295,6 +295,8 @@ The Asset Production Layer is responsible for turning structured content plans i
 
 This layer should use provider interfaces rather than concrete vendor APIs directly. Its outputs should be normalized into `GeneratedAsset` and related domain records so that downstream systems can operate consistently regardless of which provider or tool produced the asset.
 
+Within this layer, AI video generation and final edited-output composition are separate concerns. A future `VideoProvider` may produce provider-owned clips from prompts or motion instructions, while a separate render or composition boundary is responsible for assembling prepared scene assets, narration references, captions, and transitions into a final Short. Those responsibilities should not be collapsed into one provider contract unless a later decision record explicitly changes that boundary.
+
 ## 10. Publishing Layer
 
 The Publishing Layer is responsible for preparing and delivering content to external distribution platforms. Its responsibilities include:
@@ -354,6 +356,7 @@ Stable internal interfaces should include types such as:
 - `VideoProvider`
 - `ImageProvider`
 - `TTSProvider`
+- `RenderProvider`
 - `VoiceProvider`
 - `StorageProvider`
 - `PublishingProvider`
@@ -394,6 +397,8 @@ The first real media adapter is now the explicit `OpenAIImageProvider` registere
 The first real speech adapter is now the explicit `OpenAITTSProvider` registered under the stable voice-provider name `openai-tts`. It reuses the same OpenAI credential path, translates the provider-neutral `TTSGenerationRequest` into the OpenAI speech SDK interface, and normalizes results back into `GeneratedAudio` without leaking SDK objects or raw audio payloads across the adapter boundary. Mock remains the configured default, automated tests stay offline, and no current workflow invokes the real TTS adapter automatically.
 
 Provider SDK objects, raw transport payloads, and vendor-specific exception types must not escape the provider adapter boundary.
+
+CreatorOS now also includes a separate provider-independent render/composition contract for final Short assembly. `VideoProvider` still represents future clip-generation work, while `RenderProvider` represents composition inputs such as timed scenes, prepared asset references, narration references, and simple transition intent. The current rendering milestone provides typed contracts, registry integration, a deterministic mock provider, and a small application-layer `MediaRenderService` only. It does not add FFmpeg execution, MoviePy, binary output creation, media-agent execution, or integrated-pipeline wiring.
 
 ## 13. Provider Selection and Routing
 
