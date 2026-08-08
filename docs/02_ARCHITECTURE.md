@@ -206,6 +206,8 @@ The first application agent now uses that same platform-owned path directly. `Ga
 
 `GamingScriptAgent` now follows the same pattern for script-generation concerns. It depends on `LLMExecutionService`, invokes stable built-in script prompt names, and returns typed script parser outputs without direct provider calls, parser calls, prompt-registry access, filesystem prompt loading, or workflow mutation.
 
+`GamingStoryboardAgent` now follows the same pattern for storyboard concerns. It depends on `LLMExecutionService`, invokes stable built-in storyboard prompt names, and returns typed storyboard parser outputs for scene breakdown, timing review, and visual direction without direct provider calls, parser calls, prompt-registry access, filesystem prompt loading, or workflow mutation.
+
 Review and quality-control prompts are part of the prompt subsystem as advisory contracts, not as autonomous approval authorities. They may evaluate supplied artifacts for consistency, quality, and readiness signals, but they must not claim independent fact verification, platform approval, or publishing authority. Human approval remains authoritative under the Level 4 operating model.
 
 Prompt assets remain outside the Python package in the repository `prompts/` directory. They are organized by category, use canonical versioned filenames, and may be described by a validated manifest that supports discovery and verification without becoming a persistence system or runtime database.
@@ -367,6 +369,8 @@ Structured observability for LLM execution may include safe operational usage me
 Current agent migration is intentionally narrow. Research-agent execution can now operate through the provider-independent prompt-to-parser service boundary using supplied research signals only. Real `TrendProvider` or `SearchProvider` integration, web research, and broader workflow migration remain separate future milestones.
 
 Script-agent migration is also intentionally narrow. Full script generation, hook generation, and CTA generation can now execute through the same provider-independent boundary using supplied inputs only, but that output is not yet wired into the orchestrator or production workflow path. Storyboard, media, and review agents remain separate future migration work.
+
+Storyboard-agent migration is similarly narrow. Scene breakdown, timing review, and per-scene visual direction can now execute through the same provider-independent boundary using supplied inputs only, but this output is not yet wired into the orchestrator, media-generation pipeline, or production workflow path. Asset production, review-agent execution, and downstream publishing integration remain separate future milestones.
 
 Provider SDK objects, raw transport payloads, and vendor-specific exception types must not escape the provider adapter boundary.
 
@@ -595,7 +599,7 @@ The intended persistence stack for CreatorOS is PostgreSQL, SQLAlchemy 2.x, Alem
 
 The initial prompt foundation should treat prompt definitions as validated JSON assets loaded from the configured prompts directory, registered through a platform-owned registry, rendered through explicit typed variables, and discoverable through a manifest-aware asset structure. Broader asset formats or remote prompt management may be considered later only if they preserve the same architectural boundaries.
 
-The current built-in prompt catalog is intentionally narrow. It covers the first provider-independent research, script, storyboard, thumbnail, narration, and review prompt assets plus local rendering support, not a complete prompt inventory for every engine or workflow. These assets define text-based output contracts only. The structured parsing foundation now validates deterministic label/value outputs before they are adapted into CreatorOS models, typed parser adapters now cover all current built-in prompt families, and a provider-independent parser registry now maps all 17 current built-in prompt logical names to typed output contracts. Evidence consistency and publication-readiness review remain advisory prompt contracts that operate on supplied inputs only. Workflow integration for parsed outputs and downstream media-generation integration remain later milestone work.
+The current built-in prompt catalog is intentionally narrow. It covers the first provider-independent research, script, storyboard, thumbnail, narration, and review prompt assets plus local rendering support, not a complete prompt inventory for every engine or workflow. These assets define text-based output contracts only. The structured parsing foundation now validates deterministic label/value outputs before they are adapted into CreatorOS models, typed parser adapters now cover all current built-in prompt families, and a provider-independent parser registry now maps all 17 current built-in prompt logical names to typed output contracts. Research, script, and storyboard agents now prove that those prompt families can execute through one shared application-owned boundary without direct provider or parser coupling. Evidence consistency and publication-readiness review remain advisory prompt contracts that operate on supplied inputs only. Workflow integration for parsed outputs and downstream media-generation integration remain later milestone work.
 
 ## 24. Testing Architecture
 

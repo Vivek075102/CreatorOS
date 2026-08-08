@@ -288,6 +288,8 @@ The first migrated application agent now follows this rule directly. Research-ag
 
 The same rule now also applies to script-agent integration. Script-agent code may call `LLMExecutionService`, but it must not call providers directly, must not invoke parser implementations directly, must not access `PromptRegistry` or `PromptRenderer` directly, and must not hardcode vendor-specific branches.
 
+The same rule now also applies to storyboard-agent integration. Storyboard-agent code may call `LLMExecutionService`, but it must not call providers directly, must not invoke parser implementations directly, must not access `PromptRegistry` or `PromptRenderer` directly, and must not couple prompt execution to workflow state, asset generation, or publishing behavior.
+
 ## 17. Prompt Engineering Standards
 
 Prompts are version-controlled product assets.
@@ -327,6 +329,8 @@ Typed parsers for prompt outputs should be added incrementally by prompt family.
 When an application agent is migrated to typed prompt execution, it should accept normalized platform-owned input models, invoke stable logical prompt names through `LLMExecutionService`, and verify the returned typed output model explicitly. It must not inspect raw provider response text or couple itself to parser implementation details.
 
 When script-generation agents are migrated, they should return typed parser output contracts first rather than collapsing directly into domain entities unless a separate explicit mapping layer is clearly owned at the application level. This keeps prompt-output contracts, domain entities, and workflow integration concerns decoupled while the migration pattern stabilizes.
+
+When storyboard agents are migrated, they should return typed parser output contracts first rather than directly constructing media assets, edited timelines, or publishing-ready artifacts. Scene breakdown, timing review, and visual direction should remain explicit typed boundaries until a later application layer owns the mapping into storyboard domain entities or asset-production workflows.
 
 When a prompt output has a typed parser, it should be registered through a provider-independent parser registry using the same stable logical prompt name used by the prompt registry. Parser registration must declare the expected output model type explicitly, and builtin prompt/parser alignment should be validated through deterministic contract checks rather than informal assumptions.
 

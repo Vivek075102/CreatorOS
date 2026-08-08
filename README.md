@@ -107,6 +107,19 @@ CreatorOS now also includes a provider-independent application script agent:
 - The script agent is not yet wired into the production workflow or orchestrator path.
 - Storyboard, media, and review agents remain unmigrated in this milestone.
 
+## Storyboard Agent Integration
+
+CreatorOS now also includes a provider-independent application storyboard agent:
+
+- `GamingStoryboardAgent` depends on `LLMExecutionService` rather than calling providers, parsers, prompt registries, or prompt files directly.
+- It currently supports typed storyboard operations for `storyboard_scene_breakdown`, `storyboard_timing_review`, and `storyboard_visual_direction`.
+- The agent returns typed parser outputs such as `StoryboardSceneBreakdownOutput`, `StoryboardTimingReviewOutput`, and `StoryboardVisualDirectionOutput` rather than prematurely collapsing them into domain storyboard entities or media-generation work.
+- `GamingStoryboardSceneBreakdownRequest.from_script(...)` provides a stable bridge from typed script output into storyboard scene-breakdown input without introducing workflow coupling.
+- Mock remains the default provider path for normal execution and tests.
+- Fake OpenAI storyboard-agent tests prove that the same agent works unchanged through the OpenAI adapter without live API calls.
+- The storyboard agent is not yet wired into the production workflow or orchestrator path.
+- Media-generation, asset-production, and review-agent integration remain later milestones.
+
 ## Controlled OpenAI Smoke Test
 
 CreatorOS now includes one explicit opt-in CLI path for a controlled live OpenAI smoke test:

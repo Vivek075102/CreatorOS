@@ -15,6 +15,12 @@ from creatoros.agents.script import (
     GamingScriptAgent,
     GamingScriptGenerationRequest,
 )
+from creatoros.agents.storyboard import (
+    GamingStoryboardAgent,
+    GamingStoryboardSceneBreakdownRequest,
+    GamingStoryboardTimingReviewRequest,
+    GamingStoryboardVisualDirectionRequest,
+)
 
 __all__ = [
     "AgentExecutionContext",
@@ -27,6 +33,10 @@ __all__ = [
     "GamingResearchAgent",
     "GamingScriptAgent",
     "GamingScriptGenerationRequest",
+    "GamingStoryboardAgent",
+    "GamingStoryboardSceneBreakdownRequest",
+    "GamingStoryboardTimingReviewRequest",
+    "GamingStoryboardVisualDirectionRequest",
     "GamingTrendDiscoveryRequest",
     "ResearchExecutionOptions",
 ]
