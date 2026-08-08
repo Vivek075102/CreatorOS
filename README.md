@@ -197,6 +197,20 @@ CreatorOS now also includes a separate provider-independent rendering foundation
 - `GamingMediaAgent` remains planning-only, and `GamingContentPipeline` remains pre-publication only.
 - No actual MP4 rendering, caption burn-in, subtitle timing, audio mixing, transition rendering, or publishing integration exists in this milestone.
 
+## Media Generation Services
+
+CreatorOS now also includes an application-layer `MediaGenerationService` for provider-independent media execution:
+
+- `GamingMediaAgent` still produces planning outputs only.
+- `MediaGenerationService` is the separate application boundary that executes `ImageProvider`, `TTSProvider`, and `VideoProvider` using existing typed request contracts.
+- The service supports one-off `generate_image`, `generate_audio`, and `generate_video` operations plus bounded package generation through `MediaGenerationPackageRequest`.
+- `GeneratedMediaPackage` aggregates typed `GeneratedImage`, `GeneratedAudio`, and `GeneratedVideo` results without exposing raw provider payloads, SDK objects, or credentials.
+- Mock remains the default runtime path, and automated tests stay fully offline.
+- The same service can use real provider adapters such as `OpenAIImageProvider` and `OpenAITTSProvider` through the shared `ProviderRegistry` when explicitly registered.
+- The service does not invoke `GamingMediaAgent`, `LLMExecutionService`, `MediaRenderService`, `RenderProvider`, publishing providers, storage providers, or workflow-state mutation.
+- No files are written, no media is materialized to disk, and no final Short is rendered in this milestone.
+- The next media stage will assemble a `GeneratedMediaPackage` into a `ShortRenderRequest` for rendering rather than mixing generation and rendering together.
+
 ## Controlled OpenAI Smoke Test
 
 CreatorOS now includes one explicit opt-in CLI path for a controlled live OpenAI smoke test:

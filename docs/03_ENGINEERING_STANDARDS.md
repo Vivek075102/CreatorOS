@@ -358,6 +358,8 @@ When a real TTS provider is added before storage or materialization services exi
 
 When a render-provider foundation is added before real rendering infrastructure exists, the initial implementation should stay contract-first. Deterministic mock rendering is acceptable for validating provider boundaries, request contracts, registry behavior, and service composition, but documentation and tests must state clearly that no binary video output, no FFmpeg execution, and no production render pipeline exist yet.
 
+When a media-generation application service is added, it must remain a provider coordinator only. It may resolve providers, forward typed generation requests, and aggregate normalized generated-media results, but it must not execute prompts, import planning agents, invoke render providers, materialize files, upload assets, or mutate workflow state. Planning, generation, and rendering are separate stages and should remain independently testable.
+
 When a prompt output has a typed parser, it should be registered through a provider-independent parser registry using the same stable logical prompt name used by the prompt registry. Parser registration must declare the expected output model type explicitly, and builtin prompt/parser alignment should be validated through deterministic contract checks rather than informal assumptions.
 
 Review parsers must remain advisory only. Parsing a decision such as `ready_for_human_review` must never publish content, approve content on behalf of a human, or mutate workflow state automatically.

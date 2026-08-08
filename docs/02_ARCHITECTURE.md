@@ -297,6 +297,8 @@ This layer should use provider interfaces rather than concrete vendor APIs direc
 
 Within this layer, AI video generation and final edited-output composition are separate concerns. A future `VideoProvider` may produce provider-owned clips from prompts or motion instructions, while a separate render or composition boundary is responsible for assembling prepared scene assets, narration references, captions, and transitions into a final Short. Those responsibilities should not be collapsed into one provider contract unless a later decision record explicitly changes that boundary.
 
+Media planning is also separate from media execution. Planning agents may recommend thumbnail direction, scene visuals, motion ideas, and narration guidance, but a dedicated application service should translate those plans into typed media-generation requests and route them through provider interfaces. This keeps prompt execution, provider execution, and final rendering as distinct architectural stages.
+
 ## 10. Publishing Layer
 
 The Publishing Layer is responsible for preparing and delivering content to external distribution platforms. Its responsibilities include:
@@ -373,6 +375,8 @@ When structured text is returned by a provider, the response should first pass t
 Providers must not parse application outputs on behalf of CreatorOS. They return normalized provider responses only. ParserRegistry resolution, typed parsing, and workflow-level interpretation remain downstream platform responsibilities.
 
 The current `LLMExecutionService` now owns that downstream prompt-to-provider-to-parser orchestration path at the application layer. It does not add retries, failover, repair logic, persistence, workflow mutation, or publication behavior. Those concerns remain separate future milestones.
+
+CreatorOS now also has a dedicated application-layer `MediaGenerationService`. It owns provider selection and bounded execution for image generation, speech generation, and clip generation using the stable `ImageGenerationRequest`, `TTSGenerationRequest`, and `VideoGenerationRequest` contracts. It does not execute prompts, does not call planning agents, does not invoke the render boundary, and does not write files or upload artifacts. Its package-level output is a typed generated-media aggregate that can later feed the render layer.
 
 Live OpenAI execution remains intentionally isolated from normal runtime paths. The current platform allows it only through an explicit guarded CLI smoke-test command that registers the OpenAI provider for one invocation, routes the request through `LLMExecutionService`, requires typed parser success, and refuses to run without a manual live-call confirmation flag. Agents, workflows, imports, health checks, and default runtime configuration remain mock-first and offline by default.
 
