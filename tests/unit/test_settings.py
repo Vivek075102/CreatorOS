@@ -52,6 +52,14 @@ def test_default_media_providers_are_mock() -> None:
     assert settings.default_video_provider == "mock"
 
 
+def test_default_image_model_is_unset() -> None:
+    """The real image model should remain unset until explicitly configured."""
+
+    settings = build_settings()
+
+    assert settings.default_image_model is None
+
+
 def test_default_database_url_uses_postgresql_psycopg() -> None:
     """The default database URL should use the PostgreSQL psycopg format."""
 
@@ -144,6 +152,7 @@ def test_environment_variables_override_defaults() -> None:
             "DATABASE_URL": "postgresql+psycopg://override_user:change_me@localhost:5432/creatoros_test",
             "DEFAULT_LLM_PROVIDER": "anthropic",
             "DEFAULT_IMAGE_PROVIDER": "custom-image",
+            "DEFAULT_IMAGE_MODEL": "gpt-image-1",
             "DEFAULT_TTS_PROVIDER": "custom-tts",
             "DEFAULT_VIDEO_PROVIDER": "custom-video",
             "PROVIDER_TIMEOUT_SECONDS": "45",
@@ -162,6 +171,7 @@ def test_environment_variables_override_defaults() -> None:
     assert settings.database_url.startswith("postgresql+psycopg://override_user")
     assert settings.default_llm_provider == "anthropic"
     assert settings.default_image_provider == "custom-image"
+    assert settings.default_image_model == "gpt-image-1"
     assert settings.default_tts_provider == "custom-tts"
     assert settings.default_video_provider == "custom-video"
     assert settings.provider_timeout_seconds == 45.0

@@ -33,8 +33,12 @@ from creatoros.providers.media import (
     VideoGenerationRequest,
 )
 from creatoros.providers.openai import (
+    DEFAULT_OPENAI_IMAGE_MODEL,
+    DEFAULT_OPENAI_IMAGE_PROVIDER_NAME,
     DEFAULT_OPENAI_MODEL,
+    OpenAIImageProvider,
     OpenAILLMProvider,
+    register_openai_image_provider,
     register_openai_provider,
 )
 from creatoros.providers.registry import (
@@ -48,6 +52,8 @@ from creatoros.providers.registry import (
 )
 
 __all__ = [
+    "DEFAULT_OPENAI_IMAGE_MODEL",
+    "DEFAULT_OPENAI_IMAGE_PROVIDER_NAME",
     "DEFAULT_OPENAI_MODEL",
     "AnalyticsProvider",
     "GeneratedAudio",
@@ -60,6 +66,7 @@ __all__ = [
     "LLMRequest",
     "LLMResponse",
     "LLMUsage",
+    "OpenAIImageProvider",
     "OpenAILLMProvider",
     "Provider",
     "ProviderCapability",
@@ -79,6 +86,7 @@ __all__ = [
     "VoiceProvider",
     "create_provider_registry",
     "get_provider_registry",
+    "register_openai_image_provider",
     "register_openai_provider",
     "resolve_default_image_provider",
     "resolve_default_llm_provider",

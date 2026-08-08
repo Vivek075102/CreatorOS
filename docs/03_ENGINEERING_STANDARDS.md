@@ -296,7 +296,7 @@ The same rule now also applies to review-agent integration. Review-agent code ma
 
 The same rule now also applies to integrated pipeline orchestration. `GamingContentPipeline` may coordinate migrated application agents, but it must not bypass them to call providers directly, must not invoke parser implementations directly, must not access `PromptRegistry` or `PromptRenderer` directly, and must stop before approval mutation or publishing behavior.
 
-The same separation now also applies to future media execution. Media-generation providers may accept typed provider-neutral media requests and return typed provider-neutral results, but they must not contain content-planning logic, workflow mutation, publishing behavior, or vendor-specific assumptions in their calling code. The current mock media providers are deterministic contract implementations only, not real generators.
+The same separation now also applies to future media execution. Media-generation providers may accept typed provider-neutral media requests and return typed provider-neutral results, but they must not contain content-planning logic, workflow mutation, publishing behavior, or vendor-specific assumptions in their calling code. The current mock media providers are deterministic contract implementations only, not real generators, and the first real `OpenAIImageProvider` must still keep OpenAI SDK objects, temporary provider URLs, and binary image payloads inside the adapter boundary.
 
 ## 17. Prompt Engineering Standards
 
@@ -347,6 +347,8 @@ When review agents are migrated, they should return typed advisory review contra
 When integrated content pipelines are added, they should coordinate only the minimum bounded set of agent calls required for a coherent package. They should prefer one economical happy path over broad prompt fan-out, and they must remain fail-fast until later milestones intentionally add retries, checkpoints, or resume behavior.
 
 When media-provider foundations are added, they should reuse the shared provider registry and exception architecture where possible instead of creating parallel registries, hidden fallbacks, or capability-specific global state. Default provider selection belongs in configuration and explicit application composition, not inside provider implementations.
+
+When a real image provider is added before storage or materialization services exist, the adapter must normalize results into safe provider-owned references rather than writing files opportunistically, exposing temporary signed URLs broadly, or retaining large base64 payloads in ordinary metadata.
 
 When a prompt output has a typed parser, it should be registered through a provider-independent parser registry using the same stable logical prompt name used by the prompt registry. Parser registration must declare the expected output model type explicitly, and builtin prompt/parser alignment should be validated through deterministic contract checks rather than informal assumptions.
 

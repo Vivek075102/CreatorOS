@@ -389,6 +389,8 @@ Integrated pipeline migration is similarly narrow. The new application pipeline 
 
 CreatorOS now also has a first provider-independent media provider foundation beneath that planning layer. Typed request and result contracts exist for image generation, speech/TTS generation, and video generation, and deterministic mock providers now satisfy those contracts through the existing generic provider registry. This establishes the future provider boundary for media execution without yet wiring binary media generation into the media-planning agent or the integrated content pipeline.
 
+The first real media adapter is now the explicit `OpenAIImageProvider` registered under the stable image-provider name `openai-image`. It reuses the existing OpenAI credential path, translates the provider-neutral `ImageGenerationRequest` into the OpenAI images SDK interface, and normalizes results back into `GeneratedImage` without leaking SDK objects, temporary provider URLs, or raw image payloads across the adapter boundary. Mock remains the configured default, automated tests stay offline, and no current workflow invokes the real image adapter automatically.
+
 Provider SDK objects, raw transport payloads, and vendor-specific exception types must not escape the provider adapter boundary.
 
 ## 13. Provider Selection and Routing

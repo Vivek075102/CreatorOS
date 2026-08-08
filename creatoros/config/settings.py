@@ -29,6 +29,7 @@ class Settings(BaseSettings):
     default_llm_provider: str = Field(default="mock", alias="DEFAULT_LLM_PROVIDER")
     default_llm_model: str = Field(default="mock-model", alias="DEFAULT_LLM_MODEL")
     default_image_provider: str = Field(default="mock", alias="DEFAULT_IMAGE_PROVIDER")
+    default_image_model: str | None = Field(default=None, alias="DEFAULT_IMAGE_MODEL")
     default_tts_provider: str = Field(default="mock", alias="DEFAULT_TTS_PROVIDER")
     default_video_provider: str = Field(default="mock", alias="DEFAULT_VIDEO_PROVIDER")
     openai_api_key: str | None = Field(default=None, alias="OPENAI_API_KEY")
@@ -65,6 +66,19 @@ class Settings(BaseSettings):
         normalized_value = value.strip()
         if not normalized_value:
             raise ValueError("value must not be blank")
+        return normalized_value
+
+    @field_validator("default_image_model", mode="before")
+    @classmethod
+    def normalize_optional_default_image_model(cls, value: str | None) -> str | None:
+        """Normalize blank default image model values to ``None``."""
+
+        if value is None:
+            return None
+
+        normalized_value = value.strip()
+        if not normalized_value:
+            return None
         return normalized_value
 
     @field_validator("log_level")

@@ -169,11 +169,15 @@ CreatorOS now also includes a provider-independent media provider foundation for
 - The current capability-specific contracts are `ImageProvider`, `TTSProvider`, and `VideoProvider`, with the existing `VoiceProvider` kept as a backward-compatible compatibility contract for the deterministic demo path.
 - The shared `ProviderRegistry` is reused for media providers. No second provider framework was introduced.
 - Default provider settings now include `default_image_provider`, `default_tts_provider`, and `default_video_provider`, each defaulting to `mock`.
+- The first real image adapter is now `OpenAIImageProvider`, registered explicitly under the stable image provider name `openai-image`.
+- `OPENAI_API_KEY` is reused for the OpenAI image adapter, and `DEFAULT_IMAGE_MODEL` must be configured explicitly before any live image request can succeed.
 - Deterministic `MockImageProvider`, `MockTTSProvider`, and `MockVideoProvider` now return typed mock generation results without network calls, binary media generation, FFmpeg, file output, or vendor SDKs.
+- Mock remains the default image provider. Real OpenAI image generation is opt-in only and is not invoked automatically by `GamingMediaAgent`, the integrated content pipeline, or automated tests.
+- OpenAI SDK client objects, temporary provider URLs, and binary image payloads remain inside the adapter boundary. No image files, storage uploads, or permanent asset materialization are created in this milestone.
 - Capability-specific mock registry helpers now exist for image, TTS, and video provider setup in addition to the existing full mock registry bootstrap.
 - `GamingMediaAgent` remains planning-only and does not call these providers yet.
 - `GamingContentPipeline` remains unchanged in responsibility and still stops at the pre-publication human-review boundary.
-- Real image, speech, and video providers remain later milestones.
+- Real speech and video providers remain later milestones, and a guarded live image smoke command is still deferred.
 
 ## Controlled OpenAI Smoke Test
 
