@@ -25,6 +25,17 @@ from creatoros.providers.mock.base import MockProviderBase
 MOCK_IMAGE_MODEL = "mock-image-model"
 MOCK_TTS_MODEL = "mock-tts-model"
 MOCK_VIDEO_MODEL = "mock-video-model"
+_MINIMAL_PNG_BYTES = (
+    b"\x89PNG\r\n\x1a\n"
+    b"\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15\xc4\x89"
+    b"\x00\x00\x00\x0bIDATx\x9cc``\x00\x00\x00\x02\x00\x01H\xaf\xa4q"
+    b"\x00\x00\x00\x00IEND\xaeB`\x82"
+)
+_MINIMAL_WAV_BYTES = (
+    b"RIFF(\x00\x00\x00WAVEfmt "
+    b"\x10\x00\x00\x00\x01\x00\x01\x00@\x1f\x00\x00@\x1f\x00\x00"
+    b"\x01\x00\x08\x00data\x04\x00\x00\x00\x80\x80\x80\x80"
+)
 
 
 def _validate_non_blank(value: str, *, field_name: str) -> str:
@@ -109,6 +120,7 @@ class MockImageProvider(MockProviderBase):
             height=request.height,
             request_id=f"mock_image_request_{digest}",
             metadata={"mock": True},
+            payload_bytes=_MINIMAL_PNG_BYTES,
         )
         return ProviderResult[GeneratedImage](
             data=result,
@@ -257,6 +269,7 @@ class MockTTSProvider(MockProviderBase):
             estimated_duration_seconds=estimated_duration_seconds,
             request_id=f"mock_tts_request_{digest}",
             metadata={"mock": True, "duration_is_estimated": True},
+            payload_bytes=_MINIMAL_WAV_BYTES,
         )
         return ProviderResult[GeneratedAudio](
             data=result,

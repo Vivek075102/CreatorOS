@@ -1,5 +1,13 @@
 """Application-layer services for CreatorOS."""
 
+from creatoros.services.artifact_materialization import (
+    ArtifactKind,
+    ArtifactMaterializationService,
+    ArtifactWorkspace,
+    MaterializedArtifact,
+    MaterializedMediaPackage,
+    create_artifact_materialization_service,
+)
 from creatoros.services.llm_execution import (
     LLMExecutionRequest,
     LLMExecutionResult,
@@ -22,10 +30,15 @@ from creatoros.services.short_assembly import (
 )
 
 __all__ = [
+    "ArtifactKind",
+    "ArtifactMaterializationService",
+    "ArtifactWorkspace",
     "GeneratedMediaPackage",
     "LLMExecutionRequest",
     "LLMExecutionResult",
     "LLMExecutionService",
+    "MaterializedArtifact",
+    "MaterializedMediaPackage",
     "MediaGenerationPackageRequest",
     "MediaGenerationService",
     "MediaProviderSelection",
@@ -33,6 +46,7 @@ __all__ = [
     "ShortAssemblyRequest",
     "ShortAssemblyResult",
     "ShortAssemblyService",
+    "create_artifact_materialization_service",
     "create_llm_execution_service",
     "create_media_generation_service",
     "create_media_render_service",

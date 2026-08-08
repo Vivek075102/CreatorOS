@@ -149,6 +149,7 @@ class GeneratedImage(CreatorOSModel):
     height: int = Field(gt=0)
     request_id: str | None = None
     metadata: dict[str, object] = Field(default_factory=dict)
+    payload_bytes: bytes | None = Field(default=None, exclude=True, repr=False)
 
     @field_validator("provider_name", "model", "mime_type")
     @classmethod
@@ -163,6 +164,17 @@ class GeneratedImage(CreatorOSModel):
         """Normalize optional request identifiers."""
 
         return _normalize_optional_string(value, field_name="request_id")
+
+    @field_validator("payload_bytes")
+    @classmethod
+    def validate_payload_bytes(cls, value: bytes | None) -> bytes | None:
+        """Require non-empty payload bytes when a payload is present."""
+
+        if value is None:
+            return None
+        if not value:
+            raise ValueError("payload_bytes must not be empty")
+        return bytes(value)
 
     @model_validator(mode="after")
     def validate_artifact_type(self) -> GeneratedImage:
@@ -185,6 +197,7 @@ class GeneratedAudio(CreatorOSModel):
     estimated_duration_seconds: float | None = None
     request_id: str | None = None
     metadata: dict[str, object] = Field(default_factory=dict)
+    payload_bytes: bytes | None = Field(default=None, exclude=True, repr=False)
 
     @field_validator("provider_name", "model", "mime_type")
     @classmethod
@@ -209,6 +222,17 @@ class GeneratedAudio(CreatorOSModel):
             return None
         return _validate_positive_finite_float(value, field_name="estimated_duration_seconds")
 
+    @field_validator("payload_bytes")
+    @classmethod
+    def validate_payload_bytes(cls, value: bytes | None) -> bytes | None:
+        """Require non-empty payload bytes when a payload is present."""
+
+        if value is None:
+            return None
+        if not value:
+            raise ValueError("payload_bytes must not be empty")
+        return bytes(value)
+
     @model_validator(mode="after")
     def validate_artifact_type(self) -> GeneratedAudio:
         """Require an audio-oriented asset reference."""
@@ -231,6 +255,7 @@ class GeneratedVideo(CreatorOSModel):
     fps: float | None = None
     request_id: str | None = None
     metadata: dict[str, object] = Field(default_factory=dict)
+    payload_bytes: bytes | None = Field(default=None, exclude=True, repr=False)
 
     @field_validator("provider_name", "model", "mime_type")
     @classmethod
@@ -261,6 +286,17 @@ class GeneratedVideo(CreatorOSModel):
         """Normalize optional request identifiers."""
 
         return _normalize_optional_string(value, field_name="request_id")
+
+    @field_validator("payload_bytes")
+    @classmethod
+    def validate_payload_bytes(cls, value: bytes | None) -> bytes | None:
+        """Require non-empty payload bytes when a payload is present."""
+
+        if value is None:
+            return None
+        if not value:
+            raise ValueError("payload_bytes must not be empty")
+        return bytes(value)
 
     @model_validator(mode="after")
     def validate_artifact_type(self) -> GeneratedVideo:

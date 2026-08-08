@@ -271,6 +271,7 @@ def _normalize_audio_result(
             "transient_source": "binary",
             "duration_provided": False,
         },
+        payload_bytes=audio_bytes,
     )
 
 

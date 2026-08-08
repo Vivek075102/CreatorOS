@@ -82,6 +82,7 @@ def test_default_paths_resolve_to_project_root_directories() -> None:
 
     settings = build_settings()
 
+    assert settings.artifact_root == PROJECT_ROOT / "artifacts"
     assert settings.assets_dir == PROJECT_ROOT / "assets"
     assert settings.logs_dir == PROJECT_ROOT / "logs"
     assert settings.prompts_dir == PROJECT_ROOT / "prompts"
@@ -168,6 +169,7 @@ def test_environment_variables_override_defaults() -> None:
             "DEFAULT_RENDER_PROVIDER": "custom-render",
             "PROVIDER_TIMEOUT_SECONDS": "45",
             "PROVIDER_MAX_RETRIES": "5",
+            "ARTIFACT_ROOT": "runtime_artifacts",
             "ASSETS_DIR": "custom_assets",
             "LOGS_DIR": "custom_logs",
             "PROMPTS_DIR": "custom_prompts",
@@ -189,6 +191,7 @@ def test_environment_variables_override_defaults() -> None:
     assert settings.default_render_provider == "custom-render"
     assert settings.provider_timeout_seconds == 45.0
     assert settings.provider_max_retries == 5
+    assert settings.artifact_root == PROJECT_ROOT / Path("runtime_artifacts")
     assert settings.assets_dir == PROJECT_ROOT / Path("custom_assets")
     assert settings.logs_dir == PROJECT_ROOT / Path("custom_logs")
     assert settings.prompts_dir == PROJECT_ROOT / Path("custom_prompts")

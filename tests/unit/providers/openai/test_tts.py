@@ -195,6 +195,7 @@ def test_generate_translates_request_and_normalizes_response(
     assert result.data.artifact.uri.startswith("openai-tts://generated/")
     assert result.data.artifact.metadata["provider_reference_kind"] == "temporary"
     assert result.data.metadata["transient_source"] == "binary"
+    assert result.data.payload_bytes == b"fake-audio-bytes"
     assert result.usage is None
     assert fake_speech.calls == [
         {
@@ -297,6 +298,21 @@ def test_duration_absent_is_handled_safely() -> None:
 
     assert result.data.estimated_duration_seconds is None
     assert result.data.metadata["duration_provided"] is False
+
+
+def test_payload_bytes_remain_ephemeral_and_excluded_from_serialization() -> None:
+    """Binary payload bytes should remain available but excluded from normal model dumps."""
+
+    provider = build_provider(
+        client=FakeOpenAITTSClient(FakeAudioClient(FakeSpeechClient(response=FakeBinaryResponse())))
+    )
+
+    result = run_async(provider.generate(TTSGenerationRequest(text="No leaks", voice="verse")))
+
+    dumped = result.data.model_dump()
+
+    assert result.data.payload_bytes == b"fake-audio-bytes"
+    assert "payload_bytes" not in dumped
 
 
 def test_auth_errors_are_translated_without_secret_or_text_leakage() -> None:
@@ -431,4 +447,3 @@ def test_openai_tts_module_contains_no_file_or_pipeline_side_effects() -> None:
     assert "ffmpeg" not in module_source.lower()
     assert "stream_to_file" not in module_source
     assert "write_to_file" not in module_source
-

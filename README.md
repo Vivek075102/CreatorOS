@@ -17,6 +17,17 @@ Build a reliable pipeline for trend research, script generation, and storyboardi
 3. Install project dependencies.
 4. Run tests before committing changes.
 
+## Runtime Artifact Workspace
+
+CreatorOS now includes a local runtime artifact materialization layer for provider-generated media.
+
+- `ARTIFACT_ROOT` defaults to the repository-local `artifacts/` directory and can be overridden through the settings system.
+- `ArtifactMaterializationService` is the only current application service that turns supported media payloads into local files.
+- Workspaces are deterministic and run-scoped, for example `artifacts/run_001/images/`, `artifacts/run_001/audio/`, and `artifacts/run_001/video/`.
+- Filenames are sanitized, MIME types are allowlisted, path traversal is rejected, and writes use a temporary file plus `os.replace` for atomic finalization.
+- Raw payload bytes remain ephemeral on generated media contracts and are excluded from normal serialization and logging.
+- Provider adapters still do not write files directly, and this milestone does not add cloud storage, FFmpeg, MP4 rendering, or publishing.
+
 ## CLI
 
 Use the CreatorOS CLI foundation to inspect configuration, mock providers, and workflow state behavior:
@@ -208,8 +219,20 @@ CreatorOS now also includes an application-layer `MediaGenerationService` for pr
 - Mock remains the default runtime path, and automated tests stay fully offline.
 - The same service can use real provider adapters such as `OpenAIImageProvider` and `OpenAITTSProvider` through the shared `ProviderRegistry` when explicitly registered.
 - The service does not invoke `GamingMediaAgent`, `LLMExecutionService`, `MediaRenderService`, `RenderProvider`, publishing providers, storage providers, or workflow-state mutation.
-- No files are written, no media is materialized to disk, and no final Short is rendered in this milestone.
+- The generated media contracts may now carry an ephemeral `payload_bytes` field for local runtime materialization, but `MediaGenerationService` still does not write files itself.
 - The next media stage will assemble a `GeneratedMediaPackage` into a `ShortRenderRequest` for rendering rather than mixing generation and rendering together.
+
+## Artifact Materialization Foundation
+
+CreatorOS now also includes `ArtifactMaterializationService` as the local runtime filesystem boundary between generated media contracts and later rendering work.
+
+- `GeneratedImage`, `GeneratedAudio`, and `GeneratedVideo` can now carry provider-neutral ephemeral payload bytes when a provider has safe materializable output available.
+- `OpenAIImageProvider` now decodes valid base64 image responses into ephemeral bytes without logging or serializing the payload.
+- `OpenAITTSProvider` now returns ephemeral audio bytes for the same reason.
+- `MockImageProvider` and `MockTTSProvider` return tiny deterministic valid payloads for offline materialization tests.
+- `MockVideoProvider` remains payload-free, so video materialization fails safely until a later milestone introduces a real supported video payload path.
+- `materialize_package(...)` turns a `GeneratedMediaPackage` into a deterministic local workspace and cleans up files created by the failed operation if package materialization aborts partway through.
+- This is still local runtime output only. There is no durable storage provider, cloud upload, render pipeline, or publishing handoff here yet.
 
 ## Final Short Assembly
 

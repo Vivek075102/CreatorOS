@@ -303,6 +303,12 @@ CreatorOS now includes that next stage as a separate application boundary. `Shor
 
 CreatorOS now also includes a dedicated post-approval execution boundary above those services. `MediaExecutionPipeline` accepts an already completed `GamingContentPipelineResult` plus explicit human approval, verifies that the package is publication-ready, translates approved planning outputs into provider-neutral media-generation requests, and then coordinates `MediaGenerationService` and `ShortAssemblyService`. This preserves a mandatory two-phase architecture: planning stops at publication readiness, and media execution begins only through a second explicit call.
 
+CreatorOS now also includes a separate local artifact materialization boundary inside the Asset Production Layer. `ArtifactMaterializationService` converts supported provider-generated payloads into deterministic run-scoped local files under the configured `artifact_root`. This boundary exists to prepare controlled runtime inputs for later rendering stages. It is not a storage provider, not a publishing system, and not a cloud-asset abstraction.
+
+The local artifact workspace is intentionally strict. Run identifiers are validated before path construction, destination paths must stay under the configured artifact root, MIME types map through an explicit allowlist to controlled extensions, filenames are sanitized for Windows-safe local use, and final writes use temporary files plus atomic replacement. Failed package materialization cleans up only the files created by that operation and leaves pre-existing files untouched.
+
+Provider-generated binary payload transport remains ephemeral. Current generated media contracts may carry provider-neutral `payload_bytes` fields that are excluded from normal serialization and logging. Provider adapters may populate those bytes when safe local materialization is needed, but providers still must not write files themselves, store raw payloads in ordinary metadata, or leak vendor SDK objects beyond the adapter boundary.
+
 ## 10. Publishing Layer
 
 The Publishing Layer is responsible for preparing and delivering content to external distribution platforms. Its responsibilities include:
@@ -382,6 +388,8 @@ The current `LLMExecutionService` now owns that downstream prompt-to-provider-to
 
 CreatorOS now also has a dedicated application-layer `MediaGenerationService`. It owns provider selection and bounded execution for image generation, speech generation, and clip generation using the stable `ImageGenerationRequest`, `TTSGenerationRequest`, and `VideoGenerationRequest` contracts. It does not execute prompts, does not call planning agents, does not invoke the render boundary, and does not write files or upload artifacts. Its package-level output is a typed generated-media aggregate that can later feed the render layer.
 
+CreatorOS now also has a dedicated application-layer `ArtifactMaterializationService`. It sits after provider execution and before any future real render backend that needs controlled local files. It owns artifact workspace creation, MIME allowlisting, safe filename derivation, atomic writes, and typed local artifact references. It does not call providers, does not invoke render services, does not upload to durable storage, and does not publish content.
+
 Live OpenAI execution remains intentionally isolated from normal runtime paths. The current platform allows it only through an explicit guarded CLI smoke-test command that registers the OpenAI provider for one invocation, routes the request through `LLMExecutionService`, requires typed parser success, and refuses to run without a manual live-call confirmation flag. Agents, workflows, imports, health checks, and default runtime configuration remain mock-first and offline by default.
 
 Structured observability for LLM execution may include safe operational usage metrics such as normalized token counts, request identifiers, provider names, models, durations, and parsed output model types. Those values are not treated as credentials. Secrets such as API keys, authorization values, access tokens, refresh tokens, client secrets, and credentials must still be redacted recursively, while rendered prompts, prompt variables, generated response text, and raw provider payloads remain excluded from normal logs.
@@ -403,6 +411,8 @@ CreatorOS now also has a first provider-independent media provider foundation be
 The first real media adapter is now the explicit `OpenAIImageProvider` registered under the stable image-provider name `openai-image`. It reuses the existing OpenAI credential path, translates the provider-neutral `ImageGenerationRequest` into the OpenAI images SDK interface, and normalizes results back into `GeneratedImage` without leaking SDK objects, temporary provider URLs, or raw image payloads across the adapter boundary. Mock remains the configured default, automated tests stay offline, and no current workflow invokes the real image adapter automatically.
 
 The first real speech adapter is now the explicit `OpenAITTSProvider` registered under the stable voice-provider name `openai-tts`. It reuses the same OpenAI credential path, translates the provider-neutral `TTSGenerationRequest` into the OpenAI speech SDK interface, and normalizes results back into `GeneratedAudio` without leaking SDK objects or raw audio payloads across the adapter boundary. Mock remains the configured default, automated tests stay offline, and no current workflow invokes the real TTS adapter automatically.
+
+Because later render stages require controlled local files rather than vendor-owned transient references, the generated image, audio, and video contracts may now carry provider-neutral ephemeral payload bytes. Those payload bytes are excluded from normal dumps and logs, exist only to support local runtime artifact materialization, and do not change the rule that provider adapters must not write files directly.
 
 Provider SDK objects, raw transport payloads, and vendor-specific exception types must not escape the provider adapter boundary.
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import base64
 import hashlib
 from typing import Protocol, cast
 
@@ -39,6 +40,7 @@ DEFAULT_OPENAI_IMAGE_PROVIDER_NAME = "openai-image"
 DEFAULT_OPENAI_IMAGE_MODEL: str | None = None
 _OPENAI_IMAGE_PROVIDER_TYPE = "image"
 _REQUESTED_OUTPUT_FORMAT = "png"
+_REQUESTED_RESPONSE_FORMAT = "b64_json"
 _SUPPORTED_IMAGE_SIZES: dict[tuple[int, int], str] = {
     (256, 256): "256x256",
     (512, 512): "512x512",
@@ -207,6 +209,27 @@ def _build_artifact_uri(
     return f"{DEFAULT_OPENAI_IMAGE_PROVIDER_NAME}://generated/{digest}/{image_index}"
 
 
+def _decode_b64_payload(b64_json: str) -> bytes:
+    """Decode provider image base64 safely into binary payload bytes."""
+
+    try:
+        decoded_bytes = base64.b64decode(b64_json, validate=True)
+    except Exception as error:
+        raise ProviderResponseError(
+            "OpenAI image response contained invalid base64 payload data",
+            code="provider_response_invalid",
+            details={"provider_name": DEFAULT_OPENAI_IMAGE_PROVIDER_NAME},
+        ) from error
+
+    if not decoded_bytes:
+        raise ProviderResponseError(
+            "OpenAI image response contained an empty image payload",
+            code="provider_response_invalid",
+            details={"provider_name": DEFAULT_OPENAI_IMAGE_PROVIDER_NAME},
+        )
+    return decoded_bytes
+
+
 def _normalize_image_result(
     response: object,
     *,
@@ -240,6 +263,7 @@ def _normalize_image_result(
     request_id = _safe_request_id(response)
     created = _safe_response_created(response)
     output_format = _normalize_output_format(response)
+    payload_bytes = None if b64_json is None else _decode_b64_payload(b64_json)
     artifact = GeneratedAsset(
         asset_type=AssetType.IMAGE,
         uri=_build_artifact_uri(
@@ -252,12 +276,12 @@ def _normalize_image_result(
         metadata={
             "provider_name": DEFAULT_OPENAI_IMAGE_PROVIDER_NAME,
             "provider_reference_kind": "temporary",
-            "transient_source": "url" if url is not None else "b64_json",
+            "transient_source": "url" if payload_bytes is None else "binary",
         },
     )
     metadata: dict[str, object] = {
         "provider_reference_kind": "temporary",
-        "transient_source": "url" if url is not None else "b64_json",
+        "transient_source": "url" if payload_bytes is None else "binary",
     }
     if created is not None:
         metadata["response_created"] = created
@@ -271,6 +295,7 @@ def _normalize_image_result(
         height=request.height,
         request_id=request_id,
         metadata=metadata,
+        payload_bytes=payload_bytes,
     )
 
 
@@ -368,7 +393,7 @@ class OpenAIImageProvider:
             "prompt": request.prompt,
             "size": size,
             "output_format": _REQUESTED_OUTPUT_FORMAT,
-            "response_format": "url",
+            "response_format": _REQUESTED_RESPONSE_FORMAT,
             "timeout": timeout_seconds,
         }
 

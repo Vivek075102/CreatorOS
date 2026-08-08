@@ -40,6 +40,7 @@ class Settings(BaseSettings):
     youtube_client_secret: str | None = Field(default=None, alias="YOUTUBE_CLIENT_SECRET")
     provider_timeout_seconds: float = Field(default=30.0, alias="PROVIDER_TIMEOUT_SECONDS")
     provider_max_retries: int = Field(default=3, alias="PROVIDER_MAX_RETRIES")
+    artifact_root: Path = Field(default=PROJECT_ROOT / "artifacts", alias="ARTIFACT_ROOT")
     assets_dir: Path = Field(default=PROJECT_ROOT / "assets", alias="ASSETS_DIR")
     logs_dir: Path = Field(default=PROJECT_ROOT / "logs", alias="LOGS_DIR")
     prompts_dir: Path = Field(default=PROJECT_ROOT / "prompts", alias="PROMPTS_DIR")
@@ -114,7 +115,7 @@ class Settings(BaseSettings):
             raise ValueError("provider_max_retries must be zero or greater")
         return value
 
-    @field_validator("assets_dir", "logs_dir", "prompts_dir", mode="before")
+    @field_validator("artifact_root", "assets_dir", "logs_dir", "prompts_dir", mode="before")
     @classmethod
     def normalize_project_paths(cls, value: Path | str) -> Path:
         """Resolve relative configuration paths from the project root."""

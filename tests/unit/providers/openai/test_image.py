@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 from collections.abc import Coroutine
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -37,15 +38,25 @@ from creatoros.providers.openai import (
     register_openai_image_provider,
 )
 
+MINIMAL_PNG_BYTES = (
+    b"\x89PNG\r\n\x1a\n"
+    b"\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15\xc4\x89"
+    b"\x00\x00\x00\x0bIDATx\x9cc``\x00\x00\x00\x02\x00\x01H\xaf\xa4q"
+    b"\x00\x00\x00\x00IEND\xaeB`\x82"
+)
+
 
 def build_image_response(
     *,
-    url: str | None = "https://example.invalid/generated.png?sig=secret",
+    url: str | None = None,
     b64_json: str | None = None,
     output_format: str = "png",
     request_id: str = "req_img_123",
 ) -> ImagesResponse:
     """Create a minimal OpenAI SDK image response for deterministic tests."""
+
+    if url is None and b64_json is None:
+        b64_json = base64.b64encode(MINIMAL_PNG_BYTES).decode("ascii")
 
     response = ImagesResponse.model_construct(
         created=1234567890,
@@ -70,6 +81,15 @@ def build_image_response(
     )
     response._request_id = request_id
     return response
+
+
+def build_binary_image_response() -> ImagesResponse:
+    """Create a deterministic binary-backed OpenAI SDK image response."""
+
+    return build_image_response(
+        url=None,
+        b64_json=base64.b64encode(MINIMAL_PNG_BYTES).decode("ascii"),
+    )
 
 
 @dataclass
@@ -185,7 +205,7 @@ def test_generate_translates_request_and_normalizes_response(
     """The adapter should translate the request and normalize the image result."""
 
     fake_logger = FakeLogger()
-    fake_images = FakeImagesClient(response=build_image_response())
+    fake_images = FakeImagesClient(response=build_binary_image_response())
     provider = build_provider(client=FakeOpenAIImageClient(fake_images))
     monkeypatch.setattr("creatoros.providers.openai.image._LOGGER", fake_logger)
     request = ImageGenerationRequest(prompt="Pixel art dragon", width=1024, height=1536)
@@ -202,7 +222,8 @@ def test_generate_translates_request_and_normalizes_response(
     assert result.data.mime_type == "image/png"
     assert result.data.artifact.uri.startswith("openai-image://generated/")
     assert result.data.artifact.metadata["provider_reference_kind"] == "temporary"
-    assert result.data.metadata["transient_source"] == "url"
+    assert result.data.metadata["transient_source"] == "binary"
+    assert result.data.payload_bytes == MINIMAL_PNG_BYTES
     assert result.usage is not None
     assert result.usage.input_units == 12
     assert result.usage.output_units == 34
@@ -215,7 +236,7 @@ def test_generate_translates_request_and_normalizes_response(
             "prompt": "Pixel art dragon",
             "size": "1024x1536",
             "output_format": "png",
-            "response_format": "url",
+            "response_format": "b64_json",
             "timeout": 30.0,
         }
     ]
@@ -302,13 +323,24 @@ def test_request_object_is_not_mutated() -> None:
 def test_response_with_base64_only_is_normalized_without_storing_payload() -> None:
     """Base64-backed responses should normalize safely without retaining payload data."""
 
-    response = build_image_response(url=None, b64_json="aGVsbG8=")
+    response = build_image_response(url=None, b64_json=base64.b64encode(b"hello").decode("ascii"))
     provider = build_provider(client=FakeOpenAIImageClient(FakeImagesClient(response=response)))
 
     result = run_async(provider.generate(ImageGenerationRequest(prompt="sprite")))
 
-    assert result.data.metadata["transient_source"] == "b64_json"
-    assert "aGVsbG8=" not in str(result.model_dump())
+    assert result.data.metadata["transient_source"] == "binary"
+    assert result.data.payload_bytes == b"hello"
+    assert base64.b64encode(b"hello").decode("ascii") not in str(result.model_dump())
+
+
+def test_malformed_base64_payload_is_rejected_safely() -> None:
+    """Malformed base64 image payloads should raise a typed provider response error."""
+
+    response = build_image_response(url=None, b64_json="%%%not-base64%%%")
+    provider = build_provider(client=FakeOpenAIImageClient(FakeImagesClient(response=response)))
+
+    with pytest.raises(ProviderResponseError):
+        run_async(provider.generate(ImageGenerationRequest(prompt="broken payload")))
 
 
 def test_missing_image_output_is_rejected_safely() -> None:
@@ -334,7 +366,21 @@ def test_missing_image_output_is_rejected_safely() -> None:
 def test_malformed_image_output_is_rejected_safely() -> None:
     """Responses with unusable image payloads should raise a typed error."""
 
-    malformed_response = build_image_response(url=None, b64_json=None)
+    malformed_response = ImagesResponse.model_construct(
+        created=1,
+        background="auto",
+        data=[
+            Image.model_construct(
+                url=None,
+                b64_json=None,
+                revised_prompt="provider prompt rewrite should not escape",
+            )
+        ],
+        output_format="png",
+        quality="standard",
+        size="1024x1024",
+        usage=None,
+    )
     provider = build_provider(
         client=FakeOpenAIImageClient(FakeImagesClient(response=malformed_response))
     )

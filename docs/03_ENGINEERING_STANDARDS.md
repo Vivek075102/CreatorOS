@@ -360,6 +360,8 @@ When a render-provider foundation is added before real rendering infrastructure 
 
 When a media-generation application service is added, it must remain a provider coordinator only. It may resolve providers, forward typed generation requests, and aggregate normalized generated-media results, but it must not execute prompts, import planning agents, invoke render providers, materialize files, upload assets, or mutate workflow state. Planning, generation, and rendering are separate stages and should remain independently testable.
 
+When local artifact materialization is needed, it must happen in a dedicated application-layer service rather than inside provider adapters, planning agents, or render providers. Providers may expose ephemeral payload bytes through provider-neutral result contracts when that is the smallest safe transport needed, but they must not write files directly, store raw payload blobs in ordinary metadata, or log payload contents.
+
 When a final-assembly application service is added, it must remain a mapping and coordination layer only. It may accept typed storyboard and generated-media inputs, enforce deterministic scene-to-asset alignment, build a `ShortRenderRequest`, and delegate to `MediaRenderService`, but it must not call provider registries directly, generate images, generate narration, generate clips, invoke agents, execute prompts, write files, publish content, or silently repair invalid asset counts.
 
 When a post-approval media-execution pipeline is added, it must preserve the two-phase architecture explicitly. Content planning must still stop at publication-readiness review, and media execution must require a second explicit call with positive human approval. Publication readiness must never be treated as implicit approval, and no media-generation or render-provider calls may occur before both gates pass.
@@ -390,6 +392,10 @@ The following rules are mandatory:
 - Temporary files must be cleaned reliably.
 - Generated assets must be referenced through structured records.
 - Valuable outputs must not be overwritten without explicit intent.
+- Local runtime artifact workspaces must stay under the configured artifact root and reject traversal-style identifiers before path joining.
+- MIME-to-extension mapping must be allowlisted explicitly rather than trusting provider-supplied filenames or extensions.
+- Ephemeral provider payload bytes must be excluded from normal serialization and logging.
+- Local artifact materialization is distinct from durable storage, cloud upload, publishing, and rendering.
 
 File and asset operations should preserve traceability, reproducibility, and recovery.
 

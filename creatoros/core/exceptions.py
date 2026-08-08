@@ -230,6 +230,18 @@ class AssetError(ApplicationError):
     """Raised for asset-related failures."""
 
 
+class ArtifactPathError(AssetError):
+    """Raised when artifact workspace or filename paths are invalid or unsafe."""
+
+
+class ArtifactPayloadError(AssetError):
+    """Raised when artifact payload bytes are missing, empty, or unusable."""
+
+
+class ArtifactAlreadyExistsError(AssetError):
+    """Raised when a materialized artifact would overwrite an existing file."""
+
+
 class PromptError(ApplicationError):
     """Raised for prompt-system execution failures."""
 
