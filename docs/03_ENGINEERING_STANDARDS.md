@@ -305,6 +305,8 @@ The following rules are mandatory:
 
 Typed parsers for prompt outputs should be added incrementally by prompt family. The current parsing layer now covers the built-in research, script, storyboard, media-support, and review prompt outputs. Agent or workflow migration to consume those parsers must remain explicit future work rather than an implicit side effect of parser implementation.
 
+When a prompt output has a typed parser, it should be registered through a provider-independent parser registry using the same stable logical prompt name used by the prompt registry. Parser registration must declare the expected output model type explicitly, and builtin prompt/parser alignment should be validated through deterministic contract checks rather than informal assumptions.
+
 Review parsers must remain advisory only. Parsing a decision such as `ready_for_human_review` must never publish content, approve content on behalf of a human, or mutate workflow state automatically.
 
 Prompt engineering is part of system design and must be handled with the same care as source code.

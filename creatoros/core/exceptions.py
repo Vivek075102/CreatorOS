@@ -281,6 +281,21 @@ class ParsingError(ApplicationError):
     """Raised for structured-output parsing failures."""
 
 
+class ParserRegistryError(ParsingError):
+    """Raised when parser registry operations fail."""
+
+
+class ParserNotFoundError(ParserRegistryError):
+    """Raised when a registered parser cannot be found for a prompt name."""
+
+    def __init__(self, prompt_name: str) -> None:
+        super().__init__(
+            f"No parser is registered for prompt '{prompt_name}'",
+            code="parser_not_found",
+            details={"prompt_name": prompt_name.strip()},
+        )
+
+
 class StructuredOutputError(ParsingError):
     """Raised when structured provider text is invalid or unusable."""
 

@@ -27,6 +27,10 @@ from creatoros.core import (
 from creatoros.domain import ContentPlatform
 from creatoros.observability import configure_logging, get_logger
 from creatoros.orchestrator import GamingWorkflowInput, run_demo_gaming_workflow
+from creatoros.parsing import (
+    build_builtin_parser_registry,
+    validate_builtin_prompt_parser_contracts,
+)
 from creatoros.prompts import (
     GAMING_CTA,
     GAMING_DISCOVER_TRENDS,
@@ -499,6 +503,32 @@ def _build_parser() -> argparse.ArgumentParser:
         command_group="prompts",
         command_name="render",
         handler=_handle_prompts_render,
+    )
+
+    parsers_parser = subparsers.add_parser(
+        "parsers",
+        help="Inspect builtin prompt parser registrations.",
+    )
+    parsers_subparsers = parsers_parser.add_subparsers(dest="command_name")
+
+    parsers_list = parsers_subparsers.add_parser(
+        "list",
+        help="List builtin parser registrations.",
+    )
+    parsers_list.set_defaults(
+        command_group="parsers",
+        command_name="list",
+        handler=_handle_parsers_list,
+    )
+
+    parsers_validate = parsers_subparsers.add_parser(
+        "validate",
+        help="Validate builtin prompt/parser registry alignment.",
+    )
+    parsers_validate.set_defaults(
+        command_group="parsers",
+        command_name="validate",
+        handler=_handle_parsers_validate,
     )
 
     run_parser = subparsers.add_parser("run", help="Run deterministic local demo workflows.")
@@ -999,6 +1029,53 @@ def _handle_run_gaming(
 
     _write_rows(stdout, rows)
     return EXIT_SUCCESS
+
+
+def _handle_parsers_list(
+    args: argparse.Namespace,
+    *,
+    stdout: TextIO,
+    stderr: TextIO,
+) -> int:
+    """List builtin parser registrations without exposing prompt content."""
+
+    del args, stderr
+    registry = build_builtin_parser_registry()
+    _write_output(stdout, "prompt_name | output_model")
+    for prompt_name in registry.list_prompt_names():
+        registration = registry.resolve(prompt_name)
+        _write_output(
+            stdout,
+            f"{registration.prompt_name} | {registration.output_model_type.__name__}",
+        )
+    return EXIT_SUCCESS
+
+
+def _handle_parsers_validate(
+    args: argparse.Namespace,
+    *,
+    stdout: TextIO,
+    stderr: TextIO,
+) -> int:
+    """Validate builtin prompt/parser registry alignment without provider calls."""
+
+    del args, stderr
+    prompt_registry = create_builtin_prompt_registry()
+    parser_registry = build_builtin_parser_registry()
+    report = validate_builtin_prompt_parser_contracts(prompt_registry, parser_registry)
+
+    _write_output(stdout, f"valid: {_format_value(report.valid)}")
+    _write_output(stdout, f"prompt_count: {report.metadata['prompt_count']}")
+    _write_output(stdout, f"parser_count: {report.metadata['parser_count']}")
+    _write_output(
+        stdout,
+        f"missing_parsers: {', '.join(report.missing_parsers) if report.missing_parsers else '(none)'}",
+    )
+    _write_output(
+        stdout,
+        f"orphan_parsers: {', '.join(report.orphan_parsers) if report.orphan_parsers else '(none)'}",
+    )
+    return EXIT_SUCCESS if report.valid else EXIT_CONFIGURATION_ERROR
 
 
 def build_safe_config_summary() -> dict[str, object]:

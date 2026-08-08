@@ -1,5 +1,9 @@
 """Provider-independent structured-output parsing foundation for CreatorOS."""
 
+from creatoros.parsing.contracts import (
+    PromptParserContractReport,
+    validate_builtin_prompt_parser_contracts,
+)
 from creatoros.parsing.enums import FieldRequirement, ParseStatus
 from creatoros.parsing.media import (
     GamingNarrationDirectionOutput,
@@ -18,6 +22,14 @@ from creatoros.parsing.models import (
     StructuredTextParseResult,
 )
 from creatoros.parsing.parser import StructuredTextParser, parse_into_model
+from creatoros.parsing.registry import (
+    ParserCallable,
+    ParserRegistration,
+    ParserRegistry,
+    build_builtin_parser_registry,
+    create_parser_registry,
+    get_builtin_parser_registry,
+)
 from creatoros.parsing.research import (
     GamingKeywordExpansionOutput,
     GamingOpportunityEvaluationOutput,
@@ -72,6 +84,10 @@ __all__ = [
     "GamingTrendDiscoveryOutput",
     "ParseStatus",
     "ParsedField",
+    "ParserCallable",
+    "ParserRegistration",
+    "ParserRegistry",
+    "PromptParserContractReport",
     "StoryboardSceneBreakdownOutput",
     "StoryboardScenePlan",
     "StoryboardTimingReviewOutput",
@@ -81,6 +97,9 @@ __all__ = [
     "StructuredTextParseResult",
     "StructuredTextParser",
     "YouTubeShortsScriptOutput",
+    "build_builtin_parser_registry",
+    "create_parser_registry",
+    "get_builtin_parser_registry",
     "normalize_field_label",
     "normalize_model_text",
     "parse_gaming_cta",
@@ -101,4 +120,5 @@ __all__ = [
     "parse_storyboard_timing_review",
     "parse_storyboard_visual_direction",
     "parse_youtube_shorts_script",
+    "validate_builtin_prompt_parser_contracts",
 ]

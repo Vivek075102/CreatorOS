@@ -132,6 +132,16 @@ def test_help_displays_prompts_command(cli_module) -> None:
     assert stderr == ""
 
 
+def test_help_displays_parsers_command(cli_module) -> None:
+    """Top-level help should include parser inspection commands."""
+
+    exit_code, stdout, stderr = run_cli(cli_module, ["--help"])
+
+    assert exit_code == 0
+    assert "parsers" in stdout
+    assert stderr == ""
+
+
 def test_version_displays_package_version(cli_module) -> None:
     """Version output should use the package version source."""
 
@@ -558,6 +568,89 @@ def test_prompts_list_shows_all_seventeen_prompt_names(
         "youtube_shorts_script",
     ]:
         assert prompt_name in stdout
+    assert stderr == ""
+
+
+def test_parsers_list_succeeds_and_lists_all_seventeen_registrations(cli_module) -> None:
+    """Parser listing should succeed and report all builtin registrations."""
+
+    exit_code, stdout, stderr = run_cli(cli_module, ["parsers", "list"])
+    lines = [line for line in stdout.splitlines() if " | " in line]
+
+    assert exit_code == 0
+    assert lines[0] == "prompt_name | output_model"
+    assert len(lines[1:]) == 17
+    assert stderr == ""
+
+
+def test_parsers_list_shows_expected_output_model_names(cli_module) -> None:
+    """Parser listing should show stable expected output model names."""
+
+    exit_code, stdout, _ = run_cli(cli_module, ["parsers", "list"])
+
+    assert exit_code == 0
+    assert "gaming_discover_trends | GamingTrendDiscoveryOutput" in stdout
+    assert "youtube_shorts_script | YouTubeShortsScriptOutput" in stdout
+    assert "gaming_publication_readiness_review | GamingPublicationReadinessReviewOutput" in stdout
+
+
+def test_parsers_list_is_deterministic(cli_module) -> None:
+    """Parser list output should remain predictably ordered."""
+
+    _, stdout, _ = run_cli(cli_module, ["parsers", "list"])
+    lines = [line for line in stdout.splitlines() if " | " in line][1:]
+
+    assert lines == sorted(lines)
+
+
+def test_parsers_list_does_not_call_providers(cli_module, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Parser listing should not resolve provider registries."""
+
+    monkeypatch.setattr(cli_module, "get_provider_registry", lambda: (_ for _ in ()).throw(RuntimeError("should not be called")))
+
+    exit_code, stdout, stderr = run_cli(cli_module, ["parsers", "list"])
+
+    assert exit_code == 0
+    assert "prompt_name | output_model" in stdout
+    assert stderr == ""
+
+
+def test_parsers_validate_succeeds_and_reports_valid_contract(cli_module, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """Parser validation should succeed for the current builtin prompt/parser contract."""
+
+    _copy_repo_prompt_structure(tmp_path)
+    monkeypatch.setattr(
+        cli_module,
+        "create_builtin_prompt_registry",
+        lambda: create_builtin_prompt_registry(base_dir=tmp_path),
+    )
+
+    exit_code, stdout, stderr = run_cli(cli_module, ["parsers", "validate"])
+
+    assert exit_code == 0
+    assert "valid: true" in stdout
+    assert "prompt_count: 17" in stdout
+    assert "parser_count: 17" in stdout
+    assert "missing_parsers: (none)" in stdout
+    assert "orphan_parsers: (none)" in stdout
+    assert stderr == ""
+
+
+def test_parsers_validate_does_not_call_providers(cli_module, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """Parser validation should not resolve provider registries."""
+
+    _copy_repo_prompt_structure(tmp_path)
+    monkeypatch.setattr(
+        cli_module,
+        "create_builtin_prompt_registry",
+        lambda: create_builtin_prompt_registry(base_dir=tmp_path),
+    )
+    monkeypatch.setattr(cli_module, "get_provider_registry", lambda: (_ for _ in ()).throw(RuntimeError("should not be called")))
+
+    exit_code, stdout, stderr = run_cli(cli_module, ["parsers", "validate"])
+
+    assert exit_code == 0
+    assert "valid: true" in stdout
     assert stderr == ""
 
 

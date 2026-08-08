@@ -78,6 +78,11 @@ CreatorOS now includes a provider-independent structured-output parsing foundati
 - Storyboard prompt outputs now have typed parsers for scene breakdowns, visual direction, and timing review.
 - Media prompt outputs now have typed parsers for thumbnail concepts, scene visuals, scene motion, and narration direction.
 - Review prompt outputs now have typed advisory parsers for script, evidence, storyboard, and publication-readiness reviews.
+- A `ParserRegistry` now maps stable logical prompt names to typed parser registrations.
+- Each parser registration declares its expected output model type explicitly.
+- Prompt registration and parser registration remain separate concerns.
+- Builtin prompt/parser contract validation detects drift between prompt assets and typed parser registrations.
+- All 17 current builtin prompt assets now have typed parser registrations.
 - Keyword-list parsing supports simple `- item` bullet syntax only.
 - Repeating storyboard scenes use a dedicated safe scene-block parser rather than a brittle flat-field approximation.
 - JSON parsing is not part of this milestone.
@@ -86,6 +91,7 @@ CreatorOS now includes a provider-independent structured-output parsing foundati
 - No repair or retry mechanism exists yet.
 
 Agents and workflows are not yet migrated to consume these typed parsers automatically. Review outputs remain advisory only, and `ready_for_human_review` is not publication approval.
+Provider integration can now resolve typed parsers through a provider-independent registry contract instead of hardcoded prompt-family branching, but no real LLM provider is integrated yet and no workflow behavior changed in this milestone.
 
 ## Prompt Asset Structure
 
@@ -149,6 +155,8 @@ python -m creatoros prompts manifest show
 python -m creatoros prompts manifest validate
 python -m creatoros prompts discover
 python -m creatoros prompts list
+python -m creatoros parsers list
+python -m creatoros parsers validate
 python -m creatoros prompts render gaming_discover_trends
 python -m creatoros prompts render gaming_discover_trends --game Roblox --topic "funny myths" --signals "Players are discussing recurring myths about game mechanics." --show-content
 python -m creatoros prompts render youtube_shorts_script

@@ -222,7 +222,11 @@ This parsing layer belongs above concrete providers and below domain-model const
 
 The current typed parsers cover research, script, storyboard, media-support, and review outputs for the built-in gaming prompts. They remain provider-independent parsing adapters, not provider integrations, and they do not yet change agent or workflow execution.
 
+Prompt registration and parser registration are separate architectural concerns. Prompt registries own prompt definitions, versions, and rendering lookup. Parser registries own the mapping from stable prompt logical names to typed parser callables and their declared output model types. This separation allows provider integration code to resolve parsing contracts without coupling prompt assets to parser implementation details or hardcoded agent branching.
+
 The storyboard scene-breakdown contract uses a dedicated safe scene-block parser because it contains repeating `SCENE_N` sections that should not be forced through a brittle flat-field approximation.
+
+Builtin prompt and parser registries should also support deterministic contract validation so the platform can detect drift between registered prompt assets and registered typed parsers before provider execution paths depend on them.
 
 The current version intentionally does not include JSON parsing, Markdown-table parsing, automatic repair logic, retry-based self-correction, or workflow-state side effects from parser output. Review parsing remains advisory only. A parsed `ready_for_human_review` result is still not publication approval.
 
@@ -563,7 +567,7 @@ The intended persistence stack for CreatorOS is PostgreSQL, SQLAlchemy 2.x, Alem
 
 The initial prompt foundation should treat prompt definitions as validated JSON assets loaded from the configured prompts directory, registered through a platform-owned registry, rendered through explicit typed variables, and discoverable through a manifest-aware asset structure. Broader asset formats or remote prompt management may be considered later only if they preserve the same architectural boundaries.
 
-The current built-in prompt catalog is intentionally narrow. It covers the first provider-independent research, script, storyboard, thumbnail, narration, and review prompt assets plus local rendering support, not a complete prompt inventory for every engine or workflow. These assets define text-based output contracts only. The structured parsing foundation now validates deterministic label/value outputs before they are adapted into CreatorOS models, and typed parser adapters now cover all current built-in prompt families. Evidence consistency and publication-readiness review remain advisory prompt contracts that operate on supplied inputs only. Workflow integration for parsed outputs and downstream media-generation integration remain later milestone work.
+The current built-in prompt catalog is intentionally narrow. It covers the first provider-independent research, script, storyboard, thumbnail, narration, and review prompt assets plus local rendering support, not a complete prompt inventory for every engine or workflow. These assets define text-based output contracts only. The structured parsing foundation now validates deterministic label/value outputs before they are adapted into CreatorOS models, typed parser adapters now cover all current built-in prompt families, and a provider-independent parser registry now maps all 17 current built-in prompt logical names to typed output contracts. Evidence consistency and publication-readiness review remain advisory prompt contracts that operate on supplied inputs only. Workflow integration for parsed outputs and downstream media-generation integration remain later milestone work.
 
 ## 24. Testing Architecture
 
