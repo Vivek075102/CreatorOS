@@ -141,6 +141,7 @@ Build the Research Engine and Opportunity Engine capabilities required to gather
 - Normalized research signal models
 - Prompt system foundation with provider-independent prompt contracts, validation, rendering, registry, loader, manifest, and discovery components
 - Initial built-in gaming research prompt assets with local registry bootstrap and deterministic CLI rendering support
+- Initial built-in gaming script prompt assets with text-based output contracts and deterministic local CLI rendering support
 - Opportunity scoring rules and ranking pipeline
 - Research result persistence
 - Approval-ready content opportunity outputs

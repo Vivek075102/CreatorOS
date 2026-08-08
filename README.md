@@ -88,13 +88,16 @@ Prompt names are global logical identifiers and should be unique enough to avoid
 
 ## Built-In Research Prompts
 
-CreatorOS now includes a first set of built-in provider-independent research prompt assets for gaming workflows:
+CreatorOS now includes a first set of built-in provider-independent prompt assets for gaming workflows:
 
+- `gaming_cta`
 - `gaming_discover_trends`
 - `gaming_evaluate_opportunity`
 - `gaming_expand_keywords`
+- `gaming_hook`
+- `youtube_shorts_script`
 
-These prompts are stored as validated JSON assets under `prompts/research/gaming/`, represented in `prompts/manifest.json`, and loadable through the platform prompt registry without provider calls.
+These prompts are stored as validated JSON assets under `prompts/research/gaming/` and `prompts/script/`, represented in `prompts/manifest.json`, and loadable through the platform prompt registry without provider calls. Stable logical prompt names should be used from application code instead of filesystem paths.
 
 Use the CLI to inspect the manifest, discover assets, list registered prompts, and render the deterministic research prompt locally:
 
@@ -105,6 +108,12 @@ python -m creatoros prompts discover
 python -m creatoros prompts list
 python -m creatoros prompts render gaming_discover_trends
 python -m creatoros prompts render gaming_discover_trends --game Roblox --topic "funny myths" --signals "Players are discussing recurring myths about game mechanics." --show-content
+python -m creatoros prompts render youtube_shorts_script
+python -m creatoros prompts render youtube_shorts_script --title "Roblox: Funny Myths" --game Roblox --topic "funny myths" --angle "test three popular myths" --hook-direction "challenge a common belief" --source-summary "Supplied research notes discuss recurring myths about game mechanics." --show-content
+python -m creatoros prompts render gaming_hook --show-content
+python -m creatoros prompts render gaming_cta --show-content
 ```
 
-By default, `prompts render` shows prompt metadata only. Full rendered prompt content is shown only when `--show-content` is provided. These commands render locally and do not call an LLM provider.
+By default, `prompts render` shows prompt metadata only. Full rendered prompt content is shown only when `--show-content` is provided. These commands render locally, do not call an LLM provider, and do not imply that real AI generation is already wired into the demo workflow.
+
+The current research and script prompt output contracts are text-based. Structured parsing and downstream model migration will be added in a later milestone.

@@ -1,0 +1,66 @@
+{
+  "name": "gaming_hook",
+  "version": 1,
+  "status": "active",
+  "description": "Generate concise candidate hooks for a short-form gaming script using supplied evidence only.",
+  "format": "text",
+  "messages": [
+    {
+      "role": "system",
+      "content": "You write concise gaming hooks for short-form content. Rely only on supplied input. Do not invent unsupported claims, statistics, controversy, urgency, or certainty. Keep the output provider-independent, clear, and usable for spoken delivery."
+    },
+    {
+      "role": "user",
+      "content": "INPUTS\\nGAME: {game}\\nTITLE: {title}\\nTOPIC: {topic}\\nANGLE: {angle}\\nSOURCE_SUMMARY: {source_summary}\\nPLATFORM: {platform}\\n\\nTASK\\nGenerate three candidate hooks for a gaming short based only on the supplied input, then select the best one.\\n\\nRULES\\n- Each hook must be concise.\\n- Prioritize curiosity and clarity.\\n- No unsupported claims.\\n- No fake urgency.\\n- No fake controversy.\\n- No invented statistics.\\n- Do not use misleading certainty.\\n- BEST_HOOK must select one of the three.\\n- WHY must be brief and evaluative, not hidden reasoning.\\n\\nOUTPUT FORMAT\\nHOOK_1:\\n...\\n\\nHOOK_2:\\n...\\n\\nHOOK_3:\\n...\\n\\nBEST_HOOK:\\n...\\n\\nWHY:\\n..."
+    }
+  ],
+  "variables": [
+    {
+      "name": "game",
+      "variable_type": "string",
+      "required": true,
+      "description": "The game context for the hooks."
+    },
+    {
+      "name": "title",
+      "variable_type": "string",
+      "required": true,
+      "description": "The working title associated with the topic."
+    },
+    {
+      "name": "topic",
+      "variable_type": "string",
+      "required": true,
+      "description": "The topic the hooks should reflect."
+    },
+    {
+      "name": "angle",
+      "variable_type": "string",
+      "required": true,
+      "description": "The main angle to emphasize."
+    },
+    {
+      "name": "source_summary",
+      "variable_type": "string",
+      "required": true,
+      "description": "The supplied evidence summary supporting the hooks."
+    },
+    {
+      "name": "platform",
+      "variable_type": "string",
+      "required": true,
+      "description": "The target platform identifier."
+    }
+  ],
+  "tags": [
+    "gaming",
+    "script",
+    "hook"
+  ],
+  "metadata": {
+    "domain": "gaming",
+    "stage": "script",
+    "owner": "creatoros",
+    "provider_independent": true
+  }
+}

@@ -26,8 +26,7 @@ def test_exactly_three_research_gaming_prompt_json_files_exist() -> None:
     prompts_root = _repo_prompts_dir()
     json_paths = sorted(
         path.relative_to(prompts_root)
-        for path in prompts_root.rglob("*.json")
-        if path.name != "manifest.json"
+        for path in (prompts_root / "research" / "gaming").rglob("*.json")
     )
 
     assert json_paths == sorted(RESEARCH_PROMPT_PATHS)

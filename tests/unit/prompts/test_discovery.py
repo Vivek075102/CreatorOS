@@ -339,11 +339,14 @@ def test_manifest_json_exists_and_is_valid() -> None:
     manifest = PromptAssetManifest.model_validate(json.loads(manifest_path.read_text(encoding="utf-8")))
 
     assert manifest.schema_version == 1
-    assert len(manifest.entries) == 3
+    assert len(manifest.entries) == 6
     assert [entry.path for entry in manifest.list_entries()] == [
         "research/gaming/gaming_discover_trends.v1.json",
         "research/gaming/gaming_evaluate_opportunity.v1.json",
         "research/gaming/gaming_expand_keywords.v1.json",
+        "script/gaming_cta.v1.json",
+        "script/gaming_hook.v1.json",
+        "script/youtube_shorts_script.v1.json",
     ]
 
 
@@ -355,7 +358,6 @@ def test_empty_directories_contain_gitkeep_where_needed() -> None:
     expected_gitkeep_paths = {
         "research/.gitkeep",
         "research/common/.gitkeep",
-        "script/.gitkeep",
         "storyboard/.gitkeep",
         "narration/.gitkeep",
         "thumbnail/.gitkeep",
@@ -371,8 +373,8 @@ def test_empty_directories_contain_gitkeep_where_needed() -> None:
     assert expected_gitkeep_paths == actual_paths
 
 
-def test_repository_contains_exactly_three_prompt_definition_json_files() -> None:
-    """The repository should contain exactly the three builtin research prompt assets."""
+def test_repository_contains_exactly_six_prompt_definition_json_files() -> None:
+    """The repository should contain the three builtin research and three script prompt assets."""
 
     repo_root = Path(__file__).resolve().parents[3]
     prompts_root = repo_root / "prompts"
@@ -386,4 +388,7 @@ def test_repository_contains_exactly_three_prompt_definition_json_files() -> Non
         "research/gaming/gaming_discover_trends.v1.json",
         "research/gaming/gaming_evaluate_opportunity.v1.json",
         "research/gaming/gaming_expand_keywords.v1.json",
+        "script/gaming_cta.v1.json",
+        "script/gaming_hook.v1.json",
+        "script/youtube_shorts_script.v1.json",
     ]

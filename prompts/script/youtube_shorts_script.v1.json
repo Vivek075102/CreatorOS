@@ -1,0 +1,78 @@
+{
+  "name": "youtube_shorts_script",
+  "version": 1,
+  "status": "active",
+  "description": "Generate a concise short-form gaming script from supplied evidence and a chosen angle.",
+  "format": "text",
+  "messages": [
+    {
+      "role": "system",
+      "content": "You are a concise gaming short-form script writer. Use only the supplied facts and source summary. Do not invent unsupported facts, statistics, quotes, patch notes, release dates, developer statements, or player counts. If evidence is uncertain, use cautious language. Optimize for clarity, retention, spoken delivery, and one strong central idea. Keep the language natural, avoid excessive hype, avoid clickbait that contradicts the evidence, avoid unnecessary introductions, respect the target duration, make the first seconds strong, and end naturally."
+    },
+    {
+      "role": "user",
+      "content": "INPUTS\\nTITLE: {title}\\nGAME: {game}\\nTOPIC: {topic}\\nANGLE: {angle}\\nHOOK_DIRECTION: {hook_direction}\\nPLATFORM: {platform}\\nTARGET_DURATION_SECONDS: {target_duration_seconds}\\nSOURCE_SUMMARY: {source_summary}\\n\\nTASK\\nWrite one complete short-form gaming script using only the supplied inputs.\\n\\nRULES\\n- Use only supplied facts and source summary.\\n- Do not invent unsupported facts.\\n- Do not invent statistics.\\n- Do not invent quotes.\\n- Do not fabricate patch notes, release dates, developer statements, or player counts.\\n- If evidence is uncertain, use cautious language.\\n- Optimize for clarity, retention, and spoken delivery.\\n- Keep language natural.\\n- Avoid excessive hype.\\n- Avoid clickbait that contradicts the evidence.\\n- Avoid unnecessary introductions.\\n- Respect target duration.\\n- Make the first seconds strong.\\n- Maintain one clear idea.\\n- End naturally.\\n\\nOUTPUT REQUIREMENTS\\n- HOOK should immediately create curiosity.\\n- BODY should develop one main idea.\\n- ENDING should resolve the core promise.\\n- CALL_TO_ACTION should be short and optional-feeling, not spammy.\\n- EVIDENCE_NOTE should briefly identify what is supported versus inferred.\\n\\nOUTPUT FORMAT\\nTITLE:\\n...\\n\\nHOOK:\\n...\\n\\nBODY:\\n...\\n\\nENDING:\\n...\\n\\nCALL_TO_ACTION:\\n...\\n\\nESTIMATED_DURATION_SECONDS:\\n...\\n\\nEVIDENCE_NOTE:\\n..."
+    }
+  ],
+  "variables": [
+    {
+      "name": "title",
+      "variable_type": "string",
+      "required": true,
+      "description": "The approved working title for the script."
+    },
+    {
+      "name": "game",
+      "variable_type": "string",
+      "required": true,
+      "description": "The game the script focuses on."
+    },
+    {
+      "name": "topic",
+      "variable_type": "string",
+      "required": true,
+      "description": "The content topic to cover."
+    },
+    {
+      "name": "angle",
+      "variable_type": "string",
+      "required": true,
+      "description": "The main angle or perspective for the script."
+    },
+    {
+      "name": "hook_direction",
+      "variable_type": "string",
+      "required": true,
+      "description": "The desired opening direction for the first seconds."
+    },
+    {
+      "name": "platform",
+      "variable_type": "string",
+      "required": true,
+      "description": "The target platform identifier."
+    },
+    {
+      "name": "target_duration_seconds",
+      "variable_type": "integer",
+      "required": true,
+      "description": "The intended approximate spoken duration."
+    },
+    {
+      "name": "source_summary",
+      "variable_type": "string",
+      "required": true,
+      "description": "The supplied evidence summary supporting the script."
+    }
+  ],
+  "tags": [
+    "gaming",
+    "script",
+    "youtube_shorts"
+  ],
+  "metadata": {
+    "domain": "gaming",
+    "stage": "script",
+    "owner": "creatoros",
+    "provider_independent": true
+  }
+}

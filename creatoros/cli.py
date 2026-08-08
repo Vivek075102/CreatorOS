@@ -28,10 +28,17 @@ from creatoros.domain import ContentPlatform
 from creatoros.observability import configure_logging, get_logger
 from creatoros.orchestrator import GamingWorkflowInput, run_demo_gaming_workflow
 from creatoros.prompts import (
+    GAMING_CTA,
+    GAMING_DISCOVER_TRENDS,
+    GAMING_HOOK,
+    YOUTUBE_SHORTS_SCRIPT,
     PromptAssetDiscovery,
     PromptManifestLoader,
     create_builtin_prompt_registry,
+    render_gaming_cta,
     render_gaming_discover_trends,
+    render_gaming_hook,
+    render_youtube_shorts_script,
 )
 from creatoros.providers import get_provider_registry
 from creatoros.providers.mock import create_mock_provider_registry
@@ -316,12 +323,33 @@ def _build_parser() -> argparse.ArgumentParser:
 
     prompts_render = prompts_subparsers.add_parser("render", help="Render a builtin prompt locally.")
     prompts_render.add_argument("prompt_name", help="Stable logical prompt name to render.")
+    prompts_render.add_argument("--title", default="Minecraft: Gaming Facts", help="Title input for supported script and hook prompts.")
     prompts_render.add_argument("--game", default="Minecraft", help="Game input for the render helper.")
     prompts_render.add_argument("--topic", default="gaming facts", help="Topic input for the render helper.")
+    prompts_render.add_argument(
+        "--angle",
+        default="Explain one clear gaming fact with cautious evidence.",
+        help="Angle input for supported script and hook prompts.",
+    )
+    prompts_render.add_argument(
+        "--hook-direction",
+        default="Challenge a common assumption quickly",
+        help="Hook direction input for the short-form script prompt.",
+    )
     prompts_render.add_argument(
         "--signals",
         default="No live research supplied; deterministic local demonstration signal.",
         help="Supplied research signals for the render helper.",
+    )
+    prompts_render.add_argument(
+        "--source-summary",
+        default="Supplied evidence summary for local prompt rendering only.",
+        help="Source summary input for supported script and hook prompts.",
+    )
+    prompts_render.add_argument(
+        "--tone",
+        default="natural and concise",
+        help="Tone input for the CTA prompt.",
     )
     prompts_render.add_argument(
         "--platform",
@@ -619,22 +647,52 @@ def _handle_prompts_render(
     """Render one supported builtin prompt locally without provider calls."""
 
     del stderr
-    if args.prompt_name != "gaming_discover_trends":
+    registry = create_builtin_prompt_registry()
+    if args.prompt_name == GAMING_DISCOVER_TRENDS:
+        rendered = render_gaming_discover_trends(
+            registry,
+            game=args.game,
+            topic=args.topic,
+            research_signals=args.signals,
+            platform=args.platform,
+            target_duration_seconds=args.duration,
+        )
+    elif args.prompt_name == YOUTUBE_SHORTS_SCRIPT:
+        rendered = render_youtube_shorts_script(
+            registry,
+            title=args.title,
+            game=args.game,
+            topic=args.topic,
+            angle=args.angle,
+            hook_direction=args.hook_direction,
+            platform=args.platform,
+            target_duration_seconds=args.duration,
+            source_summary=args.source_summary,
+        )
+    elif args.prompt_name == GAMING_HOOK:
+        rendered = render_gaming_hook(
+            registry,
+            game=args.game,
+            title=args.title,
+            topic=args.topic,
+            angle=args.angle,
+            source_summary=args.source_summary,
+            platform=args.platform,
+        )
+    elif args.prompt_name == GAMING_CTA:
+        rendered = render_gaming_cta(
+            registry,
+            game=args.game,
+            topic=args.topic,
+            platform=args.platform,
+            tone=args.tone,
+        )
+    else:
         raise CreatorOSValidationError(
-            "only gaming_discover_trends is supported by the render command currently",
+            "the requested builtin prompt is not supported by the render command",
             code="prompt_render_cli_unsupported_prompt",
             details={"prompt_name": args.prompt_name},
         )
-
-    registry = create_builtin_prompt_registry()
-    rendered = render_gaming_discover_trends(
-        registry,
-        game=args.game,
-        topic=args.topic,
-        research_signals=args.signals,
-        platform=args.platform,
-        target_duration_seconds=args.duration,
-    )
 
     _write_rows(
         stdout,

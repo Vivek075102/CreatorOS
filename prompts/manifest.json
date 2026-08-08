@@ -63,6 +63,66 @@
         "owner": "creatoros",
         "provider_independent": true
       }
+    },
+    {
+      "name": "gaming_cta",
+      "version": 1,
+      "category": "script",
+      "path": "script/gaming_cta.v1.json",
+      "status": "active",
+      "description": "Generate a concise, natural call to action for short-form gaming content.",
+      "tags": [
+        "gaming",
+        "script",
+        "cta"
+      ],
+      "checksum": "20feccb06024c40b131e3aaa941f6d5ce3bd14417227dce7f792d7b5365886ea",
+      "metadata": {
+        "domain": "gaming",
+        "stage": "script",
+        "owner": "creatoros",
+        "provider_independent": true
+      }
+    },
+    {
+      "name": "gaming_hook",
+      "version": 1,
+      "category": "script",
+      "path": "script/gaming_hook.v1.json",
+      "status": "active",
+      "description": "Generate concise candidate hooks for a short-form gaming script using supplied evidence only.",
+      "tags": [
+        "gaming",
+        "script",
+        "hook"
+      ],
+      "checksum": "24f68f44bb330c6a3c1c246be044c380e4d9fda03d6dfee6806bf8de844848d3",
+      "metadata": {
+        "domain": "gaming",
+        "stage": "script",
+        "owner": "creatoros",
+        "provider_independent": true
+      }
+    },
+    {
+      "name": "youtube_shorts_script",
+      "version": 1,
+      "category": "script",
+      "path": "script/youtube_shorts_script.v1.json",
+      "status": "active",
+      "description": "Generate a concise short-form gaming script from supplied evidence and a chosen angle.",
+      "tags": [
+        "gaming",
+        "script",
+        "youtube_shorts"
+      ],
+      "checksum": "444c2eff296342ca227bd44e64606092410a0a719c6ee77c7ec2f6103d8c8ddd",
+      "metadata": {
+        "domain": "gaming",
+        "stage": "script",
+        "owner": "creatoros",
+        "provider_independent": true
+      }
     }
   ],
   "metadata": {

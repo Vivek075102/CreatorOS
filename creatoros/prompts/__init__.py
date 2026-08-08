@@ -31,11 +31,22 @@ from creatoros.prompts.research import (
     render_gaming_evaluate_opportunity,
     render_gaming_expand_keywords,
 )
+from creatoros.prompts.script import (
+    GAMING_CTA,
+    GAMING_HOOK,
+    YOUTUBE_SHORTS_SCRIPT,
+    render_gaming_cta,
+    render_gaming_hook,
+    render_youtube_shorts_script,
+)
 
 __all__ = [
+    "GAMING_CTA",
     "GAMING_DISCOVER_TRENDS",
     "GAMING_EVALUATE_OPPORTUNITY",
     "GAMING_EXPAND_KEYWORDS",
+    "GAMING_HOOK",
+    "YOUTUBE_SHORTS_SCRIPT",
     "PromptAssetCategory",
     "PromptAssetDiscovery",
     "PromptAssetManifest",
@@ -60,7 +71,10 @@ __all__ = [
     "get_prompt_registry",
     "load_builtin_prompts",
     "parse_prompt_asset_filename",
+    "render_gaming_cta",
     "render_gaming_discover_trends",
     "render_gaming_evaluate_opportunity",
     "render_gaming_expand_keywords",
+    "render_gaming_hook",
+    "render_youtube_shorts_script",
 ]

@@ -56,10 +56,13 @@ def test_initial_repository_manifest_loads() -> None:
     manifest = loader.load()
 
     assert manifest.schema_version == 1
-    assert [entry.name for entry in manifest.entries] == [
+    assert [entry.name for entry in manifest.list_entries()] == [
         "gaming_discover_trends",
         "gaming_evaluate_opportunity",
         "gaming_expand_keywords",
+        "gaming_cta",
+        "gaming_hook",
+        "youtube_shorts_script",
     ]
 
 

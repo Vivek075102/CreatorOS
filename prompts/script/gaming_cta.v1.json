@@ -1,0 +1,54 @@
+{
+  "name": "gaming_cta",
+  "version": 1,
+  "status": "active",
+  "description": "Generate a concise, natural call to action for short-form gaming content.",
+  "format": "text",
+  "messages": [
+    {
+      "role": "system",
+      "content": "You write short, natural calls to action for gaming short-form content. Use only the supplied topic context. Keep the language concise, spoken, and non-manipulative. Do not invent facts or force engagement."
+    },
+    {
+      "role": "user",
+      "content": "INPUTS\\nGAME: {game}\\nTOPIC: {topic}\\nPLATFORM: {platform}\\nTONE: {tone}\\n\\nTASK\\nGenerate one short CTA and one alternative CTA for the supplied gaming topic and platform.\\n\\nRULES\\n- No begging for likes or subscriptions.\\n- No manipulative pressure.\\n- Concise.\\n- Natural spoken language.\\n- Relevant to the topic when possible.\\n- Should work even when the viewer does not subscribe.\\n- No unsupported factual claims.\\n\\nOUTPUT FORMAT\\nCTA:\\n...\\n\\nALTERNATIVE:\\n..."
+    }
+  ],
+  "variables": [
+    {
+      "name": "game",
+      "variable_type": "string",
+      "required": true,
+      "description": "The game context for the CTA."
+    },
+    {
+      "name": "topic",
+      "variable_type": "string",
+      "required": true,
+      "description": "The topic context for the CTA."
+    },
+    {
+      "name": "platform",
+      "variable_type": "string",
+      "required": true,
+      "description": "The target platform identifier."
+    },
+    {
+      "name": "tone",
+      "variable_type": "string",
+      "required": true,
+      "description": "The desired tone for the CTA."
+    }
+  ],
+  "tags": [
+    "gaming",
+    "script",
+    "cta"
+  ],
+  "metadata": {
+    "domain": "gaming",
+    "stage": "script",
+    "owner": "creatoros",
+    "provider_independent": true
+  }
+}

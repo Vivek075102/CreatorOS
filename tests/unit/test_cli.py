@@ -520,12 +520,12 @@ def test_prompts_cli_does_not_print_prompt_contents(
     assert stderr == ""
 
 
-def test_prompts_list_shows_all_three_prompt_names(
+def test_prompts_list_shows_all_six_prompt_names(
     cli_module,
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
-    """Builtin prompt listing should show the three research prompt names."""
+    """Builtin prompt listing should show the research and script prompt names."""
 
     _copy_repo_prompt_structure(tmp_path)
     monkeypatch.setattr(
@@ -539,9 +539,12 @@ def test_prompts_list_shows_all_three_prompt_names(
 
     assert exit_code == 0
     for prompt_name in [
+        "gaming_cta",
         "gaming_discover_trends",
         "gaming_evaluate_opportunity",
         "gaming_expand_keywords",
+        "gaming_hook",
+        "youtube_shorts_script",
     ]:
         assert prompt_name in stdout
     assert stderr == ""
@@ -587,6 +590,30 @@ def test_prompts_render_gaming_discover_trends_succeeds(
 
     assert exit_code == 0
     assert "prompt_name: gaming_discover_trends" in stdout
+    assert "prompt_version: 1" in stdout
+    assert "message_count:" in stdout
+    assert "variable_names:" in stdout
+    assert stderr == ""
+
+
+def test_prompts_render_youtube_shorts_script_succeeds(
+    cli_module,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Local prompt rendering should succeed for youtube_shorts_script."""
+
+    _copy_repo_prompt_structure(tmp_path)
+    monkeypatch.setattr(
+        cli_module,
+        "create_builtin_prompt_registry",
+        lambda: create_builtin_prompt_registry(base_dir=tmp_path),
+    )
+
+    exit_code, stdout, stderr = run_cli(cli_module, ["prompts", "render", "youtube_shorts_script"])
+
+    assert exit_code == 0
+    assert "prompt_name: youtube_shorts_script" in stdout
     assert "prompt_version: 1" in stdout
     assert "message_count:" in stdout
     assert "variable_names:" in stdout
@@ -640,6 +667,32 @@ def test_show_content_prints_rendered_content(
     assert "WHY_NOW:" in stdout
 
 
+def test_show_content_prints_full_youtube_shorts_script_rendered_content(
+    cli_module,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Explicit content display should print rendered short-form script prompt text."""
+
+    _copy_repo_prompt_structure(tmp_path)
+    monkeypatch.setattr(
+        cli_module,
+        "create_builtin_prompt_registry",
+        lambda: create_builtin_prompt_registry(base_dir=tmp_path),
+    )
+
+    exit_code, stdout, _ = run_cli(
+        cli_module,
+        ["prompts", "render", "youtube_shorts_script", "--show-content"],
+    )
+
+    assert exit_code == 0
+    assert "Rendered locally only. No provider call occurred." in stdout
+    assert "HOOK_DIRECTION:" in stdout
+    assert "CALL_TO_ACTION:" in stdout
+    assert "EVIDENCE_NOTE:" in stdout
+
+
 def test_custom_game_and_topic_values_are_reflected_when_content_is_shown(
     cli_module,
     monkeypatch: pytest.MonkeyPatch,
@@ -674,6 +727,103 @@ def test_custom_game_and_topic_values_are_reflected_when_content_is_shown(
     assert "GAME: Roblox" in stdout
     assert "TOPIC: funny myths" in stdout
     assert "Players are discussing recurring myths about game mechanics." in stdout
+
+
+def test_custom_script_prompt_values_are_reflected_when_content_is_shown(
+    cli_module,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Shown script prompt content should reflect custom render inputs."""
+
+    _copy_repo_prompt_structure(tmp_path)
+    monkeypatch.setattr(
+        cli_module,
+        "create_builtin_prompt_registry",
+        lambda: create_builtin_prompt_registry(base_dir=tmp_path),
+    )
+
+    exit_code, stdout, _ = run_cli(
+        cli_module,
+        [
+            "prompts",
+            "render",
+            "youtube_shorts_script",
+            "--title",
+            "Roblox: Funny Myths",
+            "--game",
+            "Roblox",
+            "--topic",
+            "funny myths",
+            "--angle",
+            "test three popular myths",
+            "--hook-direction",
+            "challenge a common belief",
+            "--source-summary",
+            "Supplied research notes discuss recurring myths about game mechanics.",
+            "--show-content",
+        ],
+    )
+
+    assert exit_code == 0
+    assert "TITLE: Roblox: Funny Myths" in stdout
+    assert "GAME: Roblox" in stdout
+    assert "TOPIC: funny myths" in stdout
+    assert "ANGLE: test three popular myths" in stdout
+    assert "HOOK_DIRECTION: challenge a common belief" in stdout
+    assert "SOURCE_SUMMARY: Supplied research notes discuss recurring myths about game mechanics." in stdout
+
+
+def test_prompts_render_gaming_hook_succeeds(
+    cli_module,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Local prompt rendering should succeed for gaming_hook."""
+
+    _copy_repo_prompt_structure(tmp_path)
+    monkeypatch.setattr(
+        cli_module,
+        "create_builtin_prompt_registry",
+        lambda: create_builtin_prompt_registry(base_dir=tmp_path),
+    )
+
+    exit_code, stdout, stderr = run_cli(
+        cli_module,
+        ["prompts", "render", "gaming_hook", "--show-content"],
+    )
+
+    assert exit_code == 0
+    assert "prompt_name: gaming_hook" in stdout
+    assert "HOOK_1:" in stdout
+    assert "BEST_HOOK:" in stdout
+    assert stderr == ""
+
+
+def test_prompts_render_gaming_cta_succeeds(
+    cli_module,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Local prompt rendering should succeed for gaming_cta."""
+
+    _copy_repo_prompt_structure(tmp_path)
+    monkeypatch.setattr(
+        cli_module,
+        "create_builtin_prompt_registry",
+        lambda: create_builtin_prompt_registry(base_dir=tmp_path),
+    )
+
+    exit_code, stdout, stderr = run_cli(
+        cli_module,
+        ["prompts", "render", "gaming_cta", "--show-content"],
+    )
+
+    assert exit_code == 0
+    assert "prompt_name: gaming_cta" in stdout
+    assert "CTA:" in stdout
+    assert "ALTERNATIVE:" in stdout
+    assert stderr == ""
 
 
 def test_render_command_does_not_call_providers(
@@ -714,7 +864,7 @@ def test_invalid_prompt_name_returns_safe_non_zero_exit_code(
     exit_code, _, stderr = run_cli(cli_module, ["prompts", "render", "unknown_prompt"])
 
     assert exit_code == 3
-    assert "only gaming_discover_trends is supported" in stderr
+    assert "the requested builtin prompt is not supported" in stderr
 
 
 def test_prompt_cli_does_not_expose_secrets(

@@ -288,6 +288,9 @@ The following rules are mandatory:
 - Prompt discovery checksums should be calculated from exact file bytes.
 - Built-in prompt registration should occur through platform-owned bootstrap functions that validate the manifest before loading assets.
 - CLI prompt inspection commands may expose prompt metadata safely, but full rendered prompt content should require an explicit operator action such as a dedicated flag.
+- Prompt assets should rely only on supplied evidence and inputs. They must not imply browsing, hidden knowledge, or unsupported live awareness.
+- Early prompt output contracts may remain text-based when a later milestone is expected to add structured parsing. That limitation must be documented explicitly rather than hidden behind fragile assumptions.
+- Application code should resolve prompts by stable logical prompt name through the registry instead of hardcoding prompt file paths.
 
 Prompt engineering is part of system design and must be handled with the same care as source code.
 
