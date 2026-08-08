@@ -7,19 +7,22 @@ import runpy
 import shutil
 from dataclasses import dataclass
 from pathlib import Path
+from typing import cast
 
 import pytest
 
 from creatoros import __version__, cli
 from creatoros.config import get_settings
-from creatoros.core import ConfigurationError, ProviderNotFoundError
+from creatoros.core import ConfigurationError, ProviderAuthenticationError, ProviderNotFoundError
+from creatoros.parsing import GamingCTAOutput
 from creatoros.prompts import (
     PromptAssetDiscovery,
     PromptAssetManifest,
     PromptManifestLoader,
     create_builtin_prompt_registry,
 )
-from creatoros.providers import create_provider_registry
+from creatoros.providers import LLMUsage, create_provider_registry
+from creatoros.services import LLMExecutionRequest, LLMExecutionResult
 
 
 @dataclass
@@ -32,6 +35,7 @@ class StubSettings:
     log_level: str = "INFO"
     database_url: str = "postgresql+psycopg://user:secret@localhost:5432/creatoros_dev"
     default_llm_provider: str = "mock"
+    default_llm_model: str = "mock-model"
     openai_api_key: str | None = "openai-secret"
     anthropic_api_key: str | None = "anthropic-secret"
     youtube_client_id: str | None = "youtube-client"
@@ -92,6 +96,17 @@ def run_cli(
     return exit_code, stdout.getvalue(), stderr.getvalue()
 
 
+def _capture_service_kwargs(
+    captured: dict[str, object],
+    kwargs: dict[str, object],
+    service: object,
+) -> object:
+    """Record factory arguments and return the supplied fake service."""
+
+    captured["service_kwargs"] = kwargs
+    return service
+
+
 def test_help_returns_success_and_displays_creatoros(cli_module) -> None:
     """Help output should succeed and mention CreatorOS."""
 
@@ -139,6 +154,16 @@ def test_help_displays_parsers_command(cli_module) -> None:
 
     assert exit_code == 0
     assert "parsers" in stdout
+    assert stderr == ""
+
+
+def test_help_displays_llm_command(cli_module) -> None:
+    """Top-level help should include guarded LLM commands."""
+
+    exit_code, stdout, stderr = run_cli(cli_module, ["--help"])
+
+    assert exit_code == 0
+    assert "llm" in stdout
     assert stderr == ""
 
 
@@ -456,6 +481,304 @@ def test_run_gaming_accepts_explicit_game_and_topic(cli_module) -> None:
     assert "Roblox" in stdout
     assert "Funny Myths" in stdout
     assert "Elden Ring" not in stdout
+
+
+def test_openai_check_succeeds_without_network(cli_module, monkeypatch: pytest.MonkeyPatch) -> None:
+    """The local OpenAI readiness check should not make a network request."""
+
+    monkeypatch.setattr(
+        cli_module,
+        "get_settings",
+        lambda: StubSettings(openai_api_key=None, default_llm_model="mock-model"),
+    )
+    monkeypatch.setattr(
+        cli_module,
+        "register_openai_provider",
+        lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("should not be called")),
+    )
+
+    exit_code, stdout, stderr = run_cli(cli_module, ["llm", "openai-check"])
+
+    assert exit_code == 0
+    assert "provider: openai" in stdout
+    assert "api_key_configured: false" in stdout
+    assert "model_configured: false" in stdout
+    assert "ready_for_live_smoke: false" in stdout
+    assert stderr == ""
+
+
+def test_openai_check_never_prints_api_key_value(cli_module, monkeypatch: pytest.MonkeyPatch) -> None:
+    """The local readiness check must never reveal the API key value."""
+
+    monkeypatch.setattr(
+        cli_module,
+        "get_settings",
+        lambda: StubSettings(openai_api_key="sk-test-secret", default_llm_model="gpt-5-mini"),
+    )
+
+    exit_code, stdout, stderr = run_cli(cli_module, ["llm", "openai-check"])
+
+    assert exit_code == 0
+    assert "sk-test-secret" not in stdout
+    assert "sk-test-secret" not in stderr
+
+
+def test_openai_smoke_refuses_without_confirmation_and_makes_zero_calls(
+    cli_module,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Live smoke must require an explicit confirmation flag before any provider activity."""
+
+    calls: list[str] = []
+    monkeypatch.setattr(cli_module, "get_settings", lambda: StubSettings(default_llm_model="gpt-5-mini"))
+    monkeypatch.setattr(
+        cli_module,
+        "register_openai_provider",
+        lambda *args, **kwargs: calls.append("register"),
+    )
+    monkeypatch.setattr(
+        cli_module,
+        "create_llm_execution_service",
+        lambda *args, **kwargs: calls.append("service"),
+    )
+
+    exit_code, stdout, stderr = run_cli(cli_module, ["llm", "openai-smoke", "--model", "test-model"])
+
+    assert exit_code == 3
+    assert stdout == ""
+    assert "--confirm-live-call" in stderr
+    assert calls == []
+
+
+def test_openai_smoke_missing_api_key_prevents_live_call(
+    cli_module,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """An absent API key should stop the smoke path before any provider call."""
+
+    calls: list[str] = []
+    monkeypatch.setattr(
+        cli_module,
+        "get_settings",
+        lambda: StubSettings(openai_api_key=None, default_llm_model="gpt-5-mini"),
+    )
+    monkeypatch.setattr(
+        cli_module,
+        "register_openai_provider",
+        lambda *args, **kwargs: calls.append("register"),
+    )
+
+    exit_code, stdout, stderr = run_cli(
+        cli_module,
+        ["llm", "openai-smoke", "--model", "test-model", "--confirm-live-call"],
+    )
+
+    assert exit_code == 3
+    assert stdout == ""
+    assert "OPENAI_API_KEY is not configured" in stderr
+    assert calls == []
+
+
+def test_openai_smoke_rejects_mock_placeholder_model(
+    cli_module,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The live smoke path must never silently substitute a real model for the mock placeholder."""
+
+    calls: list[str] = []
+    monkeypatch.setattr(
+        cli_module,
+        "get_settings",
+        lambda: StubSettings(default_llm_model="mock-model"),
+    )
+    monkeypatch.setattr(
+        cli_module,
+        "register_openai_provider",
+        lambda *args, **kwargs: calls.append("register"),
+    )
+
+    exit_code, stdout, stderr = run_cli(cli_module, ["llm", "openai-smoke", "--confirm-live-call"])
+
+    assert exit_code == 3
+    assert stdout == ""
+    assert "Provide --model <valid OpenAI model>" in stderr
+    assert calls == []
+
+
+def test_openai_smoke_uses_llm_execution_service_and_forwards_inputs(
+    cli_module,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The smoke path should execute through LLMExecutionService with typed output and safe output rendering."""
+
+    captured: dict[str, object] = {}
+
+    class FakeExecutionService:
+        async def execute(self, request) -> LLMExecutionResult[GamingCTAOutput]:
+            captured["request"] = request
+            return LLMExecutionResult[GamingCTAOutput](
+                prompt_name="gaming_cta",
+                prompt_version=1,
+                provider_name="openai",
+                model="gpt-5-mini",
+                output=GamingCTAOutput(
+                    cta="Tell us which Roblox myth we should test next.",
+                    alternative="Follow for more Roblox myth breakdowns.",
+                ),
+                usage=LLMUsage(input_tokens=12, output_tokens=9, total_tokens=21),
+                request_id="req_123",
+                metadata={},
+            )
+
+    def fake_register_openai_provider(registry, **kwargs):
+        captured["registry"] = registry
+        captured["register_kwargs"] = kwargs
+        return object()
+
+    monkeypatch.setattr(
+        cli_module,
+        "get_settings",
+        lambda: StubSettings(default_llm_model="gpt-5-mini"),
+    )
+    monkeypatch.setattr(cli_module, "register_openai_provider", fake_register_openai_provider)
+    monkeypatch.setattr(
+        cli_module,
+        "create_llm_execution_service",
+        lambda **kwargs: _capture_service_kwargs(captured, kwargs, FakeExecutionService()),
+    )
+
+    exit_code, stdout, stderr = run_cli(
+        cli_module,
+        [
+            "llm",
+            "openai-smoke",
+            "--model",
+            "gpt-5-mini",
+            "--game",
+            "Roblox",
+            "--topic",
+            "funny myths",
+            "--platform",
+            "youtube_shorts",
+            "--tone",
+            "natural",
+            "--confirm-live-call",
+        ],
+    )
+
+    request = cast(LLMExecutionRequest, captured["request"])
+    assert exit_code == 0
+    assert request.prompt_name == "gaming_cta"
+    assert request.provider_name == "openai"
+    assert request.model == "gpt-5-mini"
+    assert request.variables == {
+        "game": "Roblox",
+        "topic": "funny myths",
+        "platform": "youtube_shorts",
+        "tone": "natural",
+    }
+    assert captured["register_kwargs"] == {"default_model": "gpt-5-mini"}
+    assert captured["service_kwargs"]["provider_registry"] is captured["registry"]
+    assert "provider_name: openai" in stdout
+    assert "model: gpt-5-mini" in stdout
+    assert "prompt_name: gaming_cta" in stdout
+    assert "output_model: GamingCTAOutput" in stdout
+    assert "request_id: req_123" in stdout
+    assert "input_tokens: 12" in stdout
+    assert "output_tokens: 9" in stdout
+    assert "total_tokens: 21" in stdout
+    assert "success: true" in stdout
+    assert "CTA:" in stdout
+    assert "ALTERNATIVE:" in stdout
+    assert "Tell us which Roblox myth we should test next." in stdout
+    assert "Follow for more Roblox myth breakdowns." in stdout
+    assert "Authorization" not in stdout
+    assert "system" not in stdout.casefold()
+    assert "user" not in stdout.casefold()
+    assert stderr == ""
+
+
+def test_openai_smoke_uses_default_safe_inputs_when_not_overridden(
+    cli_module,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Default smoke-test inputs should remain deterministic and compact."""
+
+    captured: dict[str, object] = {}
+
+    class FakeExecutionService:
+        async def execute(self, request) -> LLMExecutionResult[GamingCTAOutput]:
+            captured["request"] = request
+            return LLMExecutionResult[GamingCTAOutput](
+                prompt_name="gaming_cta",
+                prompt_version=1,
+                provider_name="openai",
+                model="gpt-5-mini",
+                output=GamingCTAOutput(cta="CTA text", alternative="Alternative text"),
+                usage=None,
+                request_id=None,
+                metadata={},
+            )
+
+    monkeypatch.setattr(
+        cli_module,
+        "get_settings",
+        lambda: StubSettings(default_llm_model="gpt-5-mini"),
+    )
+    monkeypatch.setattr(cli_module, "register_openai_provider", lambda *args, **kwargs: object())
+    monkeypatch.setattr(cli_module, "create_llm_execution_service", lambda **kwargs: FakeExecutionService())
+
+    exit_code, stdout, stderr = run_cli(
+        cli_module,
+        ["llm", "openai-smoke", "--model", "gpt-5-mini", "--confirm-live-call"],
+    )
+
+    request = cast(LLMExecutionRequest, captured["request"])
+    assert exit_code == 0
+    assert request.variables == {
+        "game": "Minecraft",
+        "topic": "gaming myths",
+        "platform": "youtube_shorts",
+        "tone": "natural",
+    }
+    assert "request_id: none" in stdout
+    assert "input_tokens: None" in stdout
+    assert "output_tokens: None" in stdout
+    assert "total_tokens: None" in stdout
+    assert stderr == ""
+
+
+def test_openai_smoke_provider_errors_return_safe_resource_exit_code(
+    cli_module,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Provider failures should map to the CLI resource-unavailable exit code."""
+
+    class ExplodingExecutionService:
+        async def execute(self, request) -> LLMExecutionResult[GamingCTAOutput]:
+            del request
+            raise ProviderAuthenticationError("OpenAI authentication failed")
+
+    monkeypatch.setattr(
+        cli_module,
+        "get_settings",
+        lambda: StubSettings(default_llm_model="gpt-5-mini"),
+    )
+    monkeypatch.setattr(cli_module, "register_openai_provider", lambda *args, **kwargs: object())
+    monkeypatch.setattr(
+        cli_module,
+        "create_llm_execution_service",
+        lambda **kwargs: ExplodingExecutionService(),
+    )
+
+    exit_code, stdout, stderr = run_cli(
+        cli_module,
+        ["llm", "openai-smoke", "--model", "gpt-5-mini", "--confirm-live-call"],
+    )
+
+    assert exit_code == 4
+    assert stdout == ""
+    assert "Error: OpenAI authentication failed" in stderr
 
 
 def test_prompts_manifest_show_reports_schema_version_and_zero_entries(

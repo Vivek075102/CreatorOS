@@ -356,6 +356,8 @@ Providers must not parse application outputs on behalf of CreatorOS. They return
 
 The current `LLMExecutionService` now owns that downstream prompt-to-provider-to-parser orchestration path at the application layer. It does not add retries, failover, repair logic, persistence, workflow mutation, or publication behavior. Those concerns remain separate future milestones.
 
+Live OpenAI execution remains intentionally isolated from normal runtime paths. The current platform allows it only through an explicit guarded CLI smoke-test command that registers the OpenAI provider for one invocation, routes the request through `LLMExecutionService`, requires typed parser success, and refuses to run without a manual live-call confirmation flag. Agents, workflows, imports, health checks, and default runtime configuration remain mock-first and offline by default.
+
 Provider SDK objects, raw transport payloads, and vendor-specific exception types must not escape the provider adapter boundary.
 
 ## 13. Provider Selection and Routing

@@ -152,6 +152,8 @@ The following rules are mandatory:
 
 Configuration behavior must remain explicit and auditable. Hidden fallback behavior that changes production outcomes is not acceptable.
 
+When a live provider smoke test is needed, it must be exposed through an explicit guarded path rather than through implicit startup behavior, normal workflow execution, or routine CLI commands. Local readiness checks must remain offline, and live smoke execution must require deliberate confirmation before any paid network request is attempted.
+
 ## 11. Logging and Observability
 
 CreatorOS requires structured logging.
@@ -186,6 +188,7 @@ Additional mandatory rules:
 - Full rendered prompt contents should not be logged by default.
 - Exceptions should preserve useful context.
 - Logging failures must not hide the original error.
+- API keys must never be printed back to the terminal, including in smoke-test or diagnostics commands.
 
 ## 12. Error Handling
 
@@ -274,6 +277,8 @@ LLM providers must accept provider-independent request contracts and return norm
 When a real vendor adapter is introduced, the same rules still apply. For example, the current OpenAI adapter may depend on the official OpenAI SDK internally, but it must keep SDK objects, raw transport payloads, authentication details, and vendor exception types inside the adapter boundary.
 
 Application-layer execution orchestration belongs outside providers. CreatorOS now uses `LLMExecutionService` as the platform-owned path that resolves prompt definitions, renders variables, selects a registered provider, and resolves the typed parser registration. Agents and engines should eventually depend on that service boundary rather than duplicating prompt-to-provider-to-parser orchestration internally.
+
+If a live provider verification path is added for development diagnostics, it must still use the same application-owned execution service and parser registry path rather than calling a vendor SDK directly from a CLI command, script, or engine.
 
 ## 17. Prompt Engineering Standards
 
@@ -398,6 +403,7 @@ The following rules are mandatory:
 - Tests must be deterministic.
 - Paid APIs are prohibited in normal unit tests.
 - Real publishing is prohibited in automated tests.
+- Real OpenAI or other paid-provider calls are prohibited in automated tests. Use fake clients, fake services, or mock providers instead.
 - Temporary storage and databases must be isolated.
 - Test names must be descriptive.
 - Arrange, Act, Assert structure should be used where practical.

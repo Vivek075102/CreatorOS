@@ -21,6 +21,7 @@ from creatoros.core import (
     CreatorOSValidationError,
     PromptLoadError,
     PromptManifestError,
+    ProviderError,
     ProviderNotFoundError,
     ProviderUnavailableError,
 )
@@ -28,6 +29,7 @@ from creatoros.domain import ContentPlatform
 from creatoros.observability import configure_logging, get_logger
 from creatoros.orchestrator import GamingWorkflowInput, run_demo_gaming_workflow
 from creatoros.parsing import (
+    GamingCTAOutput,
     build_builtin_parser_registry,
     validate_builtin_prompt_parser_contracts,
 )
@@ -66,8 +68,13 @@ from creatoros.prompts import (
     render_storyboard_visual_direction,
     render_youtube_shorts_script,
 )
-from creatoros.providers import get_provider_registry
+from creatoros.providers import (
+    create_provider_registry,
+    get_provider_registry,
+    register_openai_provider,
+)
 from creatoros.providers.mock import create_mock_provider_registry
+from creatoros.services import LLMExecutionRequest, create_llm_execution_service
 from creatoros.workflows import (
     WorkflowExecution,
     WorkflowExecutionStatus,
@@ -163,6 +170,17 @@ def _run_cli(
         )
         return exit_code
     except (ProviderNotFoundError, ProviderUnavailableError) as error:
+        logger.error(
+            "cli_command_failed",
+            command_group=args.command_group,
+            command_name=args.command_name,
+            exit_code=EXIT_RESOURCE_UNAVAILABLE,
+            error_type=type(error).__name__,
+            error_code=error.code,
+        )
+        _write_error(stderr, f"Error: {error}")
+        return EXIT_RESOURCE_UNAVAILABLE
+    except ProviderError as error:
         logger.error(
             "cli_command_failed",
             command_group=args.command_group,
@@ -280,6 +298,50 @@ def _build_parser() -> argparse.ArgumentParser:
         command_group="providers",
         command_name="health",
         handler=_handle_providers_health,
+    )
+
+    llm_parser = subparsers.add_parser(
+        "llm",
+        help="Run guarded LLM configuration checks and explicit smoke tests.",
+    )
+    llm_subparsers = llm_parser.add_subparsers(dest="command_name")
+
+    llm_openai_check = llm_subparsers.add_parser(
+        "openai-check",
+        help="Inspect local OpenAI smoke-test readiness without making any network request.",
+    )
+    llm_openai_check.set_defaults(
+        command_group="llm",
+        command_name="openai-check",
+        handler=_handle_llm_openai_check,
+    )
+
+    llm_openai_smoke = llm_subparsers.add_parser(
+        "openai-smoke",
+        help="Run one explicit OpenAI smoke test through the standard LLM execution path.",
+    )
+    llm_openai_smoke.add_argument(
+        "--model",
+        default=None,
+        help="Explicit live OpenAI model. If omitted, the configured default model is used when it is not the mock placeholder.",
+    )
+    llm_openai_smoke.add_argument("--game", default="Minecraft", help="Game input for the smoke-test prompt.")
+    llm_openai_smoke.add_argument("--topic", default="gaming myths", help="Topic input for the smoke-test prompt.")
+    llm_openai_smoke.add_argument(
+        "--platform",
+        default=ContentPlatform.YOUTUBE_SHORTS.value,
+        help="Platform input for the smoke-test prompt.",
+    )
+    llm_openai_smoke.add_argument("--tone", default="natural", help="Tone input for the smoke-test prompt.")
+    llm_openai_smoke.add_argument(
+        "--confirm-live-call",
+        action="store_true",
+        help="Required acknowledgement before any live OpenAI request is attempted.",
+    )
+    llm_openai_smoke.set_defaults(
+        command_group="llm",
+        command_name="openai-smoke",
+        handler=_handle_llm_openai_smoke,
     )
 
     workflows_parser = subparsers.add_parser("workflows", help="Inspect workflow foundations.")
@@ -711,6 +773,113 @@ def _handle_workflow_demo_state(
     return EXIT_SUCCESS
 
 
+def _handle_llm_openai_check(
+    args: argparse.Namespace,
+    *,
+    stdout: TextIO,
+    stderr: TextIO,
+) -> int:
+    """Report local OpenAI smoke-test readiness without calling external services."""
+
+    del args, stderr
+    settings = get_settings()
+    model_configured = _is_live_model_configured(settings.default_llm_model)
+    api_key_configured = _is_configured(settings.openai_api_key)
+    _write_rows(
+        stdout,
+        [
+            ("provider", "openai"),
+            ("api_key_configured", api_key_configured),
+            ("model_configured", model_configured),
+            ("ready_for_live_smoke", api_key_configured and model_configured),
+        ],
+    )
+    return EXIT_SUCCESS
+
+
+def _handle_llm_openai_smoke(
+    args: argparse.Namespace,
+    *,
+    stdout: TextIO,
+    stderr: TextIO,
+) -> int:
+    """Run one explicit OpenAI smoke test through the standard CreatorOS execution path."""
+
+    if not args.confirm_live_call:
+        _write_error(
+            stderr,
+            "Error: openai-smoke requires --confirm-live-call before any live provider request is attempted.",
+        )
+        return EXIT_CONFIGURATION_ERROR
+
+    settings = get_settings()
+    if not _is_configured(settings.openai_api_key):
+        _write_error(
+            stderr,
+            "Error: OPENAI_API_KEY is not configured. Set it manually before running a live smoke test.",
+        )
+        return EXIT_CONFIGURATION_ERROR
+
+    model_name = args.model if args.model is not None else settings.default_llm_model
+    if not _is_live_model_configured(model_name):
+        _write_error(
+            stderr,
+            "Error: A live OpenAI model is required. Provide --model <valid OpenAI model> or configure a non-mock default model.",
+        )
+        return EXIT_CONFIGURATION_ERROR
+
+    provider_registry = create_provider_registry()
+    register_openai_provider(provider_registry, default_model=model_name)
+    service = create_llm_execution_service(
+        settings=settings,
+        provider_registry=provider_registry,
+    )
+    result = asyncio.run(
+        service.execute(
+            LLMExecutionRequest(
+                prompt_name=GAMING_CTA,
+                provider_name="openai",
+                model=model_name,
+                variables={
+                    "game": args.game,
+                    "topic": args.topic,
+                    "platform": args.platform,
+                    "tone": args.tone,
+                },
+            )
+        )
+    )
+    if not isinstance(result.output, GamingCTAOutput):
+        raise CreatorOSValidationError(
+            "openai smoke test returned an unexpected parsed output model",
+            code="llm_smoke_invalid_output_model",
+            details={"output_model_type": type(result.output).__name__},
+        )
+
+    _write_rows(
+        stdout,
+        [
+            ("provider_name", result.provider_name),
+            ("model", result.model),
+            ("prompt_name", result.prompt_name),
+            ("prompt_version", result.prompt_version),
+            ("output_model", type(result.output).__name__),
+            ("request_id", result.request_id or "none"),
+            ("input_tokens", None if result.usage is None else result.usage.input_tokens),
+            ("output_tokens", None if result.usage is None else result.usage.output_tokens),
+            ("total_tokens", None if result.usage is None else result.usage.total_tokens),
+            ("success", True),
+        ],
+    )
+    _write_output(stdout, "")
+    _write_output(stdout, "CTA:")
+    _write_output(stdout, result.output.cta)
+    _write_output(stdout, "")
+    _write_output(stdout, "ALTERNATIVE:")
+    _write_output(stdout, result.output.alternative)
+    return EXIT_SUCCESS
+
+
 def _handle_prompts_manifest_show(
     args: argparse.Namespace,
     *,
@@ -1126,6 +1295,18 @@ def _is_configured(value: str | None) -> bool:
     """Return whether an optional credential value is configured."""
 
     return value is not None and bool(value.strip())
+
+
+def _is_live_model_configured(value: str | None) -> bool:
+    """Return whether a model value is suitable for an explicit live OpenAI smoke test."""
+
+    if value is None:
+        return False
+
+    normalized_value = value.strip()
+    if not normalized_value:
+        return False
+    return normalized_value.casefold() != "mock-model"
 
 
 def _resolve_registry(*, use_mock: bool):

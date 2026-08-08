@@ -29,11 +29,13 @@ python -m creatoros providers list --mock
 python -m creatoros providers health --mock
 python -m creatoros workflows transitions running
 python -m creatoros workflows demo-state
+python -m creatoros llm openai-check
 ```
 
 Mock providers are local and free.
 `workflows demo-state` demonstrates workflow state management only.
 The first end-to-end content workflow remains deferred to Step 10.
+`llm openai-check` is local-only and does not call OpenAI.
 
 ## First Executable Demo Workflow
 
@@ -78,6 +80,23 @@ CreatorOS now includes an application-layer `LLMExecutionService` under `creator
 - The current service does not add retries, response repair, failover, persistence, workflow-state updates, or publishing.
 - Agents and workflows are not migrated to this service yet, but it is the intended application-layer entry point for future integration.
 - Current tests prove complete offline end-to-end execution with both the mock provider and a fake OpenAI client without real network calls.
+
+## Controlled OpenAI Smoke Test
+
+CreatorOS now includes one explicit opt-in CLI path for a controlled live OpenAI smoke test:
+
+```bash
+python -m creatoros llm openai-check
+python -m creatoros llm openai-smoke --model gpt-5-mini --confirm-live-call
+python -m creatoros llm openai-smoke --model gpt-5-mini --game Roblox --topic "funny myths" --platform youtube_shorts --tone natural --confirm-live-call
+```
+
+- `openai-check` is local-only. It reports whether an API key and non-mock model are configured for a future live smoke run.
+- `openai-smoke` is the only current CLI command allowed to make a live OpenAI request, and it refuses to run without `--confirm-live-call`.
+- The smoke path uses the existing `gaming_cta` builtin prompt, the provider registry, `LLMExecutionService`, and the typed `GamingCTAOutput` parser result.
+- The command does not print prompt contents, raw SDK payloads, or secrets.
+- Automated tests continue to use fake providers and fake clients only. They do not make real OpenAI calls.
+- Agents, workflows, and the default runtime remain mock-first until later migration milestones.
 
 ## Prompt Foundation
 

@@ -150,6 +150,7 @@ Build the Research Engine and Opportunity Engine capabilities required to gather
 - Builtin prompt/parser contract validation to detect registry drift before provider integration
 - Typed provider-independent parsers for built-in research and script prompt outputs
 - Typed provider-independent parsers for built-in storyboard, media-support, and review prompt outputs
+- Controlled local `openai-check` diagnostics and an explicit guarded `openai-smoke` CLI path for one typed live verification run
 - Opportunity scoring rules and ranking pipeline
 - Research result persistence
 - Approval-ready content opportunity outputs
@@ -182,6 +183,7 @@ Build the Research Engine and Opportunity Engine capabilities required to gather
 - Application-layer `LLMExecutionService` that connects prompt rendering, provider execution, and typed parser resolution
 - Built-in research and script prompt outputs can be converted into typed validated parser models without provider-specific logic
 - Built-in storyboard, media-support, and review prompt outputs can be converted into typed validated parser models without provider-specific logic or workflow side effects
+- Live OpenAI verification remains opt-in only, uses an existing builtin prompt, and requires explicit operator confirmation before any paid request
 - Content opportunities can be ranked using explicit rules
 - Research workflows produce auditable structured outputs that can feed downstream content generation
 
@@ -193,6 +195,7 @@ Build the Research Engine and Opportunity Engine capabilities required to gather
 - Multi-language research support
 - Prompt-specific parsers and richer structured-output formats when justified by later milestones
 - Agent and workflow migration to real LLM execution after the provider boundary proves stable
+- Broader live-provider diagnostics only after the guarded smoke-test path proves operationally safe
 - Retry, repair, fallback, streaming, and workflow-state integration only when later milestones justify them
 
 ## Milestone 3 — Content Intelligence
