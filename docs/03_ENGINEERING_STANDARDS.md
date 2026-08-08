@@ -362,6 +362,8 @@ When a media-generation application service is added, it must remain a provider 
 
 When a final-assembly application service is added, it must remain a mapping and coordination layer only. It may accept typed storyboard and generated-media inputs, enforce deterministic scene-to-asset alignment, build a `ShortRenderRequest`, and delegate to `MediaRenderService`, but it must not call provider registries directly, generate images, generate narration, generate clips, invoke agents, execute prompts, write files, publish content, or silently repair invalid asset counts.
 
+When a post-approval media-execution pipeline is added, it must preserve the two-phase architecture explicitly. Content planning must still stop at publication-readiness review, and media execution must require a second explicit call with positive human approval. Publication readiness must never be treated as implicit approval, and no media-generation or render-provider calls may occur before both gates pass.
+
 When a prompt output has a typed parser, it should be registered through a provider-independent parser registry using the same stable logical prompt name used by the prompt registry. Parser registration must declare the expected output model type explicitly, and builtin prompt/parser alignment should be validated through deterministic contract checks rather than informal assumptions.
 
 Review parsers must remain advisory only. Parsing a decision such as `ready_for_human_review` must never publish content, approve content on behalf of a human, or mutate workflow state automatically.

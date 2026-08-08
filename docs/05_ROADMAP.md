@@ -163,6 +163,7 @@ Build the Research Engine and Opportunity Engine capabilities required to gather
 - Separate provider-independent render/composition foundation for final Short assembly with typed render contracts, deterministic mock rendering, and application-layer provider resolution
 - Application-layer media-generation service that coordinates image, TTS, and clip-generation providers into typed generated-media packages without rendering
 - Application-layer final Short assembly service that converts typed storyboard output plus a generated-media package into a deterministic render request and delegates final composition through the existing render boundary
+- Application-layer approved media-execution pipeline that takes a completed publication-ready planning result plus explicit human approval, maps approved plans into provider-neutral generation requests, and coordinates media generation with final Short assembly
 - First explicit real image adapter behind `ImageProvider`, using the OpenAI SDK through the existing provider boundary while keeping mock as the default
 - First explicit real TTS adapter behind `TTSProvider`, using the OpenAI SDK through the existing provider boundary while keeping mock as the default
 - Opportunity scoring rules and ranking pipeline
@@ -216,6 +217,7 @@ Build the Research Engine and Opportunity Engine capabilities required to gather
 - Media-provider-foundation completion in this milestone means contract and mock-provider readiness only. It does not mean real image generation, real speech synthesis, real video rendering, storage upload, or media execution inside the integrated pipeline are complete
 - Media-generation-service completion in this milestone means application-layer provider orchestration only. It does not mean pipeline integration, file materialization, storage upload, rendering, or publishing are complete
 - Final-assembly completion in this milestone means typed storyboard-to-render-request conversion and render-service delegation only. It does not mean binary MP4 creation, FFmpeg, MoviePy, caption burn-in, audio mixing, pipeline integration, or publishing are complete
+- Approved-media-execution completion in this milestone means explicit post-approval orchestration only. It does not mean automatic execution after planning, binary MP4 creation, FFmpeg, MoviePy, file materialization, storage, or publishing are complete
 - Render-foundation completion in this milestone means contract, registry, service, and mock-provider readiness only. It does not mean FFmpeg execution, MoviePy, MP4 creation, audio mixing, caption burn-in, transition rendering, or pipeline media execution are complete
 - Content opportunities can be ranked using explicit rules
 - Research workflows produce auditable structured outputs that can feed downstream content generation
@@ -238,6 +240,7 @@ Build the Research Engine and Opportunity Engine capabilities required to gather
 - Real render backends, binary video materialization, audio mixing, subtitle rendering, and pipeline render execution only when later 2.5 milestones intentionally start that work
 - Generated-media-package to render-request conversion only when the next render-integration milestone intentionally starts that work
 - Integrated media-generation plus assembly orchestration inside the larger CreatorOS workflow only when Milestone 2.5G intentionally starts that work
+- Real artifact materialization, richer rendering, and downstream publishing integration only when later milestones intentionally start that work
 - Guarded live image smoke verification, binary materialization, and durable storage references only when later media milestones intentionally add those operational paths
 - Guarded live TTS smoke verification, binary audio materialization, and durable storage references only when later media milestones intentionally add those operational paths
 - Broader live-provider diagnostics only after the guarded smoke-test path proves operationally safe

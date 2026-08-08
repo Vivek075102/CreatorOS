@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from creatoros.orchestrator.models import (
+    ApprovedMediaExecutionRequest,
     DemoAssetBundle,
     GamingContentMediaPlanSet,
     GamingContentPipelineRequest,
@@ -12,6 +13,8 @@ from creatoros.orchestrator.models import (
     GamingContentReviewSet,
     GamingWorkflowInput,
     GamingWorkflowResult,
+    HumanApproval,
+    MediaExecutionResult,
 )
 
 if TYPE_CHECKING:
@@ -23,8 +26,10 @@ def __getattr__(name: str) -> Any:
 
     if name in {
         "GamingContentPipeline",
+        "MediaExecutionPipeline",
         "GamingWorkflowOrchestrator",
         "build_gaming_content_pipeline",
+        "create_media_execution_pipeline",
         "run_demo_gaming_workflow",
     }:
         from creatoros.orchestrator.content_pipeline import (
@@ -35,11 +40,17 @@ def __getattr__(name: str) -> Any:
             GamingWorkflowOrchestrator,
             run_demo_gaming_workflow,
         )
+        from creatoros.orchestrator.media_pipeline import (
+            MediaExecutionPipeline,
+            create_media_execution_pipeline,
+        )
 
         exports = {
             "GamingContentPipeline": GamingContentPipeline,
+            "MediaExecutionPipeline": MediaExecutionPipeline,
             "GamingWorkflowOrchestrator": GamingWorkflowOrchestrator,
             "build_gaming_content_pipeline": build_gaming_content_pipeline,
+            "create_media_execution_pipeline": create_media_execution_pipeline,
             "run_demo_gaming_workflow": run_demo_gaming_workflow,
         }
         return exports[name]
@@ -47,6 +58,7 @@ def __getattr__(name: str) -> Any:
 
 
 __all__ = [
+    "ApprovedMediaExecutionRequest",
     "DemoAssetBundle",
     "GamingContentMediaPlanSet",
     "GamingContentPipeline",
@@ -56,6 +68,10 @@ __all__ = [
     "GamingWorkflowInput",
     "GamingWorkflowOrchestrator",
     "GamingWorkflowResult",
+    "HumanApproval",
+    "MediaExecutionPipeline",
+    "MediaExecutionResult",
     "build_gaming_content_pipeline",
+    "create_media_execution_pipeline",
     "run_demo_gaming_workflow",
 ]

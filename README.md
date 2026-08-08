@@ -226,6 +226,20 @@ CreatorOS now also includes a provider-independent final assembly layer for Shor
 - No actual MP4, FFmpeg pipeline, MoviePy pipeline, caption burn-in, audio mixing, or integrated publishing flow exists yet.
 - Larger pipeline wiring between planning, generation, assembly, and publication remains a later milestone.
 
+## Approved Media Execution
+
+CreatorOS now also includes an explicit post-approval media-execution pipeline:
+
+- `GamingContentPipeline` remains phase 1 only. It still stops after publication-readiness review and does not generate media automatically.
+- `MediaExecutionPipeline` is a separate phase 2 entry point. The caller must pass both a completed `GamingContentPipelineResult` and explicit positive `HumanApproval`.
+- Publication readiness does not equal human approval. Both gates must pass before any media-generation or render calls begin.
+- The execution path is `GamingContentPipelineResult -> MediaGenerationService -> GeneratedMediaPackage -> ShortAssemblyService -> MediaRenderService -> RenderedVideo`.
+- Thumbnail planning becomes a thumbnail-generation request and remains outside the video timeline for later publishing work.
+- Narration planning becomes a typed TTS request, and storyboard scenes become deterministic scene-image requests using existing approved planning data only.
+- Optional scene-video requests are created only when aligned typed scene-visual and scene-motion plans are actually available.
+- Default providers remain mock-first, so normal execution stays offline and deterministic unless real providers are explicitly registered and selected.
+- No real MP4, FFmpeg, MoviePy, file materialization, storage, or publishing exists in this milestone.
+
 ## Controlled OpenAI Smoke Test
 
 CreatorOS now includes one explicit opt-in CLI path for a controlled live OpenAI smoke test:

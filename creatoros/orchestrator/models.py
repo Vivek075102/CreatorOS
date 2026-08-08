@@ -1,7 +1,8 @@
-"""Typed input and result models for the demo CreatorOS gaming workflow."""
+"""Typed input and result models for CreatorOS orchestrators."""
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Literal
 
 from pydantic import Field, field_validator, model_validator
@@ -17,7 +18,9 @@ from creatoros.domain import (
     PublishingPackage,
     Script,
     Storyboard,
+    utc_now,
 )
+from creatoros.domain.base import ensure_aware_utc_datetime
 from creatoros.parsing import (
     GamingEvidenceConsistencyReviewOutput,
     GamingNarrationDirectionOutput,
@@ -31,6 +34,11 @@ from creatoros.parsing import (
     GamingTrendDiscoveryOutput,
     StoryboardSceneBreakdownOutput,
     YouTubeShortsScriptOutput,
+)
+from creatoros.services import (
+    GeneratedMediaPackage,
+    MediaProviderSelection,
+    ShortAssemblyResult,
 )
 from creatoros.workflows import (
     ApprovalRequest,
@@ -151,6 +159,46 @@ class GamingContentPipelineResult(CreatorOSModel):
     publication_readiness: GamingPublicationReadinessReviewOutput
 
 
+class HumanApproval(CreatorOSModel):
+    """Explicit human approval required to cross the media-execution boundary."""
+
+    approved: bool
+    approved_by: str
+    approved_at: datetime = Field(default_factory=utc_now)
+
+    @field_validator("approved_by")
+    @classmethod
+    def validate_approved_by(cls, value: str, info) -> str:
+        """Trim and reject blank human-approval actor identifiers."""
+
+        return _validate_non_blank(value, field_name=info.field_name)
+
+    @field_validator("approved_at")
+    @classmethod
+    def validate_approved_at(cls, value: datetime, info) -> datetime:
+        """Require a timezone-aware approval timestamp."""
+
+        return ensure_aware_utc_datetime(value, field_name=info.field_name)
+
+
+class ApprovedMediaExecutionRequest(CreatorOSModel):
+    """Typed post-approval request for media generation, assembly, and mock rendering."""
+
+    content_result: GamingContentPipelineResult
+    approval: HumanApproval
+    provider_selection: MediaProviderSelection | None = None
+    render_provider_name: str | None = None
+
+
+class MediaExecutionResult(CreatorOSModel):
+    """Typed post-approval aggregate result for media execution."""
+
+    content_result: GamingContentPipelineResult
+    approval: HumanApproval
+    generated_media: GeneratedMediaPackage
+    assembly: ShortAssemblyResult
+
+
 class GamingWorkflowResult(CreatorOSModel):
     """Serializable result contract for the deterministic demo gaming workflow."""
 
@@ -190,6 +238,7 @@ class GamingWorkflowResult(CreatorOSModel):
 
 
 __all__ = [
+    "ApprovedMediaExecutionRequest",
     "DemoAssetBundle",
     "GamingContentMediaPlanSet",
     "GamingContentPipelineRequest",
@@ -197,4 +246,6 @@ __all__ = [
     "GamingContentReviewSet",
     "GamingWorkflowInput",
     "GamingWorkflowResult",
+    "HumanApproval",
+    "MediaExecutionResult",
 ]

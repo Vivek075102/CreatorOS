@@ -991,6 +991,13 @@ def test_pipeline_module_avoids_direct_provider_parser_prompt_and_publishing_cou
     assert "approve(" not in module_source
     assert "generate_scene_visual" not in module_source
     assert "generate_scene_motion" not in module_source
+    assert "MediaGenerationService" not in module_source
+    assert "ShortAssemblyService" not in module_source
+    assert "MediaRenderService" not in module_source
+    assert "ImageProvider" not in module_source
+    assert "TTSProvider" not in module_source
+    assert "VideoProvider" not in module_source
+    assert "RenderProvider" not in module_source
 
 
 def test_full_pipeline_completes_offline_with_real_agents_and_mock_provider() -> None:

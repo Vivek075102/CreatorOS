@@ -301,6 +301,8 @@ Media planning is also separate from media execution. Planning agents may recomm
 
 CreatorOS now includes that next stage as a separate application boundary. `ShortAssemblyService` accepts typed storyboard output plus a generated-media package, aligns scene assets deterministically, builds a `ShortRenderRequest`, and delegates final composition through `MediaRenderService`. This keeps media generation and final Short assembly distinct while proving that typed generated-media references can feed the render layer without introducing workflow, publishing, or storage coupling.
 
+CreatorOS now also includes a dedicated post-approval execution boundary above those services. `MediaExecutionPipeline` accepts an already completed `GamingContentPipelineResult` plus explicit human approval, verifies that the package is publication-ready, translates approved planning outputs into provider-neutral media-generation requests, and then coordinates `MediaGenerationService` and `ShortAssemblyService`. This preserves a mandatory two-phase architecture: planning stops at publication readiness, and media execution begins only through a second explicit call.
+
 ## 10. Publishing Layer
 
 The Publishing Layer is responsible for preparing and delivering content to external distribution platforms. Its responsibilities include:
@@ -407,6 +409,8 @@ Provider SDK objects, raw transport payloads, and vendor-specific exception type
 CreatorOS now also includes a separate provider-independent render/composition contract for final Short assembly. `VideoProvider` still represents future clip-generation work, while `RenderProvider` represents composition inputs such as timed scenes, prepared asset references, narration references, and simple transition intent. The current rendering milestone provides typed contracts, registry integration, a deterministic mock provider, and a small application-layer `MediaRenderService` only. It does not add FFmpeg execution, MoviePy, binary output creation, media-agent execution, or integrated-pipeline wiring.
 
 CreatorOS now also includes a thin application-layer `ShortAssemblyService` above that render boundary. It does not talk to provider registries, generation providers, agents, prompts, or parsers. Its job is only to convert typed storyboard scenes and `GeneratedMediaPackage` outputs into one deterministic `ShortRenderRequest`, preserve the distinction between thumbnail assets and timeline assets, and hand the result to `MediaRenderService`. The current state still stops at a typed `RenderedVideo` contract backed by deterministic mock rendering rather than a binary MP4.
+
+The new `MediaExecutionPipeline` sits above `MediaGenerationService` and `ShortAssemblyService`, not beside or inside the planning agents. It does not rerun research, script, storyboard, media-planning, or review work. It consumes the already reviewed planning result as input, enforces explicit human approval, and keeps paid or side-effectful media work behind that approval boundary.
 
 ## 13. Provider Selection and Routing
 
