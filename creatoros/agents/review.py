@@ -197,6 +197,26 @@ class GamingEvidenceConsistencyReviewRequest(CreatorOSModel):
 
         return _validate_non_blank(value, field_name=info.field_name)
 
+    @classmethod
+    def from_script(
+        cls,
+        script_output: YouTubeShortsScriptOutput,
+        *,
+        game: str,
+        source_summary: str,
+        research_notes: str,
+        content_stage: str,
+    ) -> GamingEvidenceConsistencyReviewRequest:
+        """Build an evidence-consistency request from one typed script output."""
+
+        return cls(
+            game=game,
+            source_summary=source_summary,
+            research_notes=research_notes,
+            content_text=_build_script_text(script_output),
+            content_stage=content_stage,
+        )
+
 
 class GamingStoryboardQualityReviewRequest(CreatorOSModel):
     """Normalized application input for storyboard-quality review."""
@@ -235,6 +255,26 @@ class GamingStoryboardQualityReviewRequest(CreatorOSModel):
             storyboard_text=_build_storyboard_text(storyboard_output),
             platform=platform,
             target_duration_seconds=target_duration_seconds,
+        )
+
+    @classmethod
+    def from_script_and_storyboard(
+        cls,
+        storyboard_output: StoryboardSceneBreakdownOutput,
+        script_output: YouTubeShortsScriptOutput,
+        *,
+        game: str,
+        platform: str,
+    ) -> GamingStoryboardQualityReviewRequest:
+        """Build a storyboard-quality request from typed script and storyboard outputs."""
+
+        return cls(
+            title=script_output.title,
+            game=game,
+            script_text=_build_script_text(script_output),
+            storyboard_text=_build_storyboard_text(storyboard_output),
+            platform=platform,
+            target_duration_seconds=script_output.estimated_duration_seconds,
         )
 
 

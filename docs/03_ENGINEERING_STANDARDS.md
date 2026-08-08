@@ -294,6 +294,8 @@ The same rule now also applies to media-agent integration. Media-agent code may 
 
 The same rule now also applies to review-agent integration. Review-agent code may call `LLMExecutionService`, but it must not call providers directly, must not invoke parser implementations directly, must not access `PromptRegistry` or `PromptRenderer` directly, and must not turn advisory review outputs into automatic revision, approval, workflow mutation, or publishing behavior inside the agent layer.
 
+The same rule now also applies to integrated pipeline orchestration. `GamingContentPipeline` may coordinate migrated application agents, but it must not bypass them to call providers directly, must not invoke parser implementations directly, must not access `PromptRegistry` or `PromptRenderer` directly, and must stop before approval mutation or publishing behavior.
+
 ## 17. Prompt Engineering Standards
 
 Prompts are version-controlled product assets.
@@ -340,9 +342,13 @@ When media-planning agents are migrated, they should return typed planning outpu
 
 When review agents are migrated, they should return typed advisory review contracts first rather than directly constructing regenerated content, approval decisions, workflow-state transitions, or publishing actions. Script-quality, evidence-consistency, storyboard-quality, and publication-readiness reviews should remain explicit typed evaluation boundaries until a later application layer owns any human-reviewed downstream decisions.
 
+When integrated content pipelines are added, they should coordinate only the minimum bounded set of agent calls required for a coherent package. They should prefer one economical happy path over broad prompt fan-out, and they must remain fail-fast until later milestones intentionally add retries, checkpoints, or resume behavior.
+
 When a prompt output has a typed parser, it should be registered through a provider-independent parser registry using the same stable logical prompt name used by the prompt registry. Parser registration must declare the expected output model type explicitly, and builtin prompt/parser alignment should be validated through deterministic contract checks rather than informal assumptions.
 
 Review parsers must remain advisory only. Parsing a decision such as `ready_for_human_review` must never publish content, approve content on behalf of a human, or mutate workflow state automatically.
+
+Integrated content pipelines must preserve that same boundary. A positive publication-readiness result may indicate that a package is ready for human review, but it must not be reinterpreted as approval, scheduling authority, or publication completion.
 
 When prompt execution reaches an LLM provider, the request should already be rendered into provider-independent messages. Providers should consume those rendered messages through a normalized request contract rather than reconstructing prompt definitions internally.
 

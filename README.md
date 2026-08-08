@@ -147,6 +147,20 @@ CreatorOS now also includes a provider-independent application review agent:
 - Fake OpenAI review-agent tests prove that the same agent works unchanged through the OpenAI adapter without live API calls.
 - Human approval remains mandatory, and broader cross-agent pipeline integration remains a later milestone.
 
+## Integrated AI Content Pipeline
+
+CreatorOS now also includes a first integrated provider-independent AI content pipeline:
+
+- `GamingContentPipeline` coordinates the existing `GamingResearchAgent`, `GamingScriptAgent`, `GamingStoryboardAgent`, `GamingMediaAgent`, and `GamingReviewAgent`.
+- The pipeline begins from supplied research signals only. It does not browse the web and does not call a live trend or search provider.
+- The happy-path stage order is fixed: trend discovery, opportunity evaluation, script generation, storyboard scene breakdown, thumbnail concept, narration direction, script-quality review, evidence-consistency review, storyboard-quality review, publication-readiness review.
+- The current happy path makes 10 bounded LLM calls. It intentionally does not call keyword expansion, separate hook generation, separate CTA generation, storyboard timing review, storyboard visual-direction generation, or per-scene media prompts.
+- The media stage produces planning outputs only. It does not generate binary media, upload assets, or publish anything.
+- Review outputs remain advisory only. They do not automatically revise content, approve workflow state, or schedule publication.
+- Publication readiness is not human approval. The pipeline always stops after publication-readiness review and returns a typed pre-publication package for later human review.
+- Failures are fail-fast. The pipeline does not add retries, failover, checkpoint persistence, or resume behavior in this milestone.
+- The existing deterministic demo `GamingWorkflowOrchestrator` remains in place unchanged alongside this new application pipeline.
+
 ## Controlled OpenAI Smoke Test
 
 CreatorOS now includes one explicit opt-in CLI path for a controlled live OpenAI smoke test:

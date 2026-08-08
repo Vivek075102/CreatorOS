@@ -14,6 +14,7 @@ from creatoros.parsing import (
     GamingSceneMotionOutput,
     GamingSceneVisualOutput,
     GamingThumbnailConceptOutput,
+    StoryboardSceneBreakdownOutput,
     StoryboardScenePlan,
     StoryboardVisualDirectionOutput,
     YouTubeShortsScriptOutput,
@@ -69,6 +70,28 @@ def _build_script_text(script_output: YouTubeShortsScriptOutput) -> str:
     )
 
 
+def _build_storyboard_visual_context(
+    storyboard_output: StoryboardSceneBreakdownOutput,
+) -> str:
+    """Convert typed storyboard output into one stable thumbnail-context string."""
+
+    scene_descriptions = " ".join(
+        (
+            f"Scene {scene.scene_number}: "
+            f"Purpose: {scene.purpose}. "
+            f"Visual: {scene.visual}. "
+            f"On-screen text: {scene.on_screen_text}."
+        )
+        for scene in storyboard_output.scenes
+    )
+    return (
+        f"Storyboard title: {storyboard_output.storyboard_title}. "
+        f"{scene_descriptions} "
+        f"Scene count: {storyboard_output.final_scene_count}. "
+        f"Estimated duration: {storyboard_output.total_estimated_duration_seconds} seconds."
+    )
+
+
 class GamingThumbnailConceptRequest(CreatorOSModel):
     """Normalized application input for thumbnail-concept planning."""
 
@@ -86,6 +109,29 @@ class GamingThumbnailConceptRequest(CreatorOSModel):
         """Trim and reject blank textual inputs."""
 
         return _validate_non_blank(value, field_name=info.field_name)
+
+    @classmethod
+    def from_storyboard(
+        cls,
+        storyboard_output: StoryboardSceneBreakdownOutput,
+        *,
+        game: str,
+        topic: str,
+        angle: str,
+        hook: str,
+        platform: str,
+    ) -> GamingThumbnailConceptRequest:
+        """Build a thumbnail-concept request from typed storyboard output."""
+
+        return cls(
+            title=storyboard_output.storyboard_title,
+            game=game,
+            topic=topic,
+            angle=angle,
+            hook=hook,
+            platform=platform,
+            visual_context=_build_storyboard_visual_context(storyboard_output),
+        )
 
 
 class GamingSceneVisualPromptRequest(CreatorOSModel):

@@ -118,6 +118,26 @@ class GamingOpportunityEvaluationRequest(CreatorOSModel):
 
         return _validate_non_blank(value, field_name=info.field_name)
 
+    @classmethod
+    def from_trend_discovery(
+        cls,
+        trend_output: GamingTrendDiscoveryOutput,
+        *,
+        platform: str,
+        target_duration_seconds: int,
+    ) -> GamingOpportunityEvaluationRequest:
+        """Build an opportunity-evaluation request from one typed trend-discovery output."""
+
+        return cls(
+            game=trend_output.game,
+            title=trend_output.title,
+            topic=trend_output.topic,
+            angle=trend_output.angle,
+            source_summary=trend_output.source_summary,
+            platform=platform,
+            target_duration_seconds=target_duration_seconds,
+        )
+
 
 class GamingKeywordExpansionRequest(CreatorOSModel):
     """Normalized application input for gaming keyword expansion."""

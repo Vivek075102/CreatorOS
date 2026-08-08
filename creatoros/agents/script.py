@@ -9,7 +9,13 @@ from pydantic import Field, field_validator
 from creatoros.agents.research import ResearchExecutionOptions
 from creatoros.core import CreatorOSValidationError
 from creatoros.domain import CreatorOSModel
-from creatoros.parsing import GamingCTAOutput, GamingHookOutput, YouTubeShortsScriptOutput
+from creatoros.parsing import (
+    GamingCTAOutput,
+    GamingHookOutput,
+    GamingOpportunityEvaluationOutput,
+    GamingTrendDiscoveryOutput,
+    YouTubeShortsScriptOutput,
+)
 from creatoros.prompts import GAMING_CTA, GAMING_HOOK, YOUTUBE_SHORTS_SCRIPT
 from creatoros.services import LLMExecutionRequest, LLMExecutionService
 
@@ -56,6 +62,28 @@ class GamingScriptGenerationRequest(CreatorOSModel):
         """Trim and reject blank textual inputs."""
 
         return _validate_non_blank(value, field_name=info.field_name)
+
+    @classmethod
+    def from_research_outputs(
+        cls,
+        trend_output: GamingTrendDiscoveryOutput,
+        opportunity_output: GamingOpportunityEvaluationOutput,
+        *,
+        platform: str,
+        target_duration_seconds: int,
+    ) -> GamingScriptGenerationRequest:
+        """Build a script-generation request from typed research outputs."""
+
+        return cls(
+            title=trend_output.title,
+            game=trend_output.game,
+            topic=trend_output.topic,
+            angle=opportunity_output.recommended_angle,
+            hook_direction=opportunity_output.hook_direction,
+            platform=platform,
+            target_duration_seconds=target_duration_seconds,
+            source_summary=trend_output.source_summary,
+        )
 
 
 class GamingHookGenerationRequest(CreatorOSModel):
