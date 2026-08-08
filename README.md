@@ -134,6 +134,19 @@ CreatorOS now also includes a provider-independent application media-planning ag
 - `GamingMediaAgent` is not yet wired into the production workflow or orchestrator path.
 - Real image, video, narration, storage, and publishing provider integration remain later milestones.
 
+## Review Agent Integration
+
+CreatorOS now also includes a provider-independent application review agent:
+
+- `GamingReviewAgent` depends on `LLMExecutionService` rather than calling providers, parsers, prompt registries, or prompt files directly.
+- It currently supports typed review operations for `gaming_script_quality_review`, `gaming_evidence_consistency_review`, `gaming_storyboard_quality_review`, and `gaming_publication_readiness_review`.
+- The agent returns typed advisory outputs such as `GamingScriptQualityReviewOutput`, `GamingEvidenceConsistencyReviewOutput`, `GamingStoryboardQualityReviewOutput`, and `GamingPublicationReadinessReviewOutput`.
+- Review outputs are advisory only. They do not automatically revise content, approve workflow state, publish content, schedule anything, or generate media.
+- `GamingScriptQualityReviewRequest.from_script(...)`, `GamingStoryboardQualityReviewRequest.from_storyboard(...)`, and `GamingPublicationReadinessReviewRequest.from_review_inputs(...)` provide explicit typed bridges from upstream agent outputs without introducing workflow coupling.
+- Mock remains the default provider path for normal execution and tests.
+- Fake OpenAI review-agent tests prove that the same agent works unchanged through the OpenAI adapter without live API calls.
+- Human approval remains mandatory, and broader cross-agent pipeline integration remains a later milestone.
+
 ## Controlled OpenAI Smoke Test
 
 CreatorOS now includes one explicit opt-in CLI path for a controlled live OpenAI smoke test:

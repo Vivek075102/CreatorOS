@@ -292,6 +292,8 @@ The same rule now also applies to storyboard-agent integration. Storyboard-agent
 
 The same rule now also applies to media-agent integration. Media-agent code may call `LLMExecutionService`, but it must not call image, video, voice, storage, or publishing providers directly, must not invoke parser implementations directly, must not access `PromptRegistry` or `PromptRenderer` directly, and must not turn planning outputs into generated assets inside the agent layer.
 
+The same rule now also applies to review-agent integration. Review-agent code may call `LLMExecutionService`, but it must not call providers directly, must not invoke parser implementations directly, must not access `PromptRegistry` or `PromptRenderer` directly, and must not turn advisory review outputs into automatic revision, approval, workflow mutation, or publishing behavior inside the agent layer.
+
 ## 17. Prompt Engineering Standards
 
 Prompts are version-controlled product assets.
@@ -335,6 +337,8 @@ When script-generation agents are migrated, they should return typed parser outp
 When storyboard agents are migrated, they should return typed parser output contracts first rather than directly constructing media assets, edited timelines, or publishing-ready artifacts. Scene breakdown, timing review, and visual direction should remain explicit typed boundaries until a later application layer owns the mapping into storyboard domain entities or asset-production workflows.
 
 When media-planning agents are migrated, they should return typed planning output contracts first rather than directly constructing generated assets, file paths, URLs, uploaded objects, or published media. Thumbnail concepts, scene visuals, scene motion, and narration direction should remain explicit typed planning boundaries until a later application layer owns the mapping into concrete media providers.
+
+When review agents are migrated, they should return typed advisory review contracts first rather than directly constructing regenerated content, approval decisions, workflow-state transitions, or publishing actions. Script-quality, evidence-consistency, storyboard-quality, and publication-readiness reviews should remain explicit typed evaluation boundaries until a later application layer owns any human-reviewed downstream decisions.
 
 When a prompt output has a typed parser, it should be registered through a provider-independent parser registry using the same stable logical prompt name used by the prompt registry. Parser registration must declare the expected output model type explicitly, and builtin prompt/parser alignment should be validated through deterministic contract checks rather than informal assumptions.
 
