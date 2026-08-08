@@ -344,6 +344,8 @@ Stable internal interfaces should include types such as:
 
 Providers translate between CreatorOS domain contracts and external APIs. No domain engine should depend directly on OpenAI, Anthropic, Google, YouTube, ElevenLabs, or any other concrete service.
 
+CreatorOS now includes a first real OpenAI LLM adapter behind the provider boundary. That adapter exists to validate the architecture, not to collapse it. Agents, engines, prompts, and parsers must continue to interact only through the stable `LLMRequest`, `LLMResponse`, and `LLMProvider` contracts rather than through OpenAI SDK objects or vendor-specific request shapes.
+
 Prompts must remain provider-independent at the architecture level. A rendered prompt may later be passed to an `LLMProvider`, but prompt definitions, validation rules, and asset organization belong to CreatorOS rather than to any vendor SDK or provider implementation.
 
 When structured text is returned by a provider, the response should first pass through the provider-independent parsing layer before CreatorOS constructs downstream domain models. Raw provider text must not be treated as a trusted domain object.

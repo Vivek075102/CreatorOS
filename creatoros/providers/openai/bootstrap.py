@@ -1,0 +1,35 @@
+"""Bootstrap helpers for the CreatorOS OpenAI provider adapter."""
+
+from __future__ import annotations
+
+from creatoros.config import get_settings
+from creatoros.providers.openai.llm import (
+    DEFAULT_OPENAI_MODEL,
+    OpenAILLMProvider,
+    _AsyncOpenAIClient,
+)
+from creatoros.providers.registry import ProviderRegistry
+
+
+def register_openai_provider(
+    registry: ProviderRegistry,
+    *,
+    replace: bool = False,
+    api_key: str | None = None,
+    client: _AsyncOpenAIClient | None = None,
+    default_model: str | None = None,
+) -> OpenAILLMProvider:
+    """Register one OpenAI LLM provider without making any network requests."""
+
+    settings = get_settings()
+    provider = OpenAILLMProvider(
+        api_key=settings.openai_api_key if api_key is None else api_key,
+        client=client,
+        default_model=DEFAULT_OPENAI_MODEL if default_model is None else default_model,
+        timeout_seconds=settings.provider_timeout_seconds,
+    )
+    registry.register(provider, replace=replace)
+    return provider
+
+
+__all__ = ["register_openai_provider"]

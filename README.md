@@ -61,10 +61,10 @@ CreatorOS now includes a provider-independent LLM execution boundary under `crea
 - Provider SDK objects must not escape provider adapters.
 - Prompt text, rendered messages, and LLM response text are not logged by default by the provider foundation.
 - The default provider and default model remain `mock` and `mock-model`.
-- No live LLM provider is active yet.
-- The deterministic mock LLM provider implements the new boundary without network calls.
-
-The first real adapter is intentionally deferred to Milestone 2.3B.
+- The deterministic mock LLM provider implements the new boundary without network calls and remains the default local development provider.
+- A real `OpenAILLMProvider` adapter now exists behind the same provider-independent `LLMProvider` contract.
+- The OpenAI adapter uses the official OpenAI Python SDK and the Responses API, but it is not wired into agents or workflows in this milestone.
+- Normal automated tests continue to rely on deterministic fakes and do not require live API calls.
 
 ## Prompt Foundation
 
@@ -107,7 +107,7 @@ CreatorOS now includes a provider-independent structured-output parsing foundati
 - No repair or retry mechanism exists yet.
 
 Agents and workflows are not yet migrated to consume these typed parsers automatically. Review outputs remain advisory only, and `ready_for_human_review` is not publication approval.
-Provider integration can now resolve typed parsers through a provider-independent registry contract instead of hardcoded prompt-family branching, but no real LLM provider is integrated yet and no workflow behavior changed in this milestone.
+Provider integration can now resolve typed parsers through a provider-independent registry contract instead of hardcoded prompt-family branching. A real OpenAI adapter now exists behind the provider boundary, but workflow behavior remains unchanged in this milestone and the default runtime stays on the local mock provider.
 
 ## Prompt Asset Structure
 

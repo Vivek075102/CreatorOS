@@ -23,6 +23,11 @@ from creatoros.providers.contracts import (
     VideoProvider,
     VoiceProvider,
 )
+from creatoros.providers.openai import (
+    DEFAULT_OPENAI_MODEL,
+    OpenAILLMProvider,
+    register_openai_provider,
+)
 from creatoros.providers.registry import (
     ProviderRegistry,
     create_provider_registry,
@@ -31,6 +36,7 @@ from creatoros.providers.registry import (
 )
 
 __all__ = [
+    "DEFAULT_OPENAI_MODEL",
     "AnalyticsProvider",
     "ImageProvider",
     "LLMCapabilities",
@@ -38,6 +44,7 @@ __all__ = [
     "LLMRequest",
     "LLMResponse",
     "LLMUsage",
+    "OpenAILLMProvider",
     "Provider",
     "ProviderCapability",
     "ProviderInfo",
@@ -53,5 +60,6 @@ __all__ = [
     "VoiceProvider",
     "create_provider_registry",
     "get_provider_registry",
+    "register_openai_provider",
     "resolve_default_llm_provider",
 ]

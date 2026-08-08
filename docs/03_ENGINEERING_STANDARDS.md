@@ -271,6 +271,8 @@ Provider adapters exist to isolate external systems, not to become the primary l
 
 LLM providers must accept provider-independent request contracts and return normalized response contracts. They must not accept prompt-definition objects, must not resolve prompt registries internally, must not invoke parser registries, and must not log prompt or response content by default.
 
+When a real vendor adapter is introduced, the same rules still apply. For example, the current OpenAI adapter may depend on the official OpenAI SDK internally, but it must keep SDK objects, raw transport payloads, authentication details, and vendor exception types inside the adapter boundary.
+
 ## 17. Prompt Engineering Standards
 
 Prompts are version-controlled product assets.
