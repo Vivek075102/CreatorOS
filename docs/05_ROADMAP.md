@@ -146,6 +146,7 @@ Build the Research Engine and Opportunity Engine capabilities required to gather
 - Initial built-in gaming media-support prompt assets for thumbnail concepts, scene-visual direction, scene-motion direction, and narration direction rendered locally without provider calls
 - Initial built-in gaming review prompt assets for script quality, evidence consistency, storyboard quality, and publication-readiness advisory review contracts
 - Provider-independent structured-output parsing foundation for validated label/value text
+- Typed provider-independent parsers for built-in research and script prompt outputs
 - Opportunity scoring rules and ranking pipeline
 - Research result persistence
 - Approval-ready content opportunity outputs
@@ -171,6 +172,7 @@ Build the Research Engine and Opportunity Engine capabilities required to gather
 - Research signals are normalized into platform-owned domain contracts
 - Prompt assets can be loaded, discovered, validated, registered, and rendered through platform-owned contracts
 - Structured provider text can be normalized, parsed, and adapted into validated CreatorOS models through a provider-independent parsing layer
+- Built-in research and script prompt outputs can be converted into typed validated parser models without provider-specific logic
 - Content opportunities can be ranked using explicit rules
 - Research workflows produce auditable structured outputs that can feed downstream content generation
 

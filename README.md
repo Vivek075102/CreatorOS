@@ -73,11 +73,15 @@ CreatorOS now includes a provider-independent structured-output parsing foundati
 - Provider text must not flow directly into domain objects without normalization and validation.
 - The parsing layer is provider-independent and does not integrate any real LLM vendor in this milestone.
 - The current v1 parser supports deterministic label/value structured text only.
+- Research prompt outputs now have typed parsers for trend discovery, opportunity evaluation, and keyword expansion.
+- Script prompt outputs now have typed parsers for YouTube Shorts scripts, gaming hooks, and gaming CTAs.
+- Keyword-list parsing supports simple `- item` bullet syntax only.
 - JSON parsing is not part of this milestone.
 - Markdown-table parsing is not part of this milestone.
 - Raw LLM responses must not be logged by default by the parsing layer.
+- No repair or retry mechanism exists yet.
 
-Prompt-specific research, script, storyboard, and review parsers remain later milestone work.
+Agents and workflows are not yet migrated to consume these typed parsers automatically. Storyboard, media, and review parsers remain later milestone work.
 
 ## Prompt Asset Structure
 

@@ -285,6 +285,17 @@ class StructuredOutputError(ParsingError):
     """Raised when structured provider text is invalid or unusable."""
 
 
+class StructuredValueError(StructuredOutputError):
+    """Raised when one structured parsed field contains an invalid value."""
+
+    def __init__(self, field_name: str, *, expected_type: str) -> None:
+        super().__init__(
+            "structured output field contains an invalid value",
+            code="structured_output_invalid_value",
+            details={"field_name": field_name.strip(), "expected_type": expected_type.strip()},
+        )
+
+
 class DuplicateParsedFieldError(StructuredOutputError):
     """Raised when structured output repeats the same canonical field."""
 

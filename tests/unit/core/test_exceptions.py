@@ -23,6 +23,7 @@ from creatoros.core import (
     ProviderUnavailableError,
     PublishingError,
     StructuredOutputError,
+    StructuredValueError,
     WorkflowError,
     WorkflowStateError,
     wrap_exception,
@@ -234,6 +235,7 @@ def test_exception_hierarchy_relationships_are_correct() -> None:
     assert issubclass(ProviderError, ApplicationError)
     assert issubclass(ParsingError, ApplicationError)
     assert issubclass(StructuredOutputError, ParsingError)
+    assert issubclass(StructuredValueError, StructuredOutputError)
     assert issubclass(DuplicateParsedFieldError, StructuredOutputError)
     assert issubclass(ProviderAuthenticationError, ProviderError)
     assert issubclass(ProviderRateLimitError, ProviderError)
@@ -264,3 +266,12 @@ def test_duplicate_parsed_field_error_uses_safe_duplicate_code() -> None:
 
     assert error.code == "structured_output_duplicate_field"
     assert error.details == {"field_name": "TITLE"}
+
+
+def test_structured_value_error_uses_safe_invalid_value_code() -> None:
+    """Structured value errors should expose safe typed value details only."""
+
+    error = StructuredValueError("SCORE", expected_type="integer")
+
+    assert error.code == "structured_output_invalid_value"
+    assert error.details == {"field_name": "SCORE", "expected_type": "integer"}

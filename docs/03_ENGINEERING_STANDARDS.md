@@ -101,6 +101,8 @@ Validation should happen as close as practical to the boundary where data enters
 
 Structured text returned by AI providers must pass through a provider-independent parsing layer before becoming domain or application models. Normalization, field extraction, and model adaptation should happen in explicit parsing modules rather than through ad hoc string handling inside engines or providers.
 
+When a prompt contract uses list-style sections, parsing logic must support only the documented syntax for that contract. CreatorOS currently supports simple bullet-list parsing for applicable research outputs and must not infer richer syntaxes that were not explicitly specified.
+
 ## 8. Functions and Classes
 
 Functions and classes must be designed for readability, reuse, and testability.
@@ -298,6 +300,8 @@ The following rules are mandatory:
 - Visual-direction prompt assets must remain provider-independent. They may describe composition, motion, overlays, and stylistic guidance, but they must not embed vendor-specific generation parameters or assume media has already been produced.
 - Thumbnail, scene-visual, scene-motion, and narration-direction prompt assets must remain prompt-layer contracts only until dedicated media engines consume them. They must not imply that image, video, or voice providers were invoked during local rendering or manifest validation.
 - Review prompt assets must remain advisory quality gates. They must use supplied evidence only, must not imply browsing or independent fact-checking, must not claim that content is approved for publication, and must not bypass the human approval model established by ADR-004.
+
+Typed parsers for prompt outputs should be added incrementally by prompt family. The current parsing layer covers research and script outputs only. Agent or workflow migration to consume those parsers must remain explicit future work rather than an implicit side effect of parser implementation.
 
 Prompt engineering is part of system design and must be handled with the same care as source code.
 

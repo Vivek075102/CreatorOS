@@ -212,6 +212,7 @@ The initial parsing foundation is provider-independent and accepts deterministic
 - Canonical field-label normalization
 - Structured field specification
 - Safe multiline field extraction
+- Simple bullet-list extraction for prompt contracts that explicitly use list sections
 - Detection of missing required fields
 - Detection of duplicate fields
 - Handling of unknown fields according to explicit specification
@@ -219,7 +220,9 @@ The initial parsing foundation is provider-independent and accepts deterministic
 
 This parsing layer belongs above concrete providers and below domain-model construction. Providers may return text, but they must not decide how CreatorOS interprets platform-owned structured contracts.
 
-The initial version intentionally does not include JSON parsing, Markdown-table parsing, prompt-specific research parsers, prompt-specific script parsers, prompt-specific storyboard parsers, or automatic repair logic. Those remain later milestone work.
+The first prompt-specific typed parsers cover research and script outputs for the built-in gaming prompts. They remain provider-independent parsing adapters, not provider integrations, and they do not yet change agent or workflow execution.
+
+The current version intentionally does not include JSON parsing, Markdown-table parsing, prompt-specific storyboard parsers, automatic repair logic, or retry-based self-correction. Research and script typed parsers now exist, while storyboard, media, and review parsers remain later milestone work.
 
 An engine may internally coordinate focused agents, helper modules, or provider calls. External components should interact with the engine through a stable interface rather than reaching into its internal implementation details.
 
@@ -558,7 +561,7 @@ The intended persistence stack for CreatorOS is PostgreSQL, SQLAlchemy 2.x, Alem
 
 The initial prompt foundation should treat prompt definitions as validated JSON assets loaded from the configured prompts directory, registered through a platform-owned registry, rendered through explicit typed variables, and discoverable through a manifest-aware asset structure. Broader asset formats or remote prompt management may be considered later only if they preserve the same architectural boundaries.
 
-The current built-in prompt catalog is intentionally narrow. It covers the first provider-independent research, script, storyboard, thumbnail, narration, and review prompt assets plus local rendering support, not a complete prompt inventory for every engine or workflow. These assets define text-based output contracts only. The first provider-independent structured parsing foundation now validates deterministic label/value outputs before they are adapted into CreatorOS models. Evidence consistency and publication-readiness review remain advisory prompt contracts that operate on supplied inputs only. Prompt-specific parsers, workflow integration for parsed review outputs, real storyboard model generation, and downstream media-generation integration remain later milestone work.
+The current built-in prompt catalog is intentionally narrow. It covers the first provider-independent research, script, storyboard, thumbnail, narration, and review prompt assets plus local rendering support, not a complete prompt inventory for every engine or workflow. These assets define text-based output contracts only. The structured parsing foundation now validates deterministic label/value outputs before they are adapted into CreatorOS models, and the first typed parser adapters cover research and script outputs. Evidence consistency and publication-readiness review remain advisory prompt contracts that operate on supplied inputs only. Workflow integration for parsed outputs, real storyboard model generation, and downstream media-generation integration remain later milestone work.
 
 ## 24. Testing Architecture
 
