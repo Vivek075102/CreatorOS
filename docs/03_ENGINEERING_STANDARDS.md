@@ -99,6 +99,8 @@ The following rules are mandatory:
 
 Validation should happen as close as practical to the boundary where data enters the system.
 
+Structured text returned by AI providers must pass through a provider-independent parsing layer before becoming domain or application models. Normalization, field extraction, and model adaptation should happen in explicit parsing modules rather than through ad hoc string handling inside engines or providers.
+
 ## 8. Functions and Classes
 
 Functions and classes must be designed for readability, reuse, and testability.
@@ -176,6 +178,7 @@ Additional mandatory rules:
 - `print` statements are prohibited in production modules.
 - Secrets must never appear in logs.
 - Full provider payloads must not be logged unless explicitly sanitized.
+- Raw structured-output provider text must not be logged by default.
 - Full rendered prompt contents should not be logged by default.
 - Exceptions should preserve useful context.
 - Logging failures must not hide the original error.
@@ -290,6 +293,7 @@ The following rules are mandatory:
 - CLI prompt inspection commands may expose prompt metadata safely, but full rendered prompt content should require an explicit operator action such as a dedicated flag.
 - Prompt assets should rely only on supplied evidence and inputs. They must not imply browsing, hidden knowledge, or unsupported live awareness.
 - Early prompt output contracts may remain text-based when a later milestone is expected to add structured parsing. That limitation must be documented explicitly rather than hidden behind fragile assumptions.
+- The initial structured parsing foundation supports deterministic label/value text only. JSON parsing and Markdown-table parsing must not be implied until they are implemented and documented.
 - Application code should resolve prompts by stable logical prompt name through the registry instead of hardcoding prompt file paths.
 - Visual-direction prompt assets must remain provider-independent. They may describe composition, motion, overlays, and stylistic guidance, but they must not embed vendor-specific generation parameters or assume media has already been produced.
 - Thumbnail, scene-visual, scene-motion, and narration-direction prompt assets must remain prompt-layer contracts only until dedicated media engines consume them. They must not imply that image, video, or voice providers were invoked during local rendering or manifest validation.

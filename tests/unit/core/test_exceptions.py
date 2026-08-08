@@ -12,7 +12,9 @@ from creatoros.core import (
     CreatorOSError,
     CreatorOSValidationError,
     DomainError,
+    DuplicateParsedFieldError,
     EngineError,
+    ParsingError,
     PersistenceError,
     ProviderAuthenticationError,
     ProviderError,
@@ -20,6 +22,7 @@ from creatoros.core import (
     ProviderTimeoutError,
     ProviderUnavailableError,
     PublishingError,
+    StructuredOutputError,
     WorkflowError,
     WorkflowStateError,
     wrap_exception,
@@ -229,6 +232,9 @@ def test_exception_hierarchy_relationships_are_correct() -> None:
     assert issubclass(EngineError, ApplicationError)
     assert issubclass(AgentError, ApplicationError)
     assert issubclass(ProviderError, ApplicationError)
+    assert issubclass(ParsingError, ApplicationError)
+    assert issubclass(StructuredOutputError, ParsingError)
+    assert issubclass(DuplicateParsedFieldError, StructuredOutputError)
     assert issubclass(ProviderAuthenticationError, ProviderError)
     assert issubclass(ProviderRateLimitError, ProviderError)
     assert issubclass(ProviderTimeoutError, ProviderError)
@@ -249,3 +255,12 @@ def test_no_external_exception_text_is_copied_automatically_into_details() -> No
     )
 
     assert wrapped.details == {}
+
+
+def test_duplicate_parsed_field_error_uses_safe_duplicate_code() -> None:
+    """Duplicate parsed field errors should expose safe duplicate details only."""
+
+    error = DuplicateParsedFieldError("TITLE")
+
+    assert error.code == "structured_output_duplicate_field"
+    assert error.details == {"field_name": "TITLE"}

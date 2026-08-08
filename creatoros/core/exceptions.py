@@ -277,6 +277,25 @@ class PromptRenderError(PromptError):
     """Raised when prompt rendering fails for non-validation reasons."""
 
 
+class ParsingError(ApplicationError):
+    """Raised for structured-output parsing failures."""
+
+
+class StructuredOutputError(ParsingError):
+    """Raised when structured provider text is invalid or unusable."""
+
+
+class DuplicateParsedFieldError(StructuredOutputError):
+    """Raised when structured output repeats the same canonical field."""
+
+    def __init__(self, field_name: str) -> None:
+        super().__init__(
+            "structured output contains a duplicate field",
+            code="structured_output_duplicate_field",
+            details={"field_name": field_name.strip()},
+        )
+
+
 def wrap_exception(
     error: Exception,
     *,

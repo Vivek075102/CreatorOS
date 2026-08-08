@@ -145,6 +145,7 @@ Build the Research Engine and Opportunity Engine capabilities required to gather
 - Initial built-in gaming storyboard prompt assets with scene breakdown, visual direction, and timing review contracts rendered locally without provider calls
 - Initial built-in gaming media-support prompt assets for thumbnail concepts, scene-visual direction, scene-motion direction, and narration direction rendered locally without provider calls
 - Initial built-in gaming review prompt assets for script quality, evidence consistency, storyboard quality, and publication-readiness advisory review contracts
+- Provider-independent structured-output parsing foundation for validated label/value text
 - Opportunity scoring rules and ranking pipeline
 - Research result persistence
 - Approval-ready content opportunity outputs
@@ -169,6 +170,7 @@ Build the Research Engine and Opportunity Engine capabilities required to gather
 - CreatorOS can ingest research data from one or more providers through abstractions
 - Research signals are normalized into platform-owned domain contracts
 - Prompt assets can be loaded, discovered, validated, registered, and rendered through platform-owned contracts
+- Structured provider text can be normalized, parsed, and adapted into validated CreatorOS models through a provider-independent parsing layer
 - Content opportunities can be ranked using explicit rules
 - Research workflows produce auditable structured outputs that can feed downstream content generation
 
@@ -178,6 +180,7 @@ Build the Research Engine and Opportunity Engine capabilities required to gather
 - Cross-source signal fusion
 - Controlled experimentation on scoring models
 - Multi-language research support
+- Prompt-specific parsers and richer structured-output formats when justified by later milestones
 
 ## Milestone 3 — Content Intelligence
 

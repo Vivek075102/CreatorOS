@@ -65,6 +65,20 @@ CreatorOS now includes a provider-independent prompt-system foundation under `cr
 
 This foundation does not claim that production prompt catalogs, real LLM workflows, or remote prompt management are already complete. It establishes the architectural base for those later milestones.
 
+## Structured Parsing Foundation
+
+CreatorOS now includes a provider-independent structured-output parsing foundation under `creatoros/parsing`.
+
+- Structured parsing sits between untrusted provider text and CreatorOS domain or application models.
+- Provider text must not flow directly into domain objects without normalization and validation.
+- The parsing layer is provider-independent and does not integrate any real LLM vendor in this milestone.
+- The current v1 parser supports deterministic label/value structured text only.
+- JSON parsing is not part of this milestone.
+- Markdown-table parsing is not part of this milestone.
+- Raw LLM responses must not be logged by default by the parsing layer.
+
+Prompt-specific research, script, storyboard, and review parsers remain later milestone work.
+
 ## Prompt Asset Structure
 
 The current prompt repository structure is:
