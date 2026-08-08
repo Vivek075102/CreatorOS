@@ -200,6 +200,8 @@ For LLM execution specifically, the stable handoff should be:
 
 The provider boundary begins at `LLMRequest` and ends at `LLMResponse`. Providers should receive rendered provider-independent messages, not prompt definitions, prompt registries, or parser registries.
 
+The application-layer orchestration point for that handoff is now `LLMExecutionService`. It resolves prompt definitions, renders them with validated variables, selects a registered LLM provider, executes the normalized request, and resolves the typed parser registration by stable logical prompt name. This keeps prompt selection, provider routing, and typed parsing in platform-owned application code rather than scattering that orchestration across agents, engines, or provider adapters.
+
 Review and quality-control prompts are part of the prompt subsystem as advisory contracts, not as autonomous approval authorities. They may evaluate supplied artifacts for consistency, quality, and readiness signals, but they must not claim independent fact verification, platform approval, or publishing authority. Human approval remains authoritative under the Level 4 operating model.
 
 Prompt assets remain outside the Python package in the repository `prompts/` directory. They are organized by category, use canonical versioned filenames, and may be described by a validated manifest that supports discovery and verification without becoming a persistence system or runtime database.
@@ -351,6 +353,8 @@ Prompts must remain provider-independent at the architecture level. A rendered p
 When structured text is returned by a provider, the response should first pass through the provider-independent parsing layer before CreatorOS constructs downstream domain models. Raw provider text must not be treated as a trusted domain object.
 
 Providers must not parse application outputs on behalf of CreatorOS. They return normalized provider responses only. ParserRegistry resolution, typed parsing, and workflow-level interpretation remain downstream platform responsibilities.
+
+The current `LLMExecutionService` now owns that downstream prompt-to-provider-to-parser orchestration path at the application layer. It does not add retries, failover, repair logic, persistence, workflow mutation, or publication behavior. Those concerns remain separate future milestones.
 
 Provider SDK objects, raw transport payloads, and vendor-specific exception types must not escape the provider adapter boundary.
 

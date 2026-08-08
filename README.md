@@ -66,6 +66,19 @@ CreatorOS now includes a provider-independent LLM execution boundary under `crea
 - The OpenAI adapter uses the official OpenAI Python SDK and the Responses API, but it is not wired into agents or workflows in this milestone.
 - Normal automated tests continue to rely on deterministic fakes and do not require live API calls.
 
+## LLM Execution Service
+
+CreatorOS now includes an application-layer `LLMExecutionService` under `creatoros/services`.
+
+- This service is the standard application boundary that connects `PromptRegistry`, `PromptRenderer`, `LLMProvider`, and `ParserRegistry`.
+- The execution path is `PromptDefinition -> RenderedPrompt -> LLMRequest -> LLMResponse -> typed parsed output`.
+- Parser selection is registry-driven by stable prompt logical name rather than hardcoded prompt branching.
+- The service remains provider-independent and does not know OpenAI-specific request shapes or SDK objects.
+- The default runtime remains `mock`, and OpenAI is used only when explicitly registered and selected.
+- The current service does not add retries, response repair, failover, persistence, workflow-state updates, or publishing.
+- Agents and workflows are not migrated to this service yet, but it is the intended application-layer entry point for future integration.
+- Current tests prove complete offline end-to-end execution with both the mock provider and a fake OpenAI client without real network calls.
+
 ## Prompt Foundation
 
 CreatorOS now includes a provider-independent prompt-system foundation under `creatoros/prompts`.
@@ -107,7 +120,7 @@ CreatorOS now includes a provider-independent structured-output parsing foundati
 - No repair or retry mechanism exists yet.
 
 Agents and workflows are not yet migrated to consume these typed parsers automatically. Review outputs remain advisory only, and `ready_for_human_review` is not publication approval.
-Provider integration can now resolve typed parsers through a provider-independent registry contract instead of hardcoded prompt-family branching. A real OpenAI adapter now exists behind the provider boundary, but workflow behavior remains unchanged in this milestone and the default runtime stays on the local mock provider.
+Provider integration can now resolve typed parsers through a provider-independent registry contract instead of hardcoded prompt-family branching. A real OpenAI adapter now exists behind the provider boundary, and an application-layer `LLMExecutionService` now connects prompt rendering, provider execution, and parser resolution without changing workflow behavior. The default runtime still stays on the local mock provider.
 
 ## Prompt Asset Structure
 

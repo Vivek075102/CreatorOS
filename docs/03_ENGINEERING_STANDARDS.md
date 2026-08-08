@@ -273,6 +273,8 @@ LLM providers must accept provider-independent request contracts and return norm
 
 When a real vendor adapter is introduced, the same rules still apply. For example, the current OpenAI adapter may depend on the official OpenAI SDK internally, but it must keep SDK objects, raw transport payloads, authentication details, and vendor exception types inside the adapter boundary.
 
+Application-layer execution orchestration belongs outside providers. CreatorOS now uses `LLMExecutionService` as the platform-owned path that resolves prompt definitions, renders variables, selects a registered provider, and resolves the typed parser registration. Agents and engines should eventually depend on that service boundary rather than duplicating prompt-to-provider-to-parser orchestration internally.
+
 ## 17. Prompt Engineering Standards
 
 Prompts are version-controlled product assets.
@@ -314,6 +316,8 @@ When a prompt output has a typed parser, it should be registered through a provi
 Review parsers must remain advisory only. Parsing a decision such as `ready_for_human_review` must never publish content, approve content on behalf of a human, or mutate workflow state automatically.
 
 When prompt execution reaches an LLM provider, the request should already be rendered into provider-independent messages. Providers should consume those rendered messages through a normalized request contract rather than reconstructing prompt definitions internally.
+
+Parser selection after provider execution must be registry-driven. Application services must not branch on specific prompt names when selecting parsers, and they must not reach into parser implementation internals when `ParserRegistry` already provides the needed routing.
 
 Prompt engineering is part of system design and must be handled with the same care as source code.
 
