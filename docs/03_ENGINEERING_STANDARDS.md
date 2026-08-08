@@ -103,6 +103,8 @@ Structured text returned by AI providers must pass through a provider-independen
 
 When a prompt contract uses list-style sections, parsing logic must support only the documented syntax for that contract. CreatorOS currently supports simple bullet-list parsing for applicable research outputs and must not infer richer syntaxes that were not explicitly specified.
 
+When a prompt contract uses repeating structured sections such as storyboard `SCENE_N` blocks, parsing should use the smallest dedicated safe block parser needed for that contract rather than flattening the structure into brittle ad hoc field handling.
+
 ## 8. Functions and Classes
 
 Functions and classes must be designed for readability, reuse, and testability.
@@ -301,7 +303,9 @@ The following rules are mandatory:
 - Thumbnail, scene-visual, scene-motion, and narration-direction prompt assets must remain prompt-layer contracts only until dedicated media engines consume them. They must not imply that image, video, or voice providers were invoked during local rendering or manifest validation.
 - Review prompt assets must remain advisory quality gates. They must use supplied evidence only, must not imply browsing or independent fact-checking, must not claim that content is approved for publication, and must not bypass the human approval model established by ADR-004.
 
-Typed parsers for prompt outputs should be added incrementally by prompt family. The current parsing layer covers research and script outputs only. Agent or workflow migration to consume those parsers must remain explicit future work rather than an implicit side effect of parser implementation.
+Typed parsers for prompt outputs should be added incrementally by prompt family. The current parsing layer now covers the built-in research, script, storyboard, media-support, and review prompt outputs. Agent or workflow migration to consume those parsers must remain explicit future work rather than an implicit side effect of parser implementation.
+
+Review parsers must remain advisory only. Parsing a decision such as `ready_for_human_review` must never publish content, approve content on behalf of a human, or mutate workflow state automatically.
 
 Prompt engineering is part of system design and must be handled with the same care as source code.
 

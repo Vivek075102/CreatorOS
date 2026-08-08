@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from collections.abc import Iterable
 from typing import cast
 
@@ -18,6 +19,38 @@ def parse_int_field(field_name: str, value: str) -> int:
         return int(normalized_value)
     except ValueError as error:
         raise StructuredValueError(field_name, expected_type="integer") from error
+
+
+def parse_positive_int_field(field_name: str, value: str) -> int:
+    """Convert a parsed field value into a positive integer safely."""
+
+    parsed_value = parse_int_field(field_name, value)
+    if parsed_value <= 0:
+        raise StructuredValueError(field_name, expected_type="positive_integer")
+    return parsed_value
+
+
+def parse_float_field(field_name: str, value: str) -> float:
+    """Convert a parsed field value into a finite float safely."""
+
+    normalized_value = value.strip()
+    try:
+        parsed_value = float(normalized_value)
+    except ValueError as error:
+        raise StructuredValueError(field_name, expected_type="float") from error
+
+    if not math.isfinite(parsed_value):
+        raise StructuredValueError(field_name, expected_type="finite_float")
+    return parsed_value
+
+
+def parse_positive_float_field(field_name: str, value: str) -> float:
+    """Convert a parsed field value into a positive finite float safely."""
+
+    parsed_value = parse_float_field(field_name, value)
+    if parsed_value <= 0:
+        raise StructuredValueError(field_name, expected_type="positive_float")
+    return parsed_value
 
 
 def parse_literal_field(field_name: str, value: str, allowed_values: Iterable[str]) -> str:

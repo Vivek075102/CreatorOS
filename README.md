@@ -75,13 +75,17 @@ CreatorOS now includes a provider-independent structured-output parsing foundati
 - The current v1 parser supports deterministic label/value structured text only.
 - Research prompt outputs now have typed parsers for trend discovery, opportunity evaluation, and keyword expansion.
 - Script prompt outputs now have typed parsers for YouTube Shorts scripts, gaming hooks, and gaming CTAs.
+- Storyboard prompt outputs now have typed parsers for scene breakdowns, visual direction, and timing review.
+- Media prompt outputs now have typed parsers for thumbnail concepts, scene visuals, scene motion, and narration direction.
+- Review prompt outputs now have typed advisory parsers for script, evidence, storyboard, and publication-readiness reviews.
 - Keyword-list parsing supports simple `- item` bullet syntax only.
+- Repeating storyboard scenes use a dedicated safe scene-block parser rather than a brittle flat-field approximation.
 - JSON parsing is not part of this milestone.
 - Markdown-table parsing is not part of this milestone.
 - Raw LLM responses must not be logged by default by the parsing layer.
 - No repair or retry mechanism exists yet.
 
-Agents and workflows are not yet migrated to consume these typed parsers automatically. Storyboard, media, and review parsers remain later milestone work.
+Agents and workflows are not yet migrated to consume these typed parsers automatically. Review outputs remain advisory only, and `ready_for_human_review` is not publication approval.
 
 ## Prompt Asset Structure
 
@@ -163,4 +167,4 @@ python -m creatoros prompts render gaming_narration_direction --show-content
 
 By default, `prompts render` shows prompt metadata only. Full rendered prompt content is shown only when `--show-content` is provided. These commands render locally, do not call an LLM provider, and do not imply that real AI generation is already wired into the demo workflow.
 
-The current research, script, storyboard, thumbnail, narration, and review prompt output contracts are text-based. Review prompts remain advisory and publication readiness means ready for human review, not approved for publication. Structured parsing, workflow integration for review outputs, real storyboard generation, real image generation, real video generation, real narration generation, and downstream media-production integration will be added in later milestones.
+The current research, script, storyboard, thumbnail, narration, and review prompt output contracts are text-based. All current prompt families now have typed provider-independent parsing support, but parser output still does not change workflow state automatically. Review prompts remain advisory and publication readiness means ready for human review, not approved for publication. Workflow integration for parsed outputs, real image generation, real video generation, real narration generation, and downstream media-production integration will be added in later milestones.
