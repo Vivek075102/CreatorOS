@@ -20,8 +20,17 @@ from creatoros.providers.contracts import (
     SearchProvider,
     StorageProvider,
     TrendProvider,
+    TTSProvider,
     VideoProvider,
     VoiceProvider,
+)
+from creatoros.providers.media import (
+    GeneratedAudio,
+    GeneratedImage,
+    GeneratedVideo,
+    ImageGenerationRequest,
+    TTSGenerationRequest,
+    VideoGenerationRequest,
 )
 from creatoros.providers.openai import (
     DEFAULT_OPENAI_MODEL,
@@ -32,12 +41,19 @@ from creatoros.providers.registry import (
     ProviderRegistry,
     create_provider_registry,
     get_provider_registry,
+    resolve_default_image_provider,
     resolve_default_llm_provider,
+    resolve_default_tts_provider,
+    resolve_default_video_provider,
 )
 
 __all__ = [
     "DEFAULT_OPENAI_MODEL",
     "AnalyticsProvider",
+    "GeneratedAudio",
+    "GeneratedImage",
+    "GeneratedVideo",
+    "ImageGenerationRequest",
     "ImageProvider",
     "LLMCapabilities",
     "LLMProvider",
@@ -55,11 +71,17 @@ __all__ = [
     "PublishingProvider",
     "SearchProvider",
     "StorageProvider",
+    "TTSGenerationRequest",
+    "TTSProvider",
     "TrendProvider",
+    "VideoGenerationRequest",
     "VideoProvider",
     "VoiceProvider",
     "create_provider_registry",
     "get_provider_registry",
     "register_openai_provider",
+    "resolve_default_image_provider",
     "resolve_default_llm_provider",
+    "resolve_default_tts_provider",
+    "resolve_default_video_provider",
 ]

@@ -15,6 +15,10 @@ from creatoros.domain import (
 )
 from creatoros.providers import (
     AnalyticsProvider,
+    GeneratedAudio,
+    GeneratedImage,
+    GeneratedVideo,
+    ImageGenerationRequest,
     ImageProvider,
     LLMCapabilities,
     LLMProvider,
@@ -28,6 +32,9 @@ from creatoros.providers import (
     SearchProvider,
     StorageProvider,
     TrendProvider,
+    TTSGenerationRequest,
+    TTSProvider,
+    VideoGenerationRequest,
     VideoProvider,
     VoiceProvider,
 )
@@ -126,6 +133,22 @@ class FakeImageProvider(FakeProvider):
     def info(self) -> ProviderInfo:
         return build_provider_info(ProviderCapability.IMAGE_GENERATION)
 
+    async def generate(self, request: ImageGenerationRequest, *, context=None) -> ProviderResult[GeneratedImage]:
+        return ProviderResult[GeneratedImage](
+            data=GeneratedImage(
+                artifact=GeneratedAsset(
+                    asset_type=AssetType.IMAGE,
+                    uri=f"https://example.com/{request.prompt}.png",
+                ),
+                provider_name=self.info.name,
+                model="fake-image-model",
+                mime_type="image/png",
+                width=request.width,
+                height=request.height,
+            ),
+            provider=self.info,
+        )
+
     async def generate_image(self, prompt: str, *, context=None) -> ProviderResult[GeneratedAsset]:
         return ProviderResult[GeneratedAsset](
             data=GeneratedAsset(asset_type=AssetType.IMAGE, uri=f"https://example.com/{prompt}.png"),
@@ -140,6 +163,24 @@ class FakeVideoProvider(FakeProvider):
     def info(self) -> ProviderInfo:
         return build_provider_info(ProviderCapability.VIDEO_GENERATION)
 
+    async def generate(self, request: VideoGenerationRequest, *, context=None) -> ProviderResult[GeneratedVideo]:
+        return ProviderResult[GeneratedVideo](
+            data=GeneratedVideo(
+                artifact=GeneratedAsset(
+                    asset_type=AssetType.VIDEO,
+                    uri=f"https://example.com/{request.prompt}.mp4",
+                ),
+                provider_name=self.info.name,
+                model="fake-video-model",
+                mime_type="video/mp4",
+                duration_seconds=request.duration_seconds,
+                width=request.width,
+                height=request.height,
+                fps=request.fps,
+            ),
+            provider=self.info,
+        )
+
     async def generate_video(self, prompt: str, *, context=None) -> ProviderResult[GeneratedAsset]:
         return ProviderResult[GeneratedAsset](
             data=GeneratedAsset(asset_type=AssetType.VIDEO, uri=f"https://example.com/{prompt}.mp4"),
@@ -153,6 +194,20 @@ class FakeVoiceProvider(FakeProvider):
     @property
     def info(self) -> ProviderInfo:
         return build_provider_info(ProviderCapability.VOICE_GENERATION)
+
+    async def generate(self, request: TTSGenerationRequest, *, context=None) -> ProviderResult[GeneratedAudio]:
+        return ProviderResult[GeneratedAudio](
+            data=GeneratedAudio(
+                artifact=GeneratedAsset(asset_type=AssetType.AUDIO, uri="https://example.com/audio.wav"),
+                provider_name=self.info.name,
+                model="fake-tts-model",
+                mime_type="audio/wav",
+                voice=request.voice,
+                language=request.language,
+                estimated_duration_seconds=5.0,
+            ),
+            provider=self.info,
+        )
 
     async def generate_voice(self, text: str, *, context=None) -> ProviderResult[NarrationTrack]:
         return ProviderResult[NarrationTrack](
@@ -250,6 +305,12 @@ def test_voice_provider_protocol_accepts_minimal_fake() -> None:
     """A minimal structural voice provider should satisfy the protocol."""
 
     assert isinstance(FakeVoiceProvider(), VoiceProvider)
+
+
+def test_tts_provider_protocol_accepts_minimal_fake() -> None:
+    """A minimal structural TTS provider should satisfy the protocol."""
+
+    assert isinstance(FakeVoiceProvider(), TTSProvider)
 
 
 def test_storage_provider_protocol_accepts_minimal_fake() -> None:

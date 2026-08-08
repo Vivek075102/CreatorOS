@@ -28,6 +28,9 @@ class Settings(BaseSettings):
     )
     default_llm_provider: str = Field(default="mock", alias="DEFAULT_LLM_PROVIDER")
     default_llm_model: str = Field(default="mock-model", alias="DEFAULT_LLM_MODEL")
+    default_image_provider: str = Field(default="mock", alias="DEFAULT_IMAGE_PROVIDER")
+    default_tts_provider: str = Field(default="mock", alias="DEFAULT_TTS_PROVIDER")
+    default_video_provider: str = Field(default="mock", alias="DEFAULT_VIDEO_PROVIDER")
     openai_api_key: str | None = Field(default=None, alias="OPENAI_API_KEY")
     anthropic_api_key: str | None = Field(default=None, alias="ANTHROPIC_API_KEY")
     youtube_client_id: str | None = Field(default=None, alias="YOUTUBE_CLIENT_ID")
@@ -46,7 +49,15 @@ class Settings(BaseSettings):
         populate_by_name=True,
     )
 
-    @field_validator("app_name", "default_llm_provider", "default_llm_model", "database_url")
+    @field_validator(
+        "app_name",
+        "default_image_provider",
+        "default_llm_provider",
+        "default_llm_model",
+        "default_tts_provider",
+        "default_video_provider",
+        "database_url",
+    )
     @classmethod
     def validate_non_blank_strings(cls, value: str) -> str:
         """Reject blank values for required string settings."""

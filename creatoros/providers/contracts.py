@@ -19,6 +19,14 @@ from creatoros.providers.base import (
     ProviderRequestContext,
     ProviderResult,
 )
+from creatoros.providers.media import (
+    GeneratedAudio,
+    GeneratedImage,
+    GeneratedVideo,
+    ImageGenerationRequest,
+    TTSGenerationRequest,
+    VideoGenerationRequest,
+)
 
 TStructured = TypeVar("TStructured")
 
@@ -100,6 +108,14 @@ class SearchProvider(Provider, Protocol):
 class ImageProvider(Provider, Protocol):
     """Provider contract for image generation."""
 
+    async def generate(
+        self,
+        request: ImageGenerationRequest,
+        *,
+        context: ProviderRequestContext | None = None,
+    ) -> ProviderResult[GeneratedImage]:
+        """Generate an image result from a provider-neutral request."""
+
     async def generate_image(
         self,
         prompt: str,
@@ -113,6 +129,14 @@ class ImageProvider(Provider, Protocol):
 class VideoProvider(Provider, Protocol):
     """Provider contract for video generation."""
 
+    async def generate(
+        self,
+        request: VideoGenerationRequest,
+        *,
+        context: ProviderRequestContext | None = None,
+    ) -> ProviderResult[GeneratedVideo]:
+        """Generate a video result from a provider-neutral request."""
+
     async def generate_video(
         self,
         prompt: str,
@@ -123,8 +147,21 @@ class VideoProvider(Provider, Protocol):
 
 
 @runtime_checkable
-class VoiceProvider(Provider, Protocol):
-    """Provider contract for narration generation."""
+class TTSProvider(Provider, Protocol):
+    """Provider contract for provider-neutral speech generation."""
+
+    async def generate(
+        self,
+        request: TTSGenerationRequest,
+        *,
+        context: ProviderRequestContext | None = None,
+    ) -> ProviderResult[GeneratedAudio]:
+        """Generate a speech result from a provider-neutral request."""
+
+
+@runtime_checkable
+class VoiceProvider(TTSProvider, Protocol):
+    """Backward-compatible provider contract for narration generation."""
 
     async def generate_voice(
         self,
@@ -198,6 +235,7 @@ __all__ = [
     "PublishingProvider",
     "SearchProvider",
     "StorageProvider",
+    "TTSProvider",
     "TrendProvider",
     "VideoProvider",
     "VoiceProvider",

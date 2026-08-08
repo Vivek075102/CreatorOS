@@ -4,7 +4,12 @@ from __future__ import annotations
 
 from creatoros.providers.mock.analytics import MockAnalyticsProvider
 from creatoros.providers.mock.llm import MockLLMProvider
-from creatoros.providers.mock.media import MockImageProvider, MockVideoProvider, MockVoiceProvider
+from creatoros.providers.mock.media import (
+    MockImageProvider,
+    MockTTSProvider,
+    MockVideoProvider,
+    MockVoiceProvider,
+)
 from creatoros.providers.mock.publishing import MockPublishingProvider
 from creatoros.providers.mock.search import MockSearchProvider
 from creatoros.providers.mock.storage import MockStorageProvider
@@ -41,7 +46,34 @@ def create_mock_provider_registry() -> ProviderRegistry:
     return registry
 
 
+def create_mock_image_provider_registry() -> ProviderRegistry:
+    """Return a fresh registry containing only the deterministic mock image provider."""
+
+    registry = create_provider_registry()
+    registry.register(MockImageProvider())
+    return registry
+
+
+def create_mock_tts_provider_registry() -> ProviderRegistry:
+    """Return a fresh registry containing only the deterministic mock TTS provider."""
+
+    registry = create_provider_registry()
+    registry.register(MockTTSProvider())
+    return registry
+
+
+def create_mock_video_provider_registry() -> ProviderRegistry:
+    """Return a fresh registry containing only the deterministic mock video provider."""
+
+    registry = create_provider_registry()
+    registry.register(MockVideoProvider())
+    return registry
+
+
 __all__ = [
+    "create_mock_image_provider_registry",
     "create_mock_provider_registry",
+    "create_mock_tts_provider_registry",
+    "create_mock_video_provider_registry",
     "register_mock_providers",
 ]

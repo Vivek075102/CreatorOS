@@ -353,6 +353,7 @@ Stable internal interfaces should include types such as:
 - `TrendProvider`
 - `VideoProvider`
 - `ImageProvider`
+- `TTSProvider`
 - `VoiceProvider`
 - `StorageProvider`
 - `PublishingProvider`
@@ -385,6 +386,8 @@ Media-agent migration is similarly narrow. Thumbnail concepts, scene visuals, sc
 Review-agent migration is similarly narrow. Script-quality, evidence-consistency, storyboard-quality, and publication-readiness reviews can now execute through the same provider-independent boundary using supplied inputs only, but those results remain typed advisory outputs. They do not regenerate content, mutate approval state, change workflow status, publish content, or replace human review. Cross-agent review pipelines and workflow integration remain later milestone work.
 
 Integrated pipeline migration is similarly narrow. The new application pipeline can now coordinate the migrated research, script, storyboard, media-planning, and review agents into one pre-publication content package, but it remains fail-fast and stateless. It does not add retries, checkpoints, resume behavior, persistence, publishing, or approval-state mutation.
+
+CreatorOS now also has a first provider-independent media provider foundation beneath that planning layer. Typed request and result contracts exist for image generation, speech/TTS generation, and video generation, and deterministic mock providers now satisfy those contracts through the existing generic provider registry. This establishes the future provider boundary for media execution without yet wiring binary media generation into the media-planning agent or the integrated content pipeline.
 
 Provider SDK objects, raw transport payloads, and vendor-specific exception types must not escape the provider adapter boundary.
 

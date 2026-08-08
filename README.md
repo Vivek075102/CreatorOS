@@ -161,6 +161,20 @@ CreatorOS now also includes a first integrated provider-independent AI content p
 - Failures are fail-fast. The pipeline does not add retries, failover, checkpoint persistence, or resume behavior in this milestone.
 - The existing deterministic demo `GamingWorkflowOrchestrator` remains in place unchanged alongside this new application pipeline.
 
+## Media Provider Foundation
+
+CreatorOS now also includes a provider-independent media provider foundation for future generation work:
+
+- Separate typed provider-neutral request and result contracts now exist for image generation, speech/TTS generation, and video generation.
+- The current capability-specific contracts are `ImageProvider`, `TTSProvider`, and `VideoProvider`, with the existing `VoiceProvider` kept as a backward-compatible compatibility contract for the deterministic demo path.
+- The shared `ProviderRegistry` is reused for media providers. No second provider framework was introduced.
+- Default provider settings now include `default_image_provider`, `default_tts_provider`, and `default_video_provider`, each defaulting to `mock`.
+- Deterministic `MockImageProvider`, `MockTTSProvider`, and `MockVideoProvider` now return typed mock generation results without network calls, binary media generation, FFmpeg, file output, or vendor SDKs.
+- Capability-specific mock registry helpers now exist for image, TTS, and video provider setup in addition to the existing full mock registry bootstrap.
+- `GamingMediaAgent` remains planning-only and does not call these providers yet.
+- `GamingContentPipeline` remains unchanged in responsibility and still stops at the pre-publication human-review boundary.
+- Real image, speech, and video providers remain later milestones.
+
 ## Controlled OpenAI Smoke Test
 
 CreatorOS now includes one explicit opt-in CLI path for a controlled live OpenAI smoke test:

@@ -12,6 +12,7 @@ from creatoros.providers import (
     SearchProvider,
     StorageProvider,
     TrendProvider,
+    TTSProvider,
     VideoProvider,
     VoiceProvider,
     create_provider_registry,
@@ -24,9 +25,13 @@ from creatoros.providers.mock import (
     MockSearchProvider,
     MockStorageProvider,
     MockTrendProvider,
+    MockTTSProvider,
     MockVideoProvider,
     MockVoiceProvider,
+    create_mock_image_provider_registry,
     create_mock_provider_registry,
+    create_mock_tts_provider_registry,
+    create_mock_video_provider_registry,
     register_mock_providers,
 )
 
@@ -93,6 +98,7 @@ def test_every_mock_provider_satisfies_declared_runtime_protocol() -> None:
     trend = MockTrendProvider()
     search = MockSearchProvider()
     image = MockImageProvider()
+    tts = MockTTSProvider()
     video = MockVideoProvider()
     voice = MockVoiceProvider()
     storage = MockStorageProvider()
@@ -104,6 +110,7 @@ def test_every_mock_provider_satisfies_declared_runtime_protocol() -> None:
     assert isinstance(trend, TrendProvider)
     assert isinstance(search, SearchProvider)
     assert isinstance(image, ImageProvider)
+    assert isinstance(tts, TTSProvider)
     assert isinstance(video, VideoProvider)
     assert isinstance(voice, VoiceProvider)
     assert isinstance(storage, StorageProvider)
@@ -118,3 +125,18 @@ def test_no_external_api_or_vendor_sdk_is_required() -> None:
 
     assert registry.contains("llm", "mock")
     assert registry.contains("publishing", "mock")
+
+
+def test_capability_specific_mock_registry_factories_return_isolated_registries() -> None:
+    """Capability-specific mock registry factories should stay isolated and minimal."""
+
+    image_registry = create_mock_image_provider_registry()
+    tts_registry = create_mock_tts_provider_registry()
+    video_registry = create_mock_video_provider_registry()
+
+    assert image_registry.contains("image", "mock") is True
+    assert tts_registry.contains("voice", "mock") is True
+    assert video_registry.contains("video", "mock") is True
+    assert image_registry.list_providers("voice") == ()
+    assert tts_registry.list_providers("image") == ()
+    assert video_registry.list_providers("llm") == ()

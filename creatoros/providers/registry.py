@@ -13,7 +13,13 @@ from creatoros.core import (
     ProviderTypeMismatchError,
 )
 from creatoros.providers.base import ProviderInfo
-from creatoros.providers.contracts import LLMProvider, Provider
+from creatoros.providers.contracts import (
+    ImageProvider,
+    LLMProvider,
+    Provider,
+    TTSProvider,
+    VideoProvider,
+)
 
 TProvider = TypeVar("TProvider")
 
@@ -163,9 +169,42 @@ def resolve_default_llm_provider(registry: ProviderRegistry) -> LLMProvider:
     return provider
 
 
+def resolve_default_image_provider(registry: ProviderRegistry) -> ImageProvider:
+    """Resolve the configured default image provider from the supplied registry."""
+
+    settings = get_settings()
+    provider = registry.get("image", settings.default_image_provider)
+    if not isinstance(provider, ImageProvider):
+        raise ProviderTypeMismatchError("image", settings.default_image_provider.strip().lower(), "ImageProvider")
+    return provider
+
+
+def resolve_default_tts_provider(registry: ProviderRegistry) -> TTSProvider:
+    """Resolve the configured default speech provider from the supplied registry."""
+
+    settings = get_settings()
+    provider = registry.get("voice", settings.default_tts_provider)
+    if not isinstance(provider, TTSProvider):
+        raise ProviderTypeMismatchError("voice", settings.default_tts_provider.strip().lower(), "TTSProvider")
+    return provider
+
+
+def resolve_default_video_provider(registry: ProviderRegistry) -> VideoProvider:
+    """Resolve the configured default video provider from the supplied registry."""
+
+    settings = get_settings()
+    provider = registry.get("video", settings.default_video_provider)
+    if not isinstance(provider, VideoProvider):
+        raise ProviderTypeMismatchError("video", settings.default_video_provider.strip().lower(), "VideoProvider")
+    return provider
+
+
 __all__ = [
     "ProviderRegistry",
     "create_provider_registry",
     "get_provider_registry",
+    "resolve_default_image_provider",
     "resolve_default_llm_provider",
+    "resolve_default_tts_provider",
+    "resolve_default_video_provider",
 ]

@@ -11,15 +11,21 @@ from creatoros.core import (
     ProviderTypeMismatchError,
 )
 from creatoros.providers import (
+    ImageProvider,
     LLMCapabilities,
     LLMProvider,
     LLMRequest,
     LLMResponse,
     ProviderCapability,
     ProviderInfo,
+    TTSProvider,
+    VideoProvider,
     create_provider_registry,
     get_provider_registry,
+    resolve_default_image_provider,
     resolve_default_llm_provider,
+    resolve_default_tts_provider,
+    resolve_default_video_provider,
 )
 
 
@@ -98,6 +104,78 @@ class FakeSearchProvider:
         return True
 
     async def search(self, query: str, *, limit: int = 10, context=None):
+        raise NotImplementedError
+
+
+class FakeImageProvider:
+    """Minimal fake image provider for default-resolution registry tests."""
+
+    def __init__(self, *, name: str, provider_type: str = "image") -> None:
+        self._info = build_provider_info(
+            name=name,
+            provider_type=provider_type,
+            capability=ProviderCapability.IMAGE_GENERATION,
+        )
+
+    @property
+    def info(self) -> ProviderInfo:
+        return self._info
+
+    async def health_check(self) -> bool:
+        return True
+
+    async def generate(self, request, *, context=None):
+        raise NotImplementedError
+
+    async def generate_image(self, prompt: str, *, context=None):
+        raise NotImplementedError
+
+
+class FakeVoiceProvider:
+    """Minimal fake speech provider for default-resolution registry tests."""
+
+    def __init__(self, *, name: str, provider_type: str = "voice") -> None:
+        self._info = build_provider_info(
+            name=name,
+            provider_type=provider_type,
+            capability=ProviderCapability.VOICE_GENERATION,
+        )
+
+    @property
+    def info(self) -> ProviderInfo:
+        return self._info
+
+    async def health_check(self) -> bool:
+        return True
+
+    async def generate(self, request, *, context=None):
+        raise NotImplementedError
+
+    async def generate_voice(self, text: str, *, context=None):
+        raise NotImplementedError
+
+
+class FakeVideoProvider:
+    """Minimal fake video provider for default-resolution registry tests."""
+
+    def __init__(self, *, name: str, provider_type: str = "video") -> None:
+        self._info = build_provider_info(
+            name=name,
+            provider_type=provider_type,
+            capability=ProviderCapability.VIDEO_GENERATION,
+        )
+
+    @property
+    def info(self) -> ProviderInfo:
+        return self._info
+
+    async def health_check(self) -> bool:
+        return True
+
+    async def generate(self, request, *, context=None):
+        raise NotImplementedError
+
+    async def generate_video(self, prompt: str, *, context=None):
         raise NotImplementedError
 
 
@@ -361,6 +439,63 @@ def test_resolve_default_llm_provider_raises_typed_error_when_missing(
 
     with pytest.raises(ProviderNotFoundError):
         resolve_default_llm_provider(registry)
+
+
+def test_resolve_default_image_provider_uses_settings_and_returns_configured_provider(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Default image resolution should respect the configured provider name."""
+
+    class StubSettings:
+        default_image_provider = "mock"
+
+    registry = create_provider_registry()
+    provider = FakeImageProvider(name="Mock")
+    registry.register(provider)
+    monkeypatch.setattr("creatoros.providers.registry.get_settings", lambda: StubSettings())
+
+    resolved = resolve_default_image_provider(registry)
+
+    assert resolved is provider
+    assert isinstance(resolved, ImageProvider)
+
+
+def test_resolve_default_tts_provider_uses_settings_and_returns_configured_provider(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Default speech resolution should respect the configured provider name."""
+
+    class StubSettings:
+        default_tts_provider = "mock"
+
+    registry = create_provider_registry()
+    provider = FakeVoiceProvider(name="Mock")
+    registry.register(provider)
+    monkeypatch.setattr("creatoros.providers.registry.get_settings", lambda: StubSettings())
+
+    resolved = resolve_default_tts_provider(registry)
+
+    assert resolved is provider
+    assert isinstance(resolved, TTSProvider)
+
+
+def test_resolve_default_video_provider_uses_settings_and_returns_configured_provider(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Default video resolution should respect the configured provider name."""
+
+    class StubSettings:
+        default_video_provider = "mock"
+
+    registry = create_provider_registry()
+    provider = FakeVideoProvider(name="Mock")
+    registry.register(provider)
+    monkeypatch.setattr("creatoros.providers.registry.get_settings", lambda: StubSettings())
+
+    resolved = resolve_default_video_provider(registry)
+
+    assert resolved is provider
+    assert isinstance(resolved, VideoProvider)
 
 
 def test_error_details_contain_only_safe_provider_identifiers() -> None:
