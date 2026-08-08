@@ -251,17 +251,18 @@ def test_narration_prompt_safeguards_are_present() -> None:
     assert "TARGET_DURATION_SECONDS:" in text
 
 
-def test_manifest_contains_exactly_thirteen_entries_with_expected_category_counts() -> None:
-    """The manifest should include the research, script, storyboard, thumbnail, and narration prompt assets."""
+def test_manifest_contains_exactly_seventeen_entries_with_expected_category_counts() -> None:
+    """The manifest should include the current prompt inventory with expected category counts."""
 
     manifest = PromptManifestLoader(base_dir=_repo_prompts_dir()).load()
 
-    assert len(manifest.entries) == 13
+    assert len(manifest.entries) == 17
     assert len([entry for entry in manifest.entries if entry.category is PromptAssetCategory.RESEARCH]) == 3
     assert len([entry for entry in manifest.entries if entry.category is PromptAssetCategory.SCRIPT]) == 3
     assert len([entry for entry in manifest.entries if entry.category is PromptAssetCategory.STORYBOARD]) == 5
     assert len([entry for entry in manifest.entries if entry.category is PromptAssetCategory.THUMBNAIL]) == 1
     assert len([entry for entry in manifest.entries if entry.category is PromptAssetCategory.NARRATION]) == 1
+    assert len([entry for entry in manifest.entries if entry.category is PromptAssetCategory.REVIEW]) == 4
 
 
 def test_manifest_new_media_checksums_match_current_file_contents() -> None:

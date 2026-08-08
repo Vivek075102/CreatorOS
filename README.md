@@ -111,6 +111,15 @@ CreatorOS also now includes provider-independent media-support prompt assets for
 
 These media-support prompts remain local prompt assets only. They do not invoke image generation, video generation, or narration providers, and they do not imply that downstream media engines have already been implemented.
 
+CreatorOS also includes provider-independent review prompt assets for:
+
+- `gaming_script_quality_review`
+- `gaming_evidence_consistency_review`
+- `gaming_storyboard_quality_review`
+- `gaming_publication_readiness_review`
+
+These review prompts are advisory quality gates only. They use supplied inputs only, do not browse, do not independently fact-check, do not publish, and do not bypass the human approval model.
+
 Use the CLI to inspect the manifest, discover assets, list registered prompts, and render the deterministic research prompt locally:
 
 ```bash
@@ -136,4 +145,4 @@ python -m creatoros prompts render gaming_narration_direction --show-content
 
 By default, `prompts render` shows prompt metadata only. Full rendered prompt content is shown only when `--show-content` is provided. These commands render locally, do not call an LLM provider, and do not imply that real AI generation is already wired into the demo workflow.
 
-The current research, script, storyboard, thumbnail, and narration prompt output contracts are text-based. Structured parsing, real storyboard generation, real image generation, real video generation, real narration generation, and downstream media-production integration will be added in later milestones.
+The current research, script, storyboard, thumbnail, narration, and review prompt output contracts are text-based. Review prompts remain advisory and publication readiness means ready for human review, not approved for publication. Structured parsing, workflow integration for review outputs, real storyboard generation, real image generation, real video generation, real narration generation, and downstream media-production integration will be added in later milestones.

@@ -30,10 +30,14 @@ from creatoros.orchestrator import GamingWorkflowInput, run_demo_gaming_workflow
 from creatoros.prompts import (
     GAMING_CTA,
     GAMING_DISCOVER_TRENDS,
+    GAMING_EVIDENCE_CONSISTENCY_REVIEW,
     GAMING_HOOK,
     GAMING_NARRATION_DIRECTION,
+    GAMING_PUBLICATION_READINESS_REVIEW,
     GAMING_SCENE_MOTION_PROMPT,
     GAMING_SCENE_VISUAL_PROMPT,
+    GAMING_SCRIPT_QUALITY_REVIEW,
+    GAMING_STORYBOARD_QUALITY_REVIEW,
     GAMING_THUMBNAIL_CONCEPT,
     STORYBOARD_SCENE_BREAKDOWN,
     STORYBOARD_TIMING_REVIEW,
@@ -44,10 +48,14 @@ from creatoros.prompts import (
     create_builtin_prompt_registry,
     render_gaming_cta,
     render_gaming_discover_trends,
+    render_gaming_evidence_consistency_review,
     render_gaming_hook,
     render_gaming_narration_direction,
+    render_gaming_publication_readiness_review,
     render_gaming_scene_motion_prompt,
     render_gaming_scene_visual_prompt,
+    render_gaming_script_quality_review,
+    render_gaming_storyboard_quality_review,
     render_gaming_thumbnail_concept,
     render_storyboard_scene_breakdown,
     render_storyboard_timing_review,
@@ -381,6 +389,21 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Source summary input for supported script and hook prompts.",
     )
     prompts_render.add_argument(
+        "--research-notes",
+        default="Supplied research notes for local consistency review only.",
+        help="Research notes input for the evidence consistency review prompt.",
+    )
+    prompts_render.add_argument(
+        "--content-text",
+        default="Generated content text under review for local consistency checking only.",
+        help="Content text input for the evidence consistency review prompt.",
+    )
+    prompts_render.add_argument(
+        "--content-stage",
+        default="script_draft",
+        help="Content stage input for the evidence consistency review prompt.",
+    )
+    prompts_render.add_argument(
         "--tone",
         default="natural and concise",
         help="Tone input for the CTA prompt.",
@@ -412,6 +435,16 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Scene timing summary input for the storyboard timing review prompt.",
     )
     prompts_render.add_argument(
+        "--storyboard-text",
+        default="Scene 1 supports the hook. Scene 2 explains the main point. Scene 3 reinforces the conclusion.",
+        help="Storyboard text input for the storyboard quality review prompt.",
+    )
+    prompts_render.add_argument(
+        "--storyboard-summary",
+        default="Storyboard summary for local publication-readiness review only.",
+        help="Storyboard summary input for the publication readiness review prompt.",
+    )
+    prompts_render.add_argument(
         "--visual-context",
         default="Clean gameplay-inspired context with one clear focal subject.",
         help="Visual context input for the thumbnail concept prompt.",
@@ -430,6 +463,21 @@ def _build_parser() -> argparse.ArgumentParser:
         "--script-text",
         default="You probably missed this gaming detail, and here is the quick explanation.",
         help="Script text input for the narration direction prompt.",
+    )
+    prompts_render.add_argument(
+        "--thumbnail-summary",
+        default="Thumbnail concept summary for local publication-readiness review only.",
+        help="Thumbnail summary input for the publication readiness review prompt.",
+    )
+    prompts_render.add_argument(
+        "--narration-summary",
+        default="Narration direction summary for local publication-readiness review only.",
+        help="Narration summary input for the publication readiness review prompt.",
+    )
+    prompts_render.add_argument(
+        "--evidence-review",
+        default="Evidence review summary for local publication-readiness review only.",
+        help="Evidence review input for the publication readiness review prompt.",
     )
     prompts_render.add_argument(
         "--platform",
@@ -839,6 +887,49 @@ def _handle_prompts_render(
             script_text=args.script_text,
             target_duration_seconds=args.duration,
             tone=args.tone,
+            platform=args.platform,
+        )
+    elif args.prompt_name == GAMING_SCRIPT_QUALITY_REVIEW:
+        rendered = render_gaming_script_quality_review(
+            registry,
+            title=args.title,
+            game=args.game,
+            topic=args.topic,
+            angle=args.angle,
+            source_summary=args.source_summary,
+            script_text=args.script_text,
+            platform=args.platform,
+            target_duration_seconds=args.duration,
+        )
+    elif args.prompt_name == GAMING_EVIDENCE_CONSISTENCY_REVIEW:
+        rendered = render_gaming_evidence_consistency_review(
+            registry,
+            game=args.game,
+            source_summary=args.source_summary,
+            research_notes=args.research_notes,
+            content_text=args.content_text,
+            content_stage=args.content_stage,
+        )
+    elif args.prompt_name == GAMING_STORYBOARD_QUALITY_REVIEW:
+        rendered = render_gaming_storyboard_quality_review(
+            registry,
+            title=args.title,
+            game=args.game,
+            script_text=args.script_text,
+            storyboard_text=args.storyboard_text,
+            platform=args.platform,
+            target_duration_seconds=args.duration,
+        )
+    elif args.prompt_name == GAMING_PUBLICATION_READINESS_REVIEW:
+        rendered = render_gaming_publication_readiness_review(
+            registry,
+            title=args.title,
+            game=args.game,
+            script_text=args.script_text,
+            storyboard_summary=args.storyboard_summary,
+            thumbnail_summary=args.thumbnail_summary,
+            narration_summary=args.narration_summary,
+            evidence_review=args.evidence_review,
             platform=args.platform,
         )
     else:

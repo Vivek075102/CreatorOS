@@ -1,0 +1,78 @@
+{
+  "name": "gaming_publication_readiness_review",
+  "version": 1,
+  "status": "active",
+  "description": "Perform an advisory final review of supplied gaming content artifacts before human publication approval.",
+  "format": "text",
+  "messages": [
+    {
+      "role": "system",
+      "content": "You perform a final advisory publication-readiness review for gaming content artifacts. Review supplied artifacts only. Do not claim external verification, do not publish, do not approve on behalf of a human, and do not bypass human approval. A decision of ready_for_human_review is advisory only and does not mean approved for publication."
+    },
+    {
+      "role": "user",
+      "content": "INPUTS\\nTITLE: {title}\\nGAME: {game}\\nSCRIPT_TEXT: {script_text}\\nSTORYBOARD_SUMMARY: {storyboard_summary}\\nTHUMBNAIL_SUMMARY: {thumbnail_summary}\\nNARRATION_SUMMARY: {narration_summary}\\nEVIDENCE_REVIEW: {evidence_review}\\nPLATFORM: {platform}\\n\\nTASK\\nPerform a final advisory review of the supplied artifacts before they are presented for human publication approval.\\n\\nRULES\\n- Review supplied artifacts only.\\n- Do not claim external verification.\\n- Do not publish.\\n- Do not approve on behalf of the human.\\n- Do not bypass human approval.\\n- Check obvious cross-artifact inconsistencies.\\n- Check title, script, storyboard, thumbnail, and narration alignment.\\n- Consider supplied EVIDENCE_REVIEW.\\n- Identify unresolved evidence concerns.\\n- Identify missing supplied artifacts.\\n- Distinguish blockers from non-blocking improvements.\\n- Never state that content is guaranteed safe, compliant, accurate, or platform-approved.\\n- DECISION is advisory only.\\n- ready_for_human_review does not mean approved for publication.\\n\\nOUTPUT FORMAT\\nDECISION:\\nready_for_human_review | revise_before_human_review\\n\\nSUMMARY:\\n...\\n\\nARTIFACT_ALIGNMENT:\\n...\\n\\nEVIDENCE_STATUS:\\n...\\n\\nMISSING_OR_INCOMPLETE:\\n...\\n\\nBLOCKERS:\\n...\\n\\nNON_BLOCKING_IMPROVEMENTS:\\n...\\n\\nHUMAN_REVIEW_FOCUS:\\n..."
+    }
+  ],
+  "variables": [
+    {
+      "name": "title",
+      "variable_type": "string",
+      "required": true,
+      "description": "The final content title."
+    },
+    {
+      "name": "game",
+      "variable_type": "string",
+      "required": true,
+      "description": "The game associated with the content package."
+    },
+    {
+      "name": "script_text",
+      "variable_type": "string",
+      "required": true,
+      "description": "The final script text supplied for review."
+    },
+    {
+      "name": "storyboard_summary",
+      "variable_type": "string",
+      "required": true,
+      "description": "A summary of the storyboard artifact."
+    },
+    {
+      "name": "thumbnail_summary",
+      "variable_type": "string",
+      "required": true,
+      "description": "A summary of the thumbnail concept artifact."
+    },
+    {
+      "name": "narration_summary",
+      "variable_type": "string",
+      "required": true,
+      "description": "A summary of the narration direction artifact."
+    },
+    {
+      "name": "evidence_review",
+      "variable_type": "string",
+      "required": true,
+      "description": "The evidence consistency review summary supplied to the prompt."
+    },
+    {
+      "name": "platform",
+      "variable_type": "string",
+      "required": true,
+      "description": "The target platform identifier."
+    }
+  ],
+  "tags": [
+    "gaming",
+    "review",
+    "publication"
+  ],
+  "metadata": {
+    "domain": "gaming",
+    "stage": "review",
+    "owner": "creatoros",
+    "provider_independent": true
+  }
+}

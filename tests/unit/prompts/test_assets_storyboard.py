@@ -243,12 +243,12 @@ def test_storyboard_prompt_assets_serialize_and_restore_predictably() -> None:
         assert restored == definition
 
 
-def test_manifest_contains_exactly_thirteen_entries_with_five_storyboard_entries() -> None:
+def test_manifest_contains_exactly_seventeen_entries_with_five_storyboard_entries() -> None:
     """The manifest should include the current prompt inventory with five storyboard entries."""
 
     manifest = PromptManifestLoader(base_dir=_repo_prompts_dir()).load()
 
-    assert len(manifest.entries) == 13
+    assert len(manifest.entries) == 17
     assert len([entry for entry in manifest.entries if entry.category is PromptAssetCategory.STORYBOARD]) == 5
 
 

@@ -144,6 +144,7 @@ Build the Research Engine and Opportunity Engine capabilities required to gather
 - Initial built-in gaming script prompt assets with text-based output contracts and deterministic local CLI rendering support
 - Initial built-in gaming storyboard prompt assets with scene breakdown, visual direction, and timing review contracts rendered locally without provider calls
 - Initial built-in gaming media-support prompt assets for thumbnail concepts, scene-visual direction, scene-motion direction, and narration direction rendered locally without provider calls
+- Initial built-in gaming review prompt assets for script quality, evidence consistency, storyboard quality, and publication-readiness advisory review contracts
 - Opportunity scoring rules and ranking pipeline
 - Research result persistence
 - Approval-ready content opportunity outputs

@@ -183,12 +183,12 @@ def test_script_prompt_assets_serialize_and_restore_predictably() -> None:
         assert restored == definition
 
 
-def test_manifest_contains_thirteen_entries_with_three_script_entries() -> None:
+def test_manifest_contains_seventeen_entries_with_three_script_entries() -> None:
     """The manifest should include the current prompt inventory with three script entries."""
 
     manifest = PromptManifestLoader(base_dir=_repo_prompts_dir()).load()
 
-    assert len(manifest.entries) == 13
+    assert len(manifest.entries) == 17
     assert len([entry for entry in manifest.entries if entry.category is PromptAssetCategory.RESEARCH]) == 3
     assert len([entry for entry in manifest.entries if entry.category is PromptAssetCategory.SCRIPT]) == 3
 

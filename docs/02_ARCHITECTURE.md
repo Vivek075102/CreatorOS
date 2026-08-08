@@ -194,6 +194,8 @@ The prompt subsystem is responsible for:
 
 Prompt rendering belongs above the provider layer. Providers may adapt the rendered output to vendor-specific request formats, but they must not own the underlying task definition or prompt asset lifecycle.
 
+Review and quality-control prompts are part of the prompt subsystem as advisory contracts, not as autonomous approval authorities. They may evaluate supplied artifacts for consistency, quality, and readiness signals, but they must not claim independent fact verification, platform approval, or publishing authority. Human approval remains authoritative under the Level 4 operating model.
+
 Prompt assets remain outside the Python package in the repository `prompts/` directory. They are organized by category, use canonical versioned filenames, and may be described by a validated manifest that supports discovery and verification without becoming a persistence system or runtime database.
 
 The initial real prompt catalog begins with research, script, and storyboard prompt assets for gaming workflows. Those assets are built into the repository, represented in the prompt manifest, and loadable into a fresh registry through platform-owned bootstrap functions rather than through provider adapters.
@@ -534,7 +536,7 @@ The intended persistence stack for CreatorOS is PostgreSQL, SQLAlchemy 2.x, Alem
 
 The initial prompt foundation should treat prompt definitions as validated JSON assets loaded from the configured prompts directory, registered through a platform-owned registry, rendered through explicit typed variables, and discoverable through a manifest-aware asset structure. Broader asset formats or remote prompt management may be considered later only if they preserve the same architectural boundaries.
 
-The current built-in prompt catalog is intentionally narrow. It covers the first provider-independent research, script, storyboard, thumbnail, and narration prompt assets plus local rendering support, not a complete prompt inventory for every engine or workflow. These assets define text-based output contracts only. Storyboard scene breakdown, visual direction, timing review, thumbnail concept generation, scene motion guidance, and narration direction are now represented as prompt contracts, but structured output parsing, real storyboard model generation, and downstream media-generation integration remain later milestone work.
+The current built-in prompt catalog is intentionally narrow. It covers the first provider-independent research, script, storyboard, thumbnail, narration, and review prompt assets plus local rendering support, not a complete prompt inventory for every engine or workflow. These assets define text-based output contracts only. Evidence consistency and publication-readiness review are currently advisory prompt contracts that operate on supplied inputs only. Structured output parsing, workflow integration for review outputs, real storyboard model generation, and downstream media-generation integration remain later milestone work.
 
 ## 24. Testing Architecture
 

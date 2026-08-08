@@ -85,6 +85,86 @@
       }
     },
     {
+      "name": "gaming_evidence_consistency_review",
+      "version": 1,
+      "category": "review",
+      "path": "review/gaming_evidence_consistency_review.v1.json",
+      "status": "active",
+      "description": "Review generated gaming content against supplied evidence and identify unsupported, contradictory, or overstated claims.",
+      "tags": [
+        "gaming",
+        "review",
+        "evidence"
+      ],
+      "checksum": "fbb5c7653ffd37ffa53056f172009448e579d05e63828606f2e5fc87e5130650",
+      "metadata": {
+        "domain": "gaming",
+        "stage": "review",
+        "owner": "creatoros",
+        "provider_independent": true
+      }
+    },
+    {
+      "name": "gaming_publication_readiness_review",
+      "version": 1,
+      "category": "review",
+      "path": "review/gaming_publication_readiness_review.v1.json",
+      "status": "active",
+      "description": "Perform an advisory final review of supplied gaming content artifacts before human publication approval.",
+      "tags": [
+        "gaming",
+        "review",
+        "publication"
+      ],
+      "checksum": "22eeeae0504ac2206834c9dd11397576d7aef4e8eaeab76b2df9e928f587fb26",
+      "metadata": {
+        "domain": "gaming",
+        "stage": "review",
+        "owner": "creatoros",
+        "provider_independent": true
+      }
+    },
+    {
+      "name": "gaming_script_quality_review",
+      "version": 1,
+      "category": "review",
+      "path": "review/gaming_script_quality_review.v1.json",
+      "status": "active",
+      "description": "Review a short-form gaming script for clarity, structure, pacing, and factual restraint using supplied context only.",
+      "tags": [
+        "gaming",
+        "review",
+        "quality"
+      ],
+      "checksum": "719e79f37c619e8faad69fd937becfe1534e0380afe121b9192fab69588ff2a4",
+      "metadata": {
+        "domain": "gaming",
+        "stage": "review",
+        "owner": "creatoros",
+        "provider_independent": true
+      }
+    },
+    {
+      "name": "gaming_storyboard_quality_review",
+      "version": 1,
+      "category": "review",
+      "path": "review/gaming_storyboard_quality_review.v1.json",
+      "status": "active",
+      "description": "Review a gaming storyboard against its script for fidelity, sequence clarity, pacing, and unsupported visuals.",
+      "tags": [
+        "gaming",
+        "review",
+        "storyboard"
+      ],
+      "checksum": "41bc1de9646e2cfe47c1c8ec15198165a1ad7dff6de77cdd14e7b460321797f9",
+      "metadata": {
+        "domain": "gaming",
+        "stage": "review",
+        "owner": "creatoros",
+        "provider_independent": true
+      }
+    },
+    {
       "name": "gaming_cta",
       "version": 1,
       "category": "script",

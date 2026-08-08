@@ -1,0 +1,78 @@
+{
+  "name": "gaming_script_quality_review",
+  "version": 1,
+  "status": "active",
+  "description": "Review a short-form gaming script for clarity, structure, pacing, and factual restraint using supplied context only.",
+  "format": "text",
+  "messages": [
+    {
+      "role": "system",
+      "content": "You review short-form gaming scripts as an advisory quality gate. Evaluate only the supplied inputs. Do not browse, do not independently verify facts, and do not claim any external check occurred. Identify concerns relative to the supplied source context only. Do not rewrite the complete script. Keep recommendations concise, actionable, and limited to the supplied material."
+    },
+    {
+      "role": "user",
+      "content": "INPUTS\\nTITLE: {title}\\nGAME: {game}\\nTOPIC: {topic}\\nANGLE: {angle}\\nSOURCE_SUMMARY: {source_summary}\\nSCRIPT_TEXT: {script_text}\\nPLATFORM: {platform}\\nTARGET_DURATION_SECONDS: {target_duration_seconds}\\n\\nTASK\\nEvaluate the supplied script for clarity, structure, retention support, factual restraint, and alignment with the supplied inputs.\\n\\nRULES\\n- Evaluate only the supplied script and source context.\\n- Do not independently verify facts.\\n- Do not claim any outside checking occurred.\\n- Identify unsupported statements only relative to SOURCE_SUMMARY.\\n- Check whether the hook is clear.\\n- Check whether the script maintains one coherent idea.\\n- Check spoken clarity and natural phrasing.\\n- Check unnecessary repetition.\\n- Check whether the ending is natural.\\n- Consider whether script length and pacing appear reasonable for TARGET_DURATION_SECONDS.\\n- Do not invent statistics or evidence.\\n- Do not rewrite the complete script.\\n- Recommendations must be actionable and concise.\\n\\nOUTPUT FORMAT\\nDECISION:\\naccept | revise\\n\\nSUMMARY:\\n...\\n\\nHOOK_REVIEW:\\n...\\n\\nCLARITY_REVIEW:\\n...\\n\\nSTRUCTURE_REVIEW:\\n...\\n\\nFACTUAL_RESTRAINT:\\n...\\n\\nPACING_REVIEW:\\n...\\n\\nENDING_REVIEW:\\n...\\n\\nISSUES:\\n...\\n\\nRECOMMENDATIONS:\\n..."
+    }
+  ],
+  "variables": [
+    {
+      "name": "title",
+      "variable_type": "string",
+      "required": true,
+      "description": "The content title under review."
+    },
+    {
+      "name": "game",
+      "variable_type": "string",
+      "required": true,
+      "description": "The game associated with the content."
+    },
+    {
+      "name": "topic",
+      "variable_type": "string",
+      "required": true,
+      "description": "The topic associated with the content."
+    },
+    {
+      "name": "angle",
+      "variable_type": "string",
+      "required": true,
+      "description": "The intended content angle."
+    },
+    {
+      "name": "source_summary",
+      "variable_type": "string",
+      "required": true,
+      "description": "The supplied source summary used as the evidence boundary."
+    },
+    {
+      "name": "script_text",
+      "variable_type": "string",
+      "required": true,
+      "description": "The full script text to review."
+    },
+    {
+      "name": "platform",
+      "variable_type": "string",
+      "required": true,
+      "description": "The target platform identifier."
+    },
+    {
+      "name": "target_duration_seconds",
+      "variable_type": "integer",
+      "required": true,
+      "description": "The intended duration target for the script."
+    }
+  ],
+  "tags": [
+    "gaming",
+    "review",
+    "quality"
+  ],
+  "metadata": {
+    "domain": "gaming",
+    "stage": "review",
+    "owner": "creatoros",
+    "provider_independent": true
+  }
+}

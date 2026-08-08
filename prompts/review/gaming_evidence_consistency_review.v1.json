@@ -1,0 +1,60 @@
+{
+  "name": "gaming_evidence_consistency_review",
+  "version": 1,
+  "status": "active",
+  "description": "Review generated gaming content against supplied evidence and identify unsupported, contradictory, or overstated claims.",
+  "format": "text",
+  "messages": [
+    {
+      "role": "system",
+      "content": "You perform an advisory evidence-consistency review for gaming content. Supplied evidence is the only evidence source. Do not browse, do not use outside knowledge, and do not fabricate citations or sources. Distinguish supported claims, unsupported claims, contradictions, uncertainties, and overstatements. Preserve uncertainty instead of converting weak evidence into certainty."
+    },
+    {
+      "role": "user",
+      "content": "INPUTS\\nGAME: {game}\\nSOURCE_SUMMARY: {source_summary}\\nRESEARCH_NOTES: {research_notes}\\nCONTENT_TEXT: {content_text}\\nCONTENT_STAGE: {content_stage}\\n\\nTASK\\nCompare the supplied content against the supplied evidence and identify where claims are supported, unsupported, contradictory, uncertain, or overstated.\\n\\nRULES\\n- Supplied evidence is the only evidence source.\\n- Do not browse.\\n- Do not use outside knowledge to confirm claims.\\n- Do not convert uncertainty into certainty.\\n- Identify claims not supported by supplied evidence.\\n- Identify contradictions with supplied evidence.\\n- Identify wording that overstates weak evidence.\\n- Distinguish unsupported from contradicted.\\n- If evidence is insufficient, say insufficient.\\n- Do not fabricate citations.\\n- Do not fabricate sources.\\n- Do not silently correct factual content.\\n- Recommend cautious wording where appropriate.\\n\\nOUTPUT FORMAT\\nDECISION:\\nconsistent | revise | insufficient_evidence\\n\\nSUMMARY:\\n...\\n\\nSUPPORTED_CLAIMS:\\n...\\n\\nUNSUPPORTED_CLAIMS:\\n...\\n\\nCONTRADICTIONS:\\n...\\n\\nUNCERTAINTIES:\\n...\\n\\nOVERSTATEMENTS:\\n...\\n\\nRECOMMENDATIONS:\\n..."
+    }
+  ],
+  "variables": [
+    {
+      "name": "game",
+      "variable_type": "string",
+      "required": true,
+      "description": "The game associated with the content."
+    },
+    {
+      "name": "source_summary",
+      "variable_type": "string",
+      "required": true,
+      "description": "The primary supplied evidence summary."
+    },
+    {
+      "name": "research_notes",
+      "variable_type": "string",
+      "required": true,
+      "description": "Additional supplied research notes."
+    },
+    {
+      "name": "content_text",
+      "variable_type": "string",
+      "required": true,
+      "description": "The generated content text under review."
+    },
+    {
+      "name": "content_stage",
+      "variable_type": "string",
+      "required": true,
+      "description": "The content stage represented by the supplied text."
+    }
+  ],
+  "tags": [
+    "gaming",
+    "review",
+    "evidence"
+  ],
+  "metadata": {
+    "domain": "gaming",
+    "stage": "review",
+    "owner": "creatoros",
+    "provider_independent": true
+  }
+}

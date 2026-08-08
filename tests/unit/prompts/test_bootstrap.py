@@ -28,6 +28,13 @@ from creatoros.prompts import (
     load_builtin_prompts,
 )
 
+REVIEW_PROMPT_NAMES = [
+    "gaming_evidence_consistency_review",
+    "gaming_publication_readiness_review",
+    "gaming_script_quality_review",
+    "gaming_storyboard_quality_review",
+]
+
 
 def _repo_prompts_dir() -> Path:
     """Return the repository prompt root directory."""
@@ -35,8 +42,8 @@ def _repo_prompts_dir() -> Path:
     return Path(__file__).resolve().parents[3] / "prompts"
 
 
-def test_load_builtin_prompts_registers_all_thirteen_definitions() -> None:
-    """Builtin bootstrap loading should register all research, script, storyboard, thumbnail, and narration prompts."""
+def test_load_builtin_prompts_registers_all_seventeen_definitions() -> None:
+    """Builtin bootstrap loading should register all current builtin prompt assets."""
 
     registry = create_prompt_registry()
 
@@ -53,6 +60,7 @@ def test_load_builtin_prompts_registers_all_thirteen_definitions() -> None:
             GAMING_SCENE_MOTION_PROMPT,
             GAMING_SCENE_VISUAL_PROMPT,
             GAMING_THUMBNAIL_CONCEPT,
+            *REVIEW_PROMPT_NAMES,
             STORYBOARD_SCENE_BREAKDOWN,
             STORYBOARD_TIMING_REVIEW,
             STORYBOARD_VISUAL_DIRECTION,
@@ -70,13 +78,15 @@ def test_load_builtin_prompts_registers_all_thirteen_definitions() -> None:
     assert registry.contains(GAMING_SCENE_MOTION_PROMPT, 1) is True
     assert registry.contains(GAMING_SCENE_VISUAL_PROMPT, 1) is True
     assert registry.contains(GAMING_THUMBNAIL_CONCEPT, 1) is True
+    for prompt_name in REVIEW_PROMPT_NAMES:
+        assert registry.contains(prompt_name, 1) is True
     assert registry.contains(STORYBOARD_SCENE_BREAKDOWN, 1) is True
     assert registry.contains(STORYBOARD_TIMING_REVIEW, 1) is True
     assert registry.contains(STORYBOARD_VISUAL_DIRECTION, 1) is True
     assert registry.contains(YOUTUBE_SHORTS_SCRIPT, 1) is True
 
 
-def test_fresh_builtin_registry_contains_all_thirteen_prompts() -> None:
+def test_fresh_builtin_registry_contains_all_seventeen_prompts() -> None:
     """Creating a builtin registry should populate a fresh registry only."""
 
     registry = create_builtin_prompt_registry(base_dir=_repo_prompts_dir())
@@ -92,6 +102,7 @@ def test_fresh_builtin_registry_contains_all_thirteen_prompts() -> None:
             GAMING_SCENE_MOTION_PROMPT,
             GAMING_SCENE_VISUAL_PROMPT,
             GAMING_THUMBNAIL_CONCEPT,
+            *REVIEW_PROMPT_NAMES,
             STORYBOARD_SCENE_BREAKDOWN,
             STORYBOARD_TIMING_REVIEW,
             STORYBOARD_VISUAL_DIRECTION,
@@ -143,6 +154,15 @@ def test_new_media_prompts_are_retrievable_by_stable_logical_name() -> None:
     assert registry.get(GAMING_NARRATION_DIRECTION).name == GAMING_NARRATION_DIRECTION
 
 
+def test_new_review_prompts_are_retrievable_by_stable_logical_name() -> None:
+    """Builtin review prompts should resolve by their stable logical names."""
+
+    registry = create_builtin_prompt_registry(base_dir=_repo_prompts_dir())
+
+    for prompt_name in REVIEW_PROMPT_NAMES:
+        assert registry.get(prompt_name).name == prompt_name
+
+
 def test_cached_global_registry_is_not_modified() -> None:
     """Builtin bootstrap should not mutate the cached global registry implicitly."""
 
@@ -174,7 +194,7 @@ def test_replace_true_succeeds() -> None:
 
     loaded = load_builtin_prompts(registry, base_dir=_repo_prompts_dir(), replace=True)
 
-    assert len(loaded) == 13
+    assert len(loaded) == 17
 
 
 def test_returned_definitions_are_copies() -> None:

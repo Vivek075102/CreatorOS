@@ -520,12 +520,12 @@ def test_prompts_cli_does_not_print_prompt_contents(
     assert stderr == ""
 
 
-def test_prompts_list_shows_all_thirteen_prompt_names(
+def test_prompts_list_shows_all_seventeen_prompt_names(
     cli_module,
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
-    """Builtin prompt listing should show the research, script, storyboard, thumbnail, and narration prompt names."""
+    """Builtin prompt listing should show every current builtin prompt name."""
 
     _copy_repo_prompt_structure(tmp_path)
     monkeypatch.setattr(
@@ -542,11 +542,15 @@ def test_prompts_list_shows_all_thirteen_prompt_names(
         "gaming_cta",
         "gaming_discover_trends",
         "gaming_evaluate_opportunity",
+        "gaming_evidence_consistency_review",
         "gaming_expand_keywords",
         "gaming_hook",
         "gaming_narration_direction",
+        "gaming_publication_readiness_review",
         "gaming_scene_motion_prompt",
         "gaming_scene_visual_prompt",
+        "gaming_script_quality_review",
+        "gaming_storyboard_quality_review",
         "gaming_thumbnail_concept",
         "storyboard_scene_breakdown",
         "storyboard_timing_review",
@@ -1012,6 +1016,195 @@ def test_prompts_render_gaming_narration_direction_succeeds(
     assert "NARRATION_TEXT:" in stdout
     assert "PRONUNCIATION_NOTES:" in stdout
     assert stderr == ""
+
+
+def test_prompts_render_gaming_script_quality_review_succeeds(
+    cli_module,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Local prompt rendering should succeed for gaming_script_quality_review."""
+
+    _copy_repo_prompt_structure(tmp_path)
+    monkeypatch.setattr(
+        cli_module,
+        "create_builtin_prompt_registry",
+        lambda: create_builtin_prompt_registry(base_dir=tmp_path),
+    )
+
+    exit_code, stdout, stderr = run_cli(
+        cli_module,
+        ["prompts", "render", "gaming_script_quality_review", "--show-content"],
+    )
+
+    assert exit_code == 0
+    assert "prompt_name: gaming_script_quality_review" in stdout
+    assert "HOOK_REVIEW:" in stdout
+    assert "FACTUAL_RESTRAINT:" in stdout
+    assert stderr == ""
+
+
+def test_prompts_render_gaming_evidence_consistency_review_succeeds(
+    cli_module,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Local prompt rendering should succeed for gaming_evidence_consistency_review."""
+
+    _copy_repo_prompt_structure(tmp_path)
+    monkeypatch.setattr(
+        cli_module,
+        "create_builtin_prompt_registry",
+        lambda: create_builtin_prompt_registry(base_dir=tmp_path),
+    )
+
+    exit_code, stdout, stderr = run_cli(
+        cli_module,
+        ["prompts", "render", "gaming_evidence_consistency_review", "--show-content"],
+    )
+
+    assert exit_code == 0
+    assert "prompt_name: gaming_evidence_consistency_review" in stdout
+    assert "SUPPORTED_CLAIMS:" in stdout
+    assert "UNSUPPORTED_CLAIMS:" in stdout
+    assert stderr == ""
+
+
+def test_prompts_render_gaming_storyboard_quality_review_succeeds(
+    cli_module,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Local prompt rendering should succeed for gaming_storyboard_quality_review."""
+
+    _copy_repo_prompt_structure(tmp_path)
+    monkeypatch.setattr(
+        cli_module,
+        "create_builtin_prompt_registry",
+        lambda: create_builtin_prompt_registry(base_dir=tmp_path),
+    )
+
+    exit_code, stdout, stderr = run_cli(
+        cli_module,
+        ["prompts", "render", "gaming_storyboard_quality_review", "--show-content"],
+    )
+
+    assert exit_code == 0
+    assert "prompt_name: gaming_storyboard_quality_review" in stdout
+    assert "SCRIPT_FIDELITY:" in stdout
+    assert "UNSUPPORTED_VISUALS:" in stdout
+    assert stderr == ""
+
+
+def test_prompts_render_gaming_publication_readiness_review_succeeds(
+    cli_module,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Local prompt rendering should succeed for gaming_publication_readiness_review."""
+
+    _copy_repo_prompt_structure(tmp_path)
+    monkeypatch.setattr(
+        cli_module,
+        "create_builtin_prompt_registry",
+        lambda: create_builtin_prompt_registry(base_dir=tmp_path),
+    )
+
+    exit_code, stdout, stderr = run_cli(
+        cli_module,
+        ["prompts", "render", "gaming_publication_readiness_review", "--show-content"],
+    )
+
+    assert exit_code == 0
+    assert "prompt_name: gaming_publication_readiness_review" in stdout
+    assert "BLOCKERS:" in stdout
+    assert "HUMAN_REVIEW_FOCUS:" in stdout
+    assert stderr == ""
+
+
+def test_review_prompt_values_are_reflected_when_content_is_shown(
+    cli_module,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Shown review prompt content should reflect custom render inputs."""
+
+    _copy_repo_prompt_structure(tmp_path)
+    monkeypatch.setattr(
+        cli_module,
+        "create_builtin_prompt_registry",
+        lambda: create_builtin_prompt_registry(base_dir=tmp_path),
+    )
+
+    exit_code, stdout, _ = run_cli(
+        cli_module,
+        [
+            "prompts",
+            "render",
+            "gaming_script_quality_review",
+            "--title",
+            "Roblox: Funny Myths",
+            "--game",
+            "Roblox",
+            "--topic",
+            "funny myths",
+            "--angle",
+            "test three popular myths",
+            "--source-summary",
+            "Supplied research notes discuss recurring myths about Roblox game mechanics.",
+            "--script-text",
+            "You probably still believe this Roblox myth, so let's check the claim carefully.",
+            "--duration",
+            "45",
+            "--show-content",
+        ],
+    )
+
+    assert exit_code == 0
+    assert "TITLE: Roblox: Funny Myths" in stdout
+    assert "GAME: Roblox" in stdout
+    assert "TOPIC: funny myths" in stdout
+    assert "TARGET_DURATION_SECONDS: 45" in stdout
+
+
+def test_evidence_review_prompt_values_are_reflected_when_content_is_shown(
+    cli_module,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Shown evidence-review prompt content should reflect custom render inputs."""
+
+    _copy_repo_prompt_structure(tmp_path)
+    monkeypatch.setattr(
+        cli_module,
+        "create_builtin_prompt_registry",
+        lambda: create_builtin_prompt_registry(base_dir=tmp_path),
+    )
+
+    exit_code, stdout, _ = run_cli(
+        cli_module,
+        [
+            "prompts",
+            "render",
+            "gaming_evidence_consistency_review",
+            "--game",
+            "Roblox",
+            "--source-summary",
+            "Supplied summary covers one recurring gameplay myth.",
+            "--research-notes",
+            "Research notes say the myth should be described cautiously.",
+            "--content-text",
+            "This myth is definitely true in every case.",
+            "--content-stage",
+            "script_draft",
+            "--show-content",
+        ],
+    )
+
+    assert exit_code == 0
+    assert "GAME: Roblox" in stdout
+    assert "CONTENT_STAGE: script_draft" in stdout
+    assert "CONTENT_TEXT: This myth is definitely true in every case." in stdout
 
 
 def test_render_command_does_not_call_providers(
