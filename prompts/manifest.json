@@ -2,6 +2,26 @@
   "schema_version": 1,
   "entries": [
     {
+      "name": "gaming_narration_direction",
+      "version": 1,
+      "category": "narration",
+      "path": "narration/gaming_narration_direction.v1.json",
+      "status": "active",
+      "description": "Prepare provider-independent narration direction for an approved gaming short script.",
+      "tags": [
+        "gaming",
+        "narration",
+        "delivery"
+      ],
+      "checksum": "81292da2786c72bc70c346f9b322dc2033363f018fa94acdcfbbecd43eb97812",
+      "metadata": {
+        "domain": "gaming",
+        "stage": "narration",
+        "owner": "creatoros",
+        "provider_independent": true
+      }
+    },
+    {
       "name": "gaming_discover_trends",
       "version": 1,
       "category": "research",
@@ -125,6 +145,46 @@
       }
     },
     {
+      "name": "gaming_scene_motion_prompt",
+      "version": 1,
+      "category": "storyboard",
+      "path": "storyboard/gaming_scene_motion_prompt.v1.json",
+      "status": "active",
+      "description": "Define provider-independent motion direction for an approved gaming storyboard scene.",
+      "tags": [
+        "gaming",
+        "storyboard",
+        "motion"
+      ],
+      "checksum": "b76973fd623ba6cb46d0afde65e9a53a5db03fc48c9caa6a396069f6da7c7d76",
+      "metadata": {
+        "domain": "gaming",
+        "stage": "storyboard",
+        "owner": "creatoros",
+        "provider_independent": true
+      }
+    },
+    {
+      "name": "gaming_scene_visual_prompt",
+      "version": 1,
+      "category": "storyboard",
+      "path": "storyboard/gaming_scene_visual_prompt.v1.json",
+      "status": "active",
+      "description": "Convert an approved storyboard scene into a provider-independent visual generation brief.",
+      "tags": [
+        "gaming",
+        "storyboard",
+        "visual"
+      ],
+      "checksum": "b77ff66cbc4415cfc9462a751716dfcac42500d07cf1fa770f75b908d33bcef8",
+      "metadata": {
+        "domain": "gaming",
+        "stage": "storyboard",
+        "owner": "creatoros",
+        "provider_independent": true
+      }
+    },
+    {
       "name": "storyboard_scene_breakdown",
       "version": 1,
       "category": "storyboard",
@@ -180,6 +240,26 @@
       "metadata": {
         "domain": "gaming",
         "stage": "storyboard",
+        "owner": "creatoros",
+        "provider_independent": true
+      }
+    },
+    {
+      "name": "gaming_thumbnail_concept",
+      "version": 1,
+      "category": "thumbnail",
+      "path": "thumbnail/gaming_thumbnail_concept.v1.json",
+      "status": "active",
+      "description": "Create a provider-independent thumbnail concept for short-form gaming content using supplied context only.",
+      "tags": [
+        "gaming",
+        "thumbnail",
+        "concept"
+      ],
+      "checksum": "c469dea0ecfc2f7a62df8e3ccaa9bd40cbcbe594dc0ffc0097975e314d97a444",
+      "metadata": {
+        "domain": "gaming",
+        "stage": "thumbnail",
         "owner": "creatoros",
         "provider_independent": true
       }

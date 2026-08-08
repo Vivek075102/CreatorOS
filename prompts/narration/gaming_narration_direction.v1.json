@@ -1,0 +1,66 @@
+{
+  "name": "gaming_narration_direction",
+  "version": 1,
+  "status": "active",
+  "description": "Prepare provider-independent narration direction for an approved gaming short script.",
+  "format": "text",
+  "messages": [
+    {
+      "role": "system",
+      "content": "You prepare narration direction for short-form gaming content. This prompt does not synthesize audio. Preserve the supplied wording and meaning, keep delivery natural, and identify emphasis and pacing without requesting imitation of a real person's voice or any vendor voice identifier."
+    },
+    {
+      "role": "user",
+      "content": "INPUTS\\nTITLE: {title}\\nGAME: {game}\\nSCRIPT_TEXT: {script_text}\\nTARGET_DURATION_SECONDS: {target_duration_seconds}\\nTONE: {tone}\\nPLATFORM: {platform}\\n\\nTASK\\nPrepare narration direction for the supplied gaming short script.\\n\\nRULES\\n- Do not rewrite factual meaning.\\n- Do not add facts.\\n- Preserve names and supplied terminology.\\n- Prioritize clear spoken delivery.\\n- Identify natural emphasis points.\\n- Use pacing appropriate to target duration.\\n- Avoid robotic delivery instructions.\\n- Do not request imitation of a real person's voice.\\n- Do not specify a vendor voice ID.\\n- Avoid extreme emotional direction unless justified by supplied content.\\n- Keep delivery natural for short-form gaming content.\\n\\nOUTPUT FORMAT\\nNARRATION_TEXT:\\n...\\n\\nTONE:\\n...\\n\\nPACE:\\n...\\n\\nEMPHASIS:\\n...\\n\\nPAUSE_GUIDANCE:\\n...\\n\\nPRONUNCIATION_NOTES:\\n...\\n\\nTARGET_DURATION_SECONDS:\\n..."
+    }
+  ],
+  "variables": [
+    {
+      "name": "title",
+      "variable_type": "string",
+      "required": true,
+      "description": "The title connected to the narration."
+    },
+    {
+      "name": "game",
+      "variable_type": "string",
+      "required": true,
+      "description": "The game context for the narration."
+    },
+    {
+      "name": "script_text",
+      "variable_type": "string",
+      "required": true,
+      "description": "The approved script text to be narrated."
+    },
+    {
+      "name": "target_duration_seconds",
+      "variable_type": "integer",
+      "required": true,
+      "description": "The target narration duration."
+    },
+    {
+      "name": "tone",
+      "variable_type": "string",
+      "required": true,
+      "description": "The desired narration tone."
+    },
+    {
+      "name": "platform",
+      "variable_type": "string",
+      "required": true,
+      "description": "The target platform identifier."
+    }
+  ],
+  "tags": [
+    "gaming",
+    "narration",
+    "delivery"
+  ],
+  "metadata": {
+    "domain": "gaming",
+    "stage": "narration",
+    "owner": "creatoros",
+    "provider_independent": true
+  }
+}

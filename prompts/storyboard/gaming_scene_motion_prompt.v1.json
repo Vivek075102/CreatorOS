@@ -1,0 +1,72 @@
+{
+  "name": "gaming_scene_motion_prompt",
+  "version": 1,
+  "status": "active",
+  "description": "Define provider-independent motion direction for an approved gaming storyboard scene.",
+  "format": "text",
+  "messages": [
+    {
+      "role": "system",
+      "content": "You define motion direction for one short-form gaming scene. Preserve the supplied scene number and treat the supplied duration as the target scene duration. Describe movement and pacing rather than provider parameters. Prefer one clear primary motion idea that supports the narrative beat."
+    },
+    {
+      "role": "user",
+      "content": "INPUTS\\nGAME: {game}\\nSCENE_NUMBER: {scene_number}\\nSCENE_PURPOSE: {scene_purpose}\\nVISUAL_SUMMARY: {visual_summary}\\nSCRIPT_BEAT: {script_beat}\\nDURATION_SECONDS: {duration_seconds}\\nPLATFORM: {platform}\\n\\nTASK\\nDefine motion and temporal direction for the supplied storyboard scene.\\n\\nRULES\\n- Preserve scene number.\\n- Treat DURATION_SECONDS as the target scene duration.\\n- Describe movement rather than provider parameters.\\n- Avoid impossible or unnecessarily complicated motion.\\n- Prefer one primary motion idea.\\n- Motion must support the narrative beat.\\n- No unsupported factual invention.\\n- No provider-specific camera commands.\\n- Generic filmmaking language is acceptable when useful.\\n- Do not imply actual footage already exists.\\n\\nOUTPUT FORMAT\\nSCENE_NUMBER:\\n...\\n\\nPRIMARY_MOTION:\\n...\\n\\nSUBJECT_MOVEMENT:\\n...\\n\\nCAMERA_DIRECTION:\\n...\\n\\nTRANSITION_GUIDANCE:\\n...\\n\\nPACING:\\n...\\n\\nDURATION_SECONDS:\\n...\\n\\nAVOID:\\n..."
+    }
+  ],
+  "variables": [
+    {
+      "name": "game",
+      "variable_type": "string",
+      "required": true,
+      "description": "The game context for the motion brief."
+    },
+    {
+      "name": "scene_number",
+      "variable_type": "integer",
+      "required": true,
+      "description": "The scene number that must remain stable."
+    },
+    {
+      "name": "scene_purpose",
+      "variable_type": "string",
+      "required": true,
+      "description": "The narrative purpose of the scene."
+    },
+    {
+      "name": "visual_summary",
+      "variable_type": "string",
+      "required": true,
+      "description": "The approved visual summary for the scene."
+    },
+    {
+      "name": "script_beat",
+      "variable_type": "string",
+      "required": true,
+      "description": "The script beat the motion should support."
+    },
+    {
+      "name": "duration_seconds",
+      "variable_type": "float",
+      "required": true,
+      "description": "The target duration for the scene motion."
+    },
+    {
+      "name": "platform",
+      "variable_type": "string",
+      "required": true,
+      "description": "The target platform identifier."
+    }
+  ],
+  "tags": [
+    "gaming",
+    "storyboard",
+    "motion"
+  ],
+  "metadata": {
+    "domain": "gaming",
+    "stage": "storyboard",
+    "owner": "creatoros",
+    "provider_independent": true
+  }
+}

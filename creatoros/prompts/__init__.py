@@ -10,6 +10,16 @@ from creatoros.prompts.discovery import PromptAssetDiscovery, PromptAssetRecord
 from creatoros.prompts.enums import PromptFormat, PromptRole, PromptStatus, PromptVariableType
 from creatoros.prompts.loader import PromptLoader
 from creatoros.prompts.manifest import PromptManifestLoader
+from creatoros.prompts.media import (
+    GAMING_NARRATION_DIRECTION,
+    GAMING_SCENE_MOTION_PROMPT,
+    GAMING_SCENE_VISUAL_PROMPT,
+    GAMING_THUMBNAIL_CONCEPT,
+    render_gaming_narration_direction,
+    render_gaming_scene_motion_prompt,
+    render_gaming_scene_visual_prompt,
+    render_gaming_thumbnail_concept,
+)
 from creatoros.prompts.models import (
     PromptDefinition,
     PromptMessage,
@@ -54,6 +64,10 @@ __all__ = [
     "GAMING_EVALUATE_OPPORTUNITY",
     "GAMING_EXPAND_KEYWORDS",
     "GAMING_HOOK",
+    "GAMING_NARRATION_DIRECTION",
+    "GAMING_SCENE_MOTION_PROMPT",
+    "GAMING_SCENE_VISUAL_PROMPT",
+    "GAMING_THUMBNAIL_CONCEPT",
     "STORYBOARD_SCENE_BREAKDOWN",
     "STORYBOARD_TIMING_REVIEW",
     "STORYBOARD_VISUAL_DIRECTION",
@@ -87,6 +101,10 @@ __all__ = [
     "render_gaming_evaluate_opportunity",
     "render_gaming_expand_keywords",
     "render_gaming_hook",
+    "render_gaming_narration_direction",
+    "render_gaming_scene_motion_prompt",
+    "render_gaming_scene_visual_prompt",
+    "render_gaming_thumbnail_concept",
     "render_storyboard_scene_breakdown",
     "render_storyboard_timing_review",
     "render_storyboard_visual_direction",

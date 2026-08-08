@@ -31,6 +31,10 @@ from creatoros.prompts import (
     GAMING_CTA,
     GAMING_DISCOVER_TRENDS,
     GAMING_HOOK,
+    GAMING_NARRATION_DIRECTION,
+    GAMING_SCENE_MOTION_PROMPT,
+    GAMING_SCENE_VISUAL_PROMPT,
+    GAMING_THUMBNAIL_CONCEPT,
     STORYBOARD_SCENE_BREAKDOWN,
     STORYBOARD_TIMING_REVIEW,
     STORYBOARD_VISUAL_DIRECTION,
@@ -41,6 +45,10 @@ from creatoros.prompts import (
     render_gaming_cta,
     render_gaming_discover_trends,
     render_gaming_hook,
+    render_gaming_narration_direction,
+    render_gaming_scene_motion_prompt,
+    render_gaming_scene_visual_prompt,
+    render_gaming_thumbnail_concept,
     render_storyboard_scene_breakdown,
     render_storyboard_timing_review,
     render_storyboard_visual_direction,
@@ -402,6 +410,26 @@ def _build_parser() -> argparse.ArgumentParser:
         "--scene-summary",
         default="Scene 1: 5 seconds hook. Scene 2: 12 seconds explanation. Scene 3: 8 seconds example. Scene 4: 5 seconds ending.",
         help="Scene timing summary input for the storyboard timing review prompt.",
+    )
+    prompts_render.add_argument(
+        "--visual-context",
+        default="Clean gameplay-inspired context with one clear focal subject.",
+        help="Visual context input for the thumbnail concept prompt.",
+    )
+    prompts_render.add_argument(
+        "--visual-direction",
+        default="Focus on one clear gameplay-related visual moment with readable overlays.",
+        help="Visual direction input for the scene visual prompt.",
+    )
+    prompts_render.add_argument(
+        "--on-screen-text",
+        default="Myth or Fact?",
+        help="On-screen text input for the scene visual prompt.",
+    )
+    prompts_render.add_argument(
+        "--script-text",
+        default="You probably missed this gaming detail, and here is the quick explanation.",
+        help="Script text input for the narration direction prompt.",
     )
     prompts_render.add_argument(
         "--platform",
@@ -768,6 +796,49 @@ def _handle_prompts_render(
             title=args.title,
             scene_summary=args.scene_summary,
             target_duration_seconds=args.duration,
+            platform=args.platform,
+        )
+    elif args.prompt_name == GAMING_THUMBNAIL_CONCEPT:
+        rendered = render_gaming_thumbnail_concept(
+            registry,
+            title=args.title,
+            game=args.game,
+            topic=args.topic,
+            angle=args.angle,
+            hook=args.hook,
+            platform=args.platform,
+            visual_context=args.visual_context,
+        )
+    elif args.prompt_name == GAMING_SCENE_VISUAL_PROMPT:
+        rendered = render_gaming_scene_visual_prompt(
+            registry,
+            game=args.game,
+            scene_number=args.scene_number,
+            scene_purpose=args.scene_purpose,
+            script_beat=args.script_beat,
+            visual_direction=args.visual_direction,
+            on_screen_text=args.on_screen_text,
+            platform=args.platform,
+        )
+    elif args.prompt_name == GAMING_SCENE_MOTION_PROMPT:
+        rendered = render_gaming_scene_motion_prompt(
+            registry,
+            game=args.game,
+            scene_number=args.scene_number,
+            scene_purpose=args.scene_purpose,
+            visual_summary=args.visual_summary,
+            script_beat=args.script_beat,
+            duration_seconds=float(args.duration),
+            platform=args.platform,
+        )
+    elif args.prompt_name == GAMING_NARRATION_DIRECTION:
+        rendered = render_gaming_narration_direction(
+            registry,
+            title=args.title,
+            game=args.game,
+            script_text=args.script_text,
+            target_duration_seconds=args.duration,
+            tone=args.tone,
             platform=args.platform,
         )
     else:

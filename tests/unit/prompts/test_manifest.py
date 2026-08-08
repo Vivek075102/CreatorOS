@@ -57,15 +57,19 @@ def test_initial_repository_manifest_loads() -> None:
 
     assert manifest.schema_version == 1
     assert [entry.name for entry in manifest.list_entries()] == [
+        "gaming_narration_direction",
         "gaming_discover_trends",
         "gaming_evaluate_opportunity",
         "gaming_expand_keywords",
         "gaming_cta",
         "gaming_hook",
         "youtube_shorts_script",
+        "gaming_scene_motion_prompt",
+        "gaming_scene_visual_prompt",
         "storyboard_scene_breakdown",
         "storyboard_timing_review",
         "storyboard_visual_direction",
+        "gaming_thumbnail_concept",
     ]
 
 

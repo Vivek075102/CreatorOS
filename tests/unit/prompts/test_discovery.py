@@ -339,17 +339,21 @@ def test_manifest_json_exists_and_is_valid() -> None:
     manifest = PromptAssetManifest.model_validate(json.loads(manifest_path.read_text(encoding="utf-8")))
 
     assert manifest.schema_version == 1
-    assert len(manifest.entries) == 9
+    assert len(manifest.entries) == 13
     assert [entry.path for entry in manifest.list_entries()] == [
+        "narration/gaming_narration_direction.v1.json",
         "research/gaming/gaming_discover_trends.v1.json",
         "research/gaming/gaming_evaluate_opportunity.v1.json",
         "research/gaming/gaming_expand_keywords.v1.json",
         "script/gaming_cta.v1.json",
         "script/gaming_hook.v1.json",
         "script/youtube_shorts_script.v1.json",
+        "storyboard/gaming_scene_motion_prompt.v1.json",
+        "storyboard/gaming_scene_visual_prompt.v1.json",
         "storyboard/storyboard_scene_breakdown.v1.json",
         "storyboard/storyboard_timing_review.v1.json",
         "storyboard/storyboard_visual_direction.v1.json",
+        "thumbnail/gaming_thumbnail_concept.v1.json",
     ]
 
 
@@ -361,8 +365,6 @@ def test_empty_directories_contain_gitkeep_where_needed() -> None:
     expected_gitkeep_paths = {
         "research/.gitkeep",
         "research/common/.gitkeep",
-        "narration/.gitkeep",
-        "thumbnail/.gitkeep",
         "metadata/.gitkeep",
         "review/.gitkeep",
         "publishing/.gitkeep",
@@ -375,8 +377,8 @@ def test_empty_directories_contain_gitkeep_where_needed() -> None:
     assert expected_gitkeep_paths == actual_paths
 
 
-def test_repository_contains_exactly_nine_prompt_definition_json_files() -> None:
-    """The repository should contain the research, script, and storyboard prompt assets."""
+def test_repository_contains_exactly_thirteen_prompt_definition_json_files() -> None:
+    """The repository should contain the research, script, storyboard, thumbnail, and narration prompt assets."""
 
     repo_root = Path(__file__).resolve().parents[3]
     prompts_root = repo_root / "prompts"
@@ -387,13 +389,17 @@ def test_repository_contains_exactly_nine_prompt_definition_json_files() -> None
     )
 
     assert json_paths == [
+        "narration/gaming_narration_direction.v1.json",
         "research/gaming/gaming_discover_trends.v1.json",
         "research/gaming/gaming_evaluate_opportunity.v1.json",
         "research/gaming/gaming_expand_keywords.v1.json",
         "script/gaming_cta.v1.json",
         "script/gaming_hook.v1.json",
         "script/youtube_shorts_script.v1.json",
+        "storyboard/gaming_scene_motion_prompt.v1.json",
+        "storyboard/gaming_scene_visual_prompt.v1.json",
         "storyboard/storyboard_scene_breakdown.v1.json",
         "storyboard/storyboard_timing_review.v1.json",
         "storyboard/storyboard_visual_direction.v1.json",
+        "thumbnail/gaming_thumbnail_concept.v1.json",
     ]

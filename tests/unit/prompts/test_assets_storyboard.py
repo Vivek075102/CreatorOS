@@ -15,6 +15,8 @@ from creatoros.prompts import (
 )
 
 STORYBOARD_PROMPT_PATHS = [
+    Path("storyboard/gaming_scene_motion_prompt.v1.json"),
+    Path("storyboard/gaming_scene_visual_prompt.v1.json"),
     Path("storyboard/storyboard_scene_breakdown.v1.json"),
     Path("storyboard/storyboard_timing_review.v1.json"),
     Path("storyboard/storyboard_visual_direction.v1.json"),
@@ -27,8 +29,8 @@ def _repo_prompts_dir() -> Path:
     return Path(__file__).resolve().parents[3] / "prompts"
 
 
-def test_exactly_three_storyboard_prompt_json_files_exist() -> None:
-    """The repository should contain exactly the three builtin storyboard prompts."""
+def test_exactly_five_storyboard_prompt_json_files_exist() -> None:
+    """The repository should contain exactly the five builtin storyboard prompts."""
 
     prompts_root = _repo_prompts_dir()
     json_paths = sorted(path.relative_to(prompts_root) for path in (prompts_root / "storyboard").rglob("*.json"))
@@ -36,7 +38,7 @@ def test_exactly_three_storyboard_prompt_json_files_exist() -> None:
     assert json_paths == sorted(STORYBOARD_PROMPT_PATHS)
 
 
-def test_all_three_storyboard_assets_load_as_prompt_definitions() -> None:
+def test_all_five_storyboard_assets_load_as_prompt_definitions() -> None:
     """Each builtin storyboard prompt asset should load as a PromptDefinition."""
 
     loader = PromptLoader(base_dir=_repo_prompts_dir())
@@ -45,14 +47,14 @@ def test_all_three_storyboard_assets_load_as_prompt_definitions() -> None:
     assert all(isinstance(definition, PromptDefinition) for definition in loaded)
 
 
-def test_all_three_storyboard_assets_are_active_version_one_assets() -> None:
+def test_all_five_storyboard_assets_are_active_version_one_assets() -> None:
     """Builtin storyboard prompts should be active version-one assets."""
 
     loader = PromptLoader(base_dir=_repo_prompts_dir())
     definitions = [loader.load_file(path) for path in STORYBOARD_PROMPT_PATHS]
 
-    assert [definition.status for definition in definitions] == [PromptStatus.ACTIVE] * 3
-    assert [definition.version for definition in definitions] == [1, 1, 1]
+    assert [definition.status for definition in definitions] == [PromptStatus.ACTIVE] * 5
+    assert [definition.version for definition in definitions] == [1, 1, 1, 1, 1]
 
 
 def test_storyboard_prompt_names_match_filenames_and_category() -> None:
@@ -104,9 +106,11 @@ def test_storyboard_prompt_variables_match_the_documented_contracts() -> None:
     """Builtin storyboard prompt variables should match the documented contracts."""
 
     loader = PromptLoader(base_dir=_repo_prompts_dir())
-    breakdown = loader.load_file(STORYBOARD_PROMPT_PATHS[0])
-    timing = loader.load_file(STORYBOARD_PROMPT_PATHS[1])
-    visual = loader.load_file(STORYBOARD_PROMPT_PATHS[2])
+    motion = loader.load_file(STORYBOARD_PROMPT_PATHS[0])
+    scene_visual = loader.load_file(STORYBOARD_PROMPT_PATHS[1])
+    breakdown = loader.load_file(STORYBOARD_PROMPT_PATHS[2])
+    timing = loader.load_file(STORYBOARD_PROMPT_PATHS[3])
+    visual = loader.load_file(STORYBOARD_PROMPT_PATHS[4])
 
     assert [variable.name for variable in breakdown.variables] == [
         "title",
@@ -117,6 +121,24 @@ def test_storyboard_prompt_variables_match_the_documented_contracts() -> None:
         "ending",
         "call_to_action",
         "target_duration_seconds",
+    ]
+    assert [variable.name for variable in motion.variables] == [
+        "game",
+        "scene_number",
+        "scene_purpose",
+        "visual_summary",
+        "script_beat",
+        "duration_seconds",
+        "platform",
+    ]
+    assert [variable.name for variable in scene_visual.variables] == [
+        "game",
+        "scene_number",
+        "scene_purpose",
+        "script_beat",
+        "visual_direction",
+        "on_screen_text",
+        "platform",
     ]
     assert [variable.name for variable in visual.variables] == [
         "game",
@@ -139,10 +161,14 @@ def test_storyboard_prompt_contents_include_required_output_labels() -> None:
     """Builtin storyboard prompt bodies should contain the required output labels."""
 
     prompts_root = _repo_prompts_dir()
-    breakdown_payload = json.loads((prompts_root / STORYBOARD_PROMPT_PATHS[0]).read_text(encoding="utf-8"))
-    timing_payload = json.loads((prompts_root / STORYBOARD_PROMPT_PATHS[1]).read_text(encoding="utf-8"))
-    visual_payload = json.loads((prompts_root / STORYBOARD_PROMPT_PATHS[2]).read_text(encoding="utf-8"))
+    motion_payload = json.loads((prompts_root / STORYBOARD_PROMPT_PATHS[0]).read_text(encoding="utf-8"))
+    scene_visual_payload = json.loads((prompts_root / STORYBOARD_PROMPT_PATHS[1]).read_text(encoding="utf-8"))
+    breakdown_payload = json.loads((prompts_root / STORYBOARD_PROMPT_PATHS[2]).read_text(encoding="utf-8"))
+    timing_payload = json.loads((prompts_root / STORYBOARD_PROMPT_PATHS[3]).read_text(encoding="utf-8"))
+    visual_payload = json.loads((prompts_root / STORYBOARD_PROMPT_PATHS[4]).read_text(encoding="utf-8"))
 
+    motion_content = "\n".join(message["content"] for message in motion_payload["messages"])
+    scene_visual_content = "\n".join(message["content"] for message in scene_visual_payload["messages"])
     breakdown_content = "\n".join(message["content"] for message in breakdown_payload["messages"])
     timing_content = "\n".join(message["content"] for message in timing_payload["messages"])
     visual_content = "\n".join(message["content"] for message in visual_payload["messages"])
@@ -159,6 +185,10 @@ def test_storyboard_prompt_contents_include_required_output_labels() -> None:
         "TOTAL_ESTIMATED_DURATION_SECONDS:",
     ]:
         assert label in breakdown_content
+    for label in ["SCENE_NUMBER:", "PRIMARY_MOTION:", "SUBJECT_MOVEMENT:", "CAMERA_DIRECTION:", "TRANSITION_GUIDANCE:", "PACING:", "DURATION_SECONDS:", "AVOID:"]:
+        assert label in motion_content
+    for label in ["SCENE_NUMBER:", "SUBJECT:", "ENVIRONMENT:", "ACTION:", "COMPOSITION:", "MOOD:", "ON_SCREEN_TEXT:", "STYLE_DIRECTION:", "NEGATIVE_GUIDANCE:"]:
+        assert label in scene_visual_content
     for label in ["SCENE_NUMBER:", "PRIMARY_VISUAL:", "COMPOSITION:", "MOTION:", "ON_SCREEN_TEXT:", "STYLE_NOTES:", "AVOID:"]:
         assert label in visual_content
     for label in ["DECISION:", "TOTAL_DURATION_ASSESSMENT:", "PACING:", "SCENE_ISSUES:", "RECOMMENDATIONS:"]:
@@ -168,7 +198,7 @@ def test_storyboard_prompt_contents_include_required_output_labels() -> None:
 def test_storyboard_scene_breakdown_safeguards_are_present() -> None:
     """The scene breakdown prompt should include the expected sequencing and timing safeguards."""
 
-    text = (_repo_prompts_dir() / STORYBOARD_PROMPT_PATHS[0]).read_text(encoding="utf-8")
+    text = (_repo_prompts_dir() / "storyboard/storyboard_scene_breakdown.v1.json").read_text(encoding="utf-8")
 
     assert "Scene numbers must remain sequential." in text
     assert "No individual scene duration may be zero or negative." in text
@@ -182,7 +212,7 @@ def test_storyboard_scene_breakdown_safeguards_are_present() -> None:
 def test_storyboard_visual_direction_safeguards_are_present() -> None:
     """The visual direction prompt should remain provider-independent and scene-stable."""
 
-    text = (_repo_prompts_dir() / STORYBOARD_PROMPT_PATHS[2]).read_text(encoding="utf-8")
+    text = (_repo_prompts_dir() / "storyboard/storyboard_visual_direction.v1.json").read_text(encoding="utf-8")
 
     assert "Describe visual composition rather than provider settings." in text
     assert "Do not use model-specific keywords" in text
@@ -194,7 +224,7 @@ def test_storyboard_visual_direction_safeguards_are_present() -> None:
 def test_storyboard_timing_review_safeguards_are_present() -> None:
     """The timing review prompt should stay bounded to supplied timing information."""
 
-    text = (_repo_prompts_dir() / STORYBOARD_PROMPT_PATHS[1]).read_text(encoding="utf-8")
+    text = (_repo_prompts_dir() / "storyboard/storyboard_timing_review.v1.json").read_text(encoding="utf-8")
 
     assert "Do not invent missing durations." in text
     assert "Consider hook pacing and ending clarity." in text
@@ -213,13 +243,13 @@ def test_storyboard_prompt_assets_serialize_and_restore_predictably() -> None:
         assert restored == definition
 
 
-def test_manifest_contains_exactly_nine_entries_with_three_storyboard_entries() -> None:
-    """The manifest should include the research, script, and storyboard builtin prompts."""
+def test_manifest_contains_exactly_thirteen_entries_with_five_storyboard_entries() -> None:
+    """The manifest should include the current prompt inventory with five storyboard entries."""
 
     manifest = PromptManifestLoader(base_dir=_repo_prompts_dir()).load()
 
-    assert len(manifest.entries) == 9
-    assert len([entry for entry in manifest.entries if entry.category is PromptAssetCategory.STORYBOARD]) == 3
+    assert len(manifest.entries) == 13
+    assert len([entry for entry in manifest.entries if entry.category is PromptAssetCategory.STORYBOARD]) == 5
 
 
 def test_manifest_storyboard_checksums_match_current_file_contents() -> None:

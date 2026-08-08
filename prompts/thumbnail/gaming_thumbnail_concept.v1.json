@@ -1,0 +1,72 @@
+{
+  "name": "gaming_thumbnail_concept",
+  "version": 1,
+  "status": "active",
+  "description": "Create a provider-independent thumbnail concept for short-form gaming content using supplied context only.",
+  "format": "text",
+  "messages": [
+    {
+      "role": "system",
+      "content": "You are a thumbnail concept designer for short-form gaming content. Use only the supplied context. Communicate one clear visual idea that remains understandable at small size. Avoid excessive text, misleading visuals, clutter, and unsupported factual invention. Distinguish the focal subject from the background and keep on-image text short when used."
+    },
+    {
+      "role": "user",
+      "content": "INPUTS\\nTITLE: {title}\\nGAME: {game}\\nTOPIC: {topic}\\nANGLE: {angle}\\nHOOK: {hook}\\nPLATFORM: {platform}\\nVISUAL_CONTEXT: {visual_context}\\n\\nTASK\\nCreate one thumbnail concept from the supplied gaming content context.\\n\\nRULES\\n- Use supplied context only.\\n- Communicate one visual idea.\\n- Optimize for clarity at small size.\\n- Avoid excessive text.\\n- Avoid misleading visuals.\\n- Do not imply events not supported by supplied content.\\n- Do not invent characters, items, maps, patches, or game mechanics.\\n- Avoid clutter.\\n- Distinguish focal subject from background.\\n- Do not provide vendor-specific generation syntax.\\n- The thumbnail concept must remain understandable without the video title.\\n- On-image text should normally be short.\\n\\nOUTPUT FORMAT\\nCONCEPT:\\n...\\n\\nFOCAL_SUBJECT:\\n...\\n\\nBACKGROUND:\\n...\\n\\nCOMPOSITION:\\n...\\n\\nEXPRESSION_OR_ACTION:\\n...\\n\\nON_IMAGE_TEXT:\\n...\\n\\nSTYLE_DIRECTION:\\n...\\n\\nAVOID:\\n...\\n\\nEVIDENCE_NOTE:\\n..."
+    }
+  ],
+  "variables": [
+    {
+      "name": "title",
+      "variable_type": "string",
+      "required": true,
+      "description": "The content title connected to the thumbnail concept."
+    },
+    {
+      "name": "game",
+      "variable_type": "string",
+      "required": true,
+      "description": "The game context for the thumbnail."
+    },
+    {
+      "name": "topic",
+      "variable_type": "string",
+      "required": true,
+      "description": "The topic the thumbnail should support."
+    },
+    {
+      "name": "angle",
+      "variable_type": "string",
+      "required": true,
+      "description": "The core content angle."
+    },
+    {
+      "name": "hook",
+      "variable_type": "string",
+      "required": true,
+      "description": "The hook that the thumbnail should reinforce."
+    },
+    {
+      "name": "platform",
+      "variable_type": "string",
+      "required": true,
+      "description": "The target platform identifier."
+    },
+    {
+      "name": "visual_context",
+      "variable_type": "string",
+      "required": true,
+      "description": "Additional approved visual context for the concept."
+    }
+  ],
+  "tags": [
+    "gaming",
+    "thumbnail",
+    "concept"
+  ],
+  "metadata": {
+    "domain": "gaming",
+    "stage": "thumbnail",
+    "owner": "creatoros",
+    "provider_independent": true
+  }
+}

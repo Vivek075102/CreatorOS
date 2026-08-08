@@ -534,7 +534,7 @@ The intended persistence stack for CreatorOS is PostgreSQL, SQLAlchemy 2.x, Alem
 
 The initial prompt foundation should treat prompt definitions as validated JSON assets loaded from the configured prompts directory, registered through a platform-owned registry, rendered through explicit typed variables, and discoverable through a manifest-aware asset structure. Broader asset formats or remote prompt management may be considered later only if they preserve the same architectural boundaries.
 
-The current built-in prompt catalog is intentionally narrow. It covers the first provider-independent research, script, and storyboard prompt assets plus local rendering support, not a complete prompt inventory for every engine or workflow. These assets define text-based output contracts only. Storyboard scene breakdown, visual direction, and timing review are now represented as prompt contracts, but structured output parsing, real storyboard model generation, and downstream media-generation integration remain later milestone work.
+The current built-in prompt catalog is intentionally narrow. It covers the first provider-independent research, script, storyboard, thumbnail, and narration prompt assets plus local rendering support, not a complete prompt inventory for every engine or workflow. These assets define text-based output contracts only. Storyboard scene breakdown, visual direction, timing review, thumbnail concept generation, scene motion guidance, and narration direction are now represented as prompt contracts, but structured output parsing, real storyboard model generation, and downstream media-generation integration remain later milestone work.
 
 ## 24. Testing Architecture
 

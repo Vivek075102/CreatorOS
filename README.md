@@ -102,6 +102,15 @@ CreatorOS now includes a first set of built-in provider-independent prompt asset
 
 These prompts are stored as validated JSON assets under `prompts/research/gaming/`, `prompts/script/`, and `prompts/storyboard/`, represented in `prompts/manifest.json`, and loadable through the platform prompt registry without provider calls. Stable logical prompt names should be used from application code instead of filesystem paths.
 
+CreatorOS also now includes provider-independent media-support prompt assets for:
+
+- `gaming_thumbnail_concept`
+- `gaming_scene_visual_prompt`
+- `gaming_scene_motion_prompt`
+- `gaming_narration_direction`
+
+These media-support prompts remain local prompt assets only. They do not invoke image generation, video generation, or narration providers, and they do not imply that downstream media engines have already been implemented.
+
 Use the CLI to inspect the manifest, discover assets, list registered prompts, and render the deterministic research prompt locally:
 
 ```bash
@@ -119,8 +128,12 @@ python -m creatoros prompts render storyboard_scene_breakdown
 python -m creatoros prompts render storyboard_scene_breakdown --title "Roblox: Funny Myths" --game Roblox --hook "You probably still believe this Roblox myth." --body "Players often repeat three myths about game mechanics." --ending "Now you know which claims deserve checking." --call-to-action "Which myth should we test next?" --duration 30 --show-content
 python -m creatoros prompts render storyboard_visual_direction --show-content
 python -m creatoros prompts render storyboard_timing_review --show-content
+python -m creatoros prompts render gaming_thumbnail_concept --show-content
+python -m creatoros prompts render gaming_scene_visual_prompt --show-content
+python -m creatoros prompts render gaming_scene_motion_prompt --show-content
+python -m creatoros prompts render gaming_narration_direction --show-content
 ```
 
 By default, `prompts render` shows prompt metadata only. Full rendered prompt content is shown only when `--show-content` is provided. These commands render locally, do not call an LLM provider, and do not imply that real AI generation is already wired into the demo workflow.
 
-The current research, script, and storyboard prompt output contracts are text-based. Storyboard prompts currently define scene breakdown, provider-independent visual direction, and timing-review contracts only. Structured parsing, real storyboard generation, and downstream media generation integration will be added in later milestones.
+The current research, script, storyboard, thumbnail, and narration prompt output contracts are text-based. Structured parsing, real storyboard generation, real image generation, real video generation, real narration generation, and downstream media-production integration will be added in later milestones.

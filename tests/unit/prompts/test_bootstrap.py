@@ -14,6 +14,10 @@ from creatoros.prompts import (
     GAMING_EVALUATE_OPPORTUNITY,
     GAMING_EXPAND_KEYWORDS,
     GAMING_HOOK,
+    GAMING_NARRATION_DIRECTION,
+    GAMING_SCENE_MOTION_PROMPT,
+    GAMING_SCENE_VISUAL_PROMPT,
+    GAMING_THUMBNAIL_CONCEPT,
     STORYBOARD_SCENE_BREAKDOWN,
     STORYBOARD_TIMING_REVIEW,
     STORYBOARD_VISUAL_DIRECTION,
@@ -31,51 +35,71 @@ def _repo_prompts_dir() -> Path:
     return Path(__file__).resolve().parents[3] / "prompts"
 
 
-def test_load_builtin_prompts_registers_all_nine_definitions() -> None:
-    """Builtin bootstrap loading should register all research, script, and storyboard prompts."""
+def test_load_builtin_prompts_registers_all_thirteen_definitions() -> None:
+    """Builtin bootstrap loading should register all research, script, storyboard, thumbnail, and narration prompts."""
 
     registry = create_prompt_registry()
 
     loaded = load_builtin_prompts(registry, base_dir=_repo_prompts_dir())
 
-    assert sorted(definition.name for definition in loaded) == [
-        GAMING_CTA,
-        GAMING_DISCOVER_TRENDS,
-        GAMING_EVALUATE_OPPORTUNITY,
-        GAMING_EXPAND_KEYWORDS,
-        GAMING_HOOK,
-        STORYBOARD_SCENE_BREAKDOWN,
-        STORYBOARD_TIMING_REVIEW,
-        STORYBOARD_VISUAL_DIRECTION,
-        YOUTUBE_SHORTS_SCRIPT,
-    ]
+    expected_names = sorted(
+        [
+            GAMING_CTA,
+            GAMING_DISCOVER_TRENDS,
+            GAMING_EVALUATE_OPPORTUNITY,
+            GAMING_EXPAND_KEYWORDS,
+            GAMING_HOOK,
+            GAMING_NARRATION_DIRECTION,
+            GAMING_SCENE_MOTION_PROMPT,
+            GAMING_SCENE_VISUAL_PROMPT,
+            GAMING_THUMBNAIL_CONCEPT,
+            STORYBOARD_SCENE_BREAKDOWN,
+            STORYBOARD_TIMING_REVIEW,
+            STORYBOARD_VISUAL_DIRECTION,
+            YOUTUBE_SHORTS_SCRIPT,
+        ]
+    )
+
+    assert sorted(definition.name for definition in loaded) == expected_names
     assert registry.contains(GAMING_CTA, 1) is True
     assert registry.contains(GAMING_DISCOVER_TRENDS, 1) is True
     assert registry.contains(GAMING_EVALUATE_OPPORTUNITY, 1) is True
     assert registry.contains(GAMING_EXPAND_KEYWORDS, 1) is True
     assert registry.contains(GAMING_HOOK, 1) is True
+    assert registry.contains(GAMING_NARRATION_DIRECTION, 1) is True
+    assert registry.contains(GAMING_SCENE_MOTION_PROMPT, 1) is True
+    assert registry.contains(GAMING_SCENE_VISUAL_PROMPT, 1) is True
+    assert registry.contains(GAMING_THUMBNAIL_CONCEPT, 1) is True
     assert registry.contains(STORYBOARD_SCENE_BREAKDOWN, 1) is True
     assert registry.contains(STORYBOARD_TIMING_REVIEW, 1) is True
     assert registry.contains(STORYBOARD_VISUAL_DIRECTION, 1) is True
     assert registry.contains(YOUTUBE_SHORTS_SCRIPT, 1) is True
 
 
-def test_fresh_builtin_registry_contains_all_nine_prompts() -> None:
+def test_fresh_builtin_registry_contains_all_thirteen_prompts() -> None:
     """Creating a builtin registry should populate a fresh registry only."""
 
     registry = create_builtin_prompt_registry(base_dir=_repo_prompts_dir())
 
-    assert [definition.name for definition in registry.list_prompts()] == [
-        GAMING_CTA,
-        GAMING_DISCOVER_TRENDS,
-        GAMING_EVALUATE_OPPORTUNITY,
-        GAMING_EXPAND_KEYWORDS,
-        GAMING_HOOK,
-        STORYBOARD_SCENE_BREAKDOWN,
-        STORYBOARD_TIMING_REVIEW,
-        STORYBOARD_VISUAL_DIRECTION,
-        YOUTUBE_SHORTS_SCRIPT,
-    ]
+    expected_names = sorted(
+        [
+            GAMING_CTA,
+            GAMING_DISCOVER_TRENDS,
+            GAMING_EVALUATE_OPPORTUNITY,
+            GAMING_EXPAND_KEYWORDS,
+            GAMING_HOOK,
+            GAMING_NARRATION_DIRECTION,
+            GAMING_SCENE_MOTION_PROMPT,
+            GAMING_SCENE_VISUAL_PROMPT,
+            GAMING_THUMBNAIL_CONCEPT,
+            STORYBOARD_SCENE_BREAKDOWN,
+            STORYBOARD_TIMING_REVIEW,
+            STORYBOARD_VISUAL_DIRECTION,
+            YOUTUBE_SHORTS_SCRIPT,
+        ]
+    )
+
+    assert [definition.name for definition in registry.list_prompts()] == expected_names
 
 
 def test_existing_research_prompts_remain_available_after_script_addition() -> None:
@@ -106,6 +130,17 @@ def test_storyboard_prompts_are_retrievable_by_stable_logical_name() -> None:
     assert registry.get(STORYBOARD_SCENE_BREAKDOWN).name == STORYBOARD_SCENE_BREAKDOWN
     assert registry.get(STORYBOARD_VISUAL_DIRECTION).name == STORYBOARD_VISUAL_DIRECTION
     assert registry.get(STORYBOARD_TIMING_REVIEW).name == STORYBOARD_TIMING_REVIEW
+
+
+def test_new_media_prompts_are_retrievable_by_stable_logical_name() -> None:
+    """Builtin media prompts should resolve by their stable logical names."""
+
+    registry = create_builtin_prompt_registry(base_dir=_repo_prompts_dir())
+
+    assert registry.get(GAMING_THUMBNAIL_CONCEPT).name == GAMING_THUMBNAIL_CONCEPT
+    assert registry.get(GAMING_SCENE_VISUAL_PROMPT).name == GAMING_SCENE_VISUAL_PROMPT
+    assert registry.get(GAMING_SCENE_MOTION_PROMPT).name == GAMING_SCENE_MOTION_PROMPT
+    assert registry.get(GAMING_NARRATION_DIRECTION).name == GAMING_NARRATION_DIRECTION
 
 
 def test_cached_global_registry_is_not_modified() -> None:
@@ -139,7 +174,7 @@ def test_replace_true_succeeds() -> None:
 
     loaded = load_builtin_prompts(registry, base_dir=_repo_prompts_dir(), replace=True)
 
-    assert len(loaded) == 9
+    assert len(loaded) == 13
 
 
 def test_returned_definitions_are_copies() -> None:
