@@ -63,6 +63,23 @@ def _copy_mapping(value: Mapping[str, object] | dict[str, object] | None) -> dic
     return deepcopy(dict(value))
 
 
+def _usage_log_fields(usage: LLMUsage | None) -> dict[str, int | None]:
+    """Return safe provider-neutral token usage fields for structured logs."""
+
+    if usage is None:
+        return {
+            "input_tokens": None,
+            "output_tokens": None,
+            "total_tokens": None,
+        }
+
+    return {
+        "input_tokens": usage.input_tokens,
+        "output_tokens": usage.output_tokens,
+        "total_tokens": usage.total_tokens,
+    }
+
+
 class LLMExecutionRequest(CreatorOSModel):
     """Provider-independent application request for prompt-to-typed-output execution."""
 
@@ -294,7 +311,6 @@ class LLMExecutionService:
         )
 
         duration_ms = int(max((perf_counter() - started_at) * 1000, 0.0))
-        usage = llm_response.usage
         self.logger.info(
             "llm_execution_completed",
             prompt_name=result.prompt_name,
@@ -304,9 +320,7 @@ class LLMExecutionService:
             output_model_type=type(result.output).__name__,
             duration_ms=duration_ms,
             request_id=result.request_id,
-            input_tokens=None if usage is None else usage.input_tokens,
-            output_tokens=None if usage is None else usage.output_tokens,
-            total_tokens=None if usage is None else usage.total_tokens,
+            **_usage_log_fields(llm_response.usage),
         )
         return result
 

@@ -80,6 +80,9 @@ CreatorOS now includes an application-layer `LLMExecutionService` under `creator
 - The current service does not add retries, response repair, failover, persistence, workflow-state updates, or publishing.
 - Agents and workflows are not migrated to this service yet, but it is the intended application-layer entry point for future integration.
 - Current tests prove complete offline end-to-end execution with both the mock provider and a fake OpenAI client without real network calls.
+- Safe token-count usage metrics such as `input_tokens`, `output_tokens`, and `total_tokens` are operational observability fields, not credentials, and may appear in structured logs.
+- Secret-style fields such as API keys, authorization values, access tokens, refresh tokens, client secrets, and credentials remain redacted in structured logs.
+- Normal logs still exclude rendered prompt text, prompt variables, generated output text, raw provider payloads, and monetary cost calculations.
 
 ## Controlled OpenAI Smoke Test
 

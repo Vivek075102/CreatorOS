@@ -126,6 +126,77 @@ def test_sensitive_values_are_redacted(tmp_path: Path, monkeypatch) -> None:
     assert payload["safe"] == "visible"
 
 
+def test_sensitive_secret_style_keys_remain_redacted(tmp_path: Path, monkeypatch) -> None:
+    """Secret-style top-level keys should remain redacted across common naming forms."""
+
+    reset_logging_state()
+    log_file = configure_test_logging(tmp_path, monkeypatch)
+
+    get_logger("unit").info(
+        "secret-style redaction test",
+        openai_api_key="dummy-openai-secret",
+        password="dummy-password",
+        authorization="Bearer dummy-secret",
+        access_token="dummy-access-secret",
+        refresh_token="dummy-refresh-secret",
+        bearer_token="dummy-bearer-secret",
+        client_secret="dummy-client-secret",
+        credential="dummy-credential",
+        credentials="dummy-credentials",
+        API_KEY="dummy-upper-secret",
+        Authorization="dummy-header-secret",
+        accessToken="dummy-camel-secret",
+    )
+
+    payload = json.loads(log_file.read_text(encoding="utf-8").strip().splitlines()[-1])
+
+    for key in [
+        "openai_api_key",
+        "password",
+        "authorization",
+        "access_token",
+        "refresh_token",
+        "bearer_token",
+        "client_secret",
+        "credential",
+        "credentials",
+        "API_KEY",
+        "Authorization",
+        "accessToken",
+    ]:
+        assert payload[key] == "[REDACTED]"
+
+
+def test_safe_usage_metric_keys_remain_visible(tmp_path: Path, monkeypatch) -> None:
+    """Known safe token-count metrics should remain visible in structured logs."""
+
+    reset_logging_state()
+    log_file = configure_test_logging(tmp_path, monkeypatch)
+
+    get_logger("unit").info(
+        "usage metric visibility test",
+        input_tokens=123,
+        output_tokens=45,
+        total_tokens=168,
+        cached_tokens=12,
+        reasoning_tokens=7,
+        TOTAL_TOKENS=168,
+        token_count=3,
+        usage_tokens=9,
+    )
+
+    payload = json.loads(log_file.read_text(encoding="utf-8").strip().splitlines()[-1])
+
+    assert payload["input_tokens"] == 123
+    assert payload["output_tokens"] == 45
+    assert payload["total_tokens"] == 168
+    assert payload["cached_tokens"] == 12
+    assert payload["reasoning_tokens"] == 7
+    assert payload["TOTAL_TOKENS"] == 168
+    assert payload["token_count"] == 3
+    assert payload["usage_tokens"] == 9
+
+
 def test_nested_sensitive_values_are_redacted(tmp_path: Path, monkeypatch) -> None:
     """Nested sensitive structures should be redacted where practical."""
 
@@ -135,19 +206,34 @@ def test_nested_sensitive_values_are_redacted(tmp_path: Path, monkeypatch) -> No
     get_logger("unit").info(
         "nested redaction test",
         payload={
-            "token": "secret-token",
-            "nested": {"client_secret": "very-secret", "safe": "ok"},
-            "items": [{"authorization": "Bearer secret"}, {"safe": "still-ok"}],
+            "nested": {
+                "api_key": "nested-secret",
+                "access_token": "nested-access-secret",
+                "total_tokens": 55,
+                "safe": "ok",
+            },
+            "items": [
+                {"authorization": "Bearer secret"},
+                {"safe": "still-ok", "cached_tokens": 4},
+            ],
+            "tuple_items": (
+                {"refresh_token": "tuple-secret"},
+                {"reasoning_tokens": 6},
+            ),
         },
     )
 
     payload = json.loads(log_file.read_text(encoding="utf-8").strip().splitlines()[-1])
 
-    assert payload["payload"]["token"] == "[REDACTED]"
-    assert payload["payload"]["nested"]["client_secret"] == "[REDACTED]"
+    assert payload["payload"]["nested"]["api_key"] == "[REDACTED]"
+    assert payload["payload"]["nested"]["access_token"] == "[REDACTED]"
+    assert payload["payload"]["nested"]["total_tokens"] == 55
     assert payload["payload"]["nested"]["safe"] == "ok"
     assert payload["payload"]["items"][0]["authorization"] == "[REDACTED]"
     assert payload["payload"]["items"][1]["safe"] == "still-ok"
+    assert payload["payload"]["items"][1]["cached_tokens"] == 4
+    assert payload["payload"]["tuple_items"][0]["refresh_token"] == "[REDACTED]"
+    assert payload["payload"]["tuple_items"][1]["reasoning_tokens"] == 6
 
 
 def test_non_sensitive_values_are_preserved(tmp_path: Path, monkeypatch) -> None:

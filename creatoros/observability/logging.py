@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from typing import Any
@@ -13,14 +14,62 @@ from creatoros.config import get_settings
 from creatoros.observability.context import get_context
 
 _BASE_LOGGER_NAME = "creatoros"
-_SENSITIVE_KEY_PARTS = (
-    "password",
-    "secret",
-    "token",
-    "api_key",
-    "authorization",
-    "credential",
+_SAFE_USAGE_METRIC_NAMES = frozenset(
+    {
+        "input_tokens",
+        "output_tokens",
+        "total_tokens",
+        "cached_tokens",
+        "reasoning_tokens",
+        "token_count",
+        "usage_tokens",
+    }
 )
+_SENSITIVE_EXACT_NAMES = frozenset(
+    {
+        "api_key",
+        "access_token",
+        "refresh_token",
+        "auth_token",
+        "bearer_token",
+        "authorization",
+        "password",
+        "client_secret",
+        "secret",
+        "credential",
+        "credentials",
+    }
+)
+_SENSITIVE_SUFFIXES = (
+    "_api_key",
+    "_access_token",
+    "_refresh_token",
+    "_auth_token",
+    "_bearer_token",
+    "_client_secret",
+    "_password",
+    "_credential",
+    "_credentials",
+    "_secret",
+)
+_SENSITIVE_PREFIXES = (
+    "api_key_",
+    "password_",
+    "authorization_",
+    "credential_",
+    "credentials_",
+    "secret_",
+)
+
+
+def _normalize_key_name(key: str) -> str:
+    """Normalize log-field keys for safe redaction classification."""
+
+    normalized_key = re.sub(r"[^0-9A-Za-z]+", "_", key.strip())
+    normalized_key = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", normalized_key)
+    normalized_key = re.sub(r"([A-Z]+)([A-Z][a-z])", r"\1_\2", normalized_key)
+    normalized_key = re.sub(r"_+", "_", normalized_key)
+    return normalized_key.strip("_").lower()
 
 
 def _add_execution_context(
@@ -38,8 +87,17 @@ def _add_execution_context(
 def _is_sensitive_key(key: str) -> bool:
     """Return whether a key name should be redacted."""
 
-    key_lower = key.lower()
-    return any(part in key_lower for part in _SENSITIVE_KEY_PARTS)
+    normalized_key = _normalize_key_name(key)
+    if not normalized_key:
+        return False
+
+    if normalized_key in _SAFE_USAGE_METRIC_NAMES:
+        return False
+    if normalized_key in _SENSITIVE_EXACT_NAMES:
+        return True
+    if normalized_key.endswith(_SENSITIVE_SUFFIXES):
+        return True
+    return normalized_key.startswith(_SENSITIVE_PREFIXES)
 
 
 def _redact_value(value: Any) -> Any:

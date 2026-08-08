@@ -189,6 +189,8 @@ Additional mandatory rules:
 - Exceptions should preserve useful context.
 - Logging failures must not hide the original error.
 - API keys must never be printed back to the terminal, including in smoke-test or diagnostics commands.
+- Safe operational usage metrics such as `input_tokens`, `output_tokens`, `total_tokens`, `cached_tokens`, and `reasoning_tokens` may be logged when available because they are usage counters rather than credentials.
+- Secret-style token fields such as `access_token`, `refresh_token`, `auth_token`, and `bearer_token` must still be redacted.
 
 ## 12. Error Handling
 
@@ -279,6 +281,8 @@ When a real vendor adapter is introduced, the same rules still apply. For exampl
 Application-layer execution orchestration belongs outside providers. CreatorOS now uses `LLMExecutionService` as the platform-owned path that resolves prompt definitions, renders variables, selects a registered provider, and resolves the typed parser registration. Agents and engines should eventually depend on that service boundary rather than duplicating prompt-to-provider-to-parser orchestration internally.
 
 If a live provider verification path is added for development diagnostics, it must still use the same application-owned execution service and parser registry path rather than calling a vendor SDK directly from a CLI command, script, or engine.
+
+Usage observability in the current milestone is limited to safe operational metadata such as normalized token counts and request identifiers. Monetary cost estimation, persistence of usage data, analytics storage, and dashboards remain future work.
 
 ## 17. Prompt Engineering Standards
 

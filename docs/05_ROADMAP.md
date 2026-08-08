@@ -151,6 +151,7 @@ Build the Research Engine and Opportunity Engine capabilities required to gather
 - Typed provider-independent parsers for built-in research and script prompt outputs
 - Typed provider-independent parsers for built-in storyboard, media-support, and review prompt outputs
 - Controlled local `openai-check` diagnostics and an explicit guarded `openai-smoke` CLI path for one typed live verification run
+- Structured observability hardening so safe token-count usage metrics remain visible while credential-style secrets stay redacted
 - Opportunity scoring rules and ranking pipeline
 - Research result persistence
 - Approval-ready content opportunity outputs
@@ -184,6 +185,7 @@ Build the Research Engine and Opportunity Engine capabilities required to gather
 - Built-in research and script prompt outputs can be converted into typed validated parser models without provider-specific logic
 - Built-in storyboard, media-support, and review prompt outputs can be converted into typed validated parser models without provider-specific logic or workflow side effects
 - Live OpenAI verification remains opt-in only, uses an existing builtin prompt, and requires explicit operator confirmation before any paid request
+- LLM execution logs can expose safe operational usage metrics without exposing prompt text, response text, raw provider payloads, or credential-style secrets
 - Content opportunities can be ranked using explicit rules
 - Research workflows produce auditable structured outputs that can feed downstream content generation
 
@@ -196,6 +198,7 @@ Build the Research Engine and Opportunity Engine capabilities required to gather
 - Prompt-specific parsers and richer structured-output formats when justified by later milestones
 - Agent and workflow migration to real LLM execution after the provider boundary proves stable
 - Broader live-provider diagnostics only after the guarded smoke-test path proves operationally safe
+- Usage persistence, monetary cost estimation, and analytics storage only when later milestones justify them
 - Retry, repair, fallback, streaming, and workflow-state integration only when later milestones justify them
 
 ## Milestone 3 — Content Intelligence

@@ -358,6 +358,8 @@ The current `LLMExecutionService` now owns that downstream prompt-to-provider-to
 
 Live OpenAI execution remains intentionally isolated from normal runtime paths. The current platform allows it only through an explicit guarded CLI smoke-test command that registers the OpenAI provider for one invocation, routes the request through `LLMExecutionService`, requires typed parser success, and refuses to run without a manual live-call confirmation flag. Agents, workflows, imports, health checks, and default runtime configuration remain mock-first and offline by default.
 
+Structured observability for LLM execution may include safe operational usage metrics such as normalized token counts, request identifiers, provider names, models, durations, and parsed output model types. Those values are not treated as credentials. Secrets such as API keys, authorization values, access tokens, refresh tokens, client secrets, and credentials must still be redacted recursively, while rendered prompts, prompt variables, generated response text, and raw provider payloads remain excluded from normal logs.
+
 Provider SDK objects, raw transport payloads, and vendor-specific exception types must not escape the provider adapter boundary.
 
 ## 13. Provider Selection and Routing

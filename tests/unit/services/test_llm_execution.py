@@ -20,6 +20,7 @@ from creatoros.config import Settings
 from creatoros.core import (
     ParserNotFoundError,
     PromptNotFoundError,
+    ProviderAuthenticationError,
     ProviderNotFoundError,
     StructuredOutputError,
 )
@@ -891,8 +892,82 @@ def test_service_logs_only_safe_lifecycle_information() -> None:
     assert "VERY_SECRET_TOPIC" not in combined
     assert "Stay concise." not in combined
     assert "VERY_SECRET_RESPONSE" not in combined
+    assert "input_tokens': 4" in combined
+    assert "output_tokens': 6" in combined
+    assert "total_tokens': 10" in combined
+    assert "[REDACTED]" not in combined
+    completed_event = next(event for event in logger.events if event["event"] == "llm_execution_completed")
+    assert completed_event["kwargs"]["prompt_name"] == "custom_prompt"
+    assert completed_event["kwargs"]["provider_name"] == "mock"
+    assert completed_event["kwargs"]["model"] == "mock-model"
+    assert completed_event["kwargs"]["request_id"] == "mock_request"
+    assert completed_event["kwargs"]["output_model_type"] == "SimpleParsedOutput"
+    assert completed_event["kwargs"]["input_tokens"] == 4
+    assert completed_event["kwargs"]["output_tokens"] == 6
+    assert completed_event["kwargs"]["total_tokens"] == 10
     assert any(event["event"] == "llm_execution_started" for event in logger.events)
     assert any(event["event"] == "llm_execution_completed" for event in logger.events)
+
+
+def test_service_failure_logs_only_safe_failure_metadata() -> None:
+    """Failure logs should capture safe operational metadata without leaking provider bodies or secrets."""
+
+    class ExplodingLLMProvider(RecordingLLMProvider):
+        async def generate(self, request: LLMRequest, *, context=None) -> LLMResponse:
+            del request, context
+            raise ProviderAuthenticationError(
+                "provider call failed safely",
+                code="provider_authentication_failed",
+                details={
+                    "api_key": "VERY_SECRET_API_KEY",
+                    "authorization": "Bearer VERY_SECRET_HEADER",
+                    "provider_body": "VERY_SECRET_PROVIDER_BODY",
+                },
+            )
+
+    prompt_registry = create_prompt_registry()
+    prompt_registry.register(build_prompt_definition())
+    parser_registry = create_parser_registry()
+    parser_registry.register(
+        ParserRegistration(
+            prompt_name="custom_prompt",
+            parser=lambda text: SimpleParsedOutput(value=text),
+            output_model_type=SimpleParsedOutput,
+        )
+    )
+    provider_registry = create_provider_registry()
+    provider_registry.register(ExplodingLLMProvider())
+    service = build_custom_service(
+        prompt_registry=prompt_registry,
+        parser_registry=parser_registry,
+        provider_registry=provider_registry,
+    )
+    logger = FakeLogger()
+    service.logger = logger
+
+    with pytest.raises(ProviderAuthenticationError):
+        run_async(
+            service.execute(
+                LLMExecutionRequest(
+                    prompt_name="custom_prompt",
+                    variables={"topic": "VERY_SECRET_TOPIC"},
+                )
+            )
+        )
+
+    combined = "".join(str(event["kwargs"]) for event in logger.events)
+    assert "VERY_SECRET_TOPIC" not in combined
+    assert "VERY_SECRET_API_KEY" not in combined
+    assert "VERY_SECRET_HEADER" not in combined
+    assert "VERY_SECRET_PROVIDER_BODY" not in combined
+    failure_event = next(event for event in logger.events if event["event"] == "llm_execution_failed")
+    assert failure_event["kwargs"]["prompt_name"] == "custom_prompt"
+    assert failure_event["kwargs"]["prompt_version"] == 1
+    assert failure_event["kwargs"]["provider_name"] == "mock"
+    assert failure_event["kwargs"]["model"] == "mock-model"
+    assert failure_event["kwargs"]["error_type"] == "ProviderAuthenticationError"
+    assert failure_event["kwargs"]["error_code"] == "provider_authentication_failed"
+    assert failure_event["kwargs"]["retryable"] is False
 
 
 def test_result_preserves_normalized_identity_and_omits_raw_response_field() -> None:
