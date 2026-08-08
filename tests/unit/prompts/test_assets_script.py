@@ -183,12 +183,12 @@ def test_script_prompt_assets_serialize_and_restore_predictably() -> None:
         assert restored == definition
 
 
-def test_manifest_contains_exactly_six_entries_with_three_script_entries() -> None:
-    """The manifest should include the three research and three script builtin prompts."""
+def test_manifest_contains_nine_entries_with_three_script_entries() -> None:
+    """The manifest should include the research, script, and storyboard builtin prompts."""
 
     manifest = PromptManifestLoader(base_dir=_repo_prompts_dir()).load()
 
-    assert len(manifest.entries) == 6
+    assert len(manifest.entries) == 9
     assert len([entry for entry in manifest.entries if entry.category is PromptAssetCategory.RESEARCH]) == 3
     assert len([entry for entry in manifest.entries if entry.category is PromptAssetCategory.SCRIPT]) == 3
 

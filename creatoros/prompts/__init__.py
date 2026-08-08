@@ -39,6 +39,14 @@ from creatoros.prompts.script import (
     render_gaming_hook,
     render_youtube_shorts_script,
 )
+from creatoros.prompts.storyboard import (
+    STORYBOARD_SCENE_BREAKDOWN,
+    STORYBOARD_TIMING_REVIEW,
+    STORYBOARD_VISUAL_DIRECTION,
+    render_storyboard_scene_breakdown,
+    render_storyboard_timing_review,
+    render_storyboard_visual_direction,
+)
 
 __all__ = [
     "GAMING_CTA",
@@ -46,6 +54,9 @@ __all__ = [
     "GAMING_EVALUATE_OPPORTUNITY",
     "GAMING_EXPAND_KEYWORDS",
     "GAMING_HOOK",
+    "STORYBOARD_SCENE_BREAKDOWN",
+    "STORYBOARD_TIMING_REVIEW",
+    "STORYBOARD_VISUAL_DIRECTION",
     "YOUTUBE_SHORTS_SCRIPT",
     "PromptAssetCategory",
     "PromptAssetDiscovery",
@@ -76,5 +87,8 @@ __all__ = [
     "render_gaming_evaluate_opportunity",
     "render_gaming_expand_keywords",
     "render_gaming_hook",
+    "render_storyboard_scene_breakdown",
+    "render_storyboard_timing_review",
+    "render_storyboard_visual_direction",
     "render_youtube_shorts_script",
 ]

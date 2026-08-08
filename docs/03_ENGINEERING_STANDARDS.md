@@ -291,6 +291,7 @@ The following rules are mandatory:
 - Prompt assets should rely only on supplied evidence and inputs. They must not imply browsing, hidden knowledge, or unsupported live awareness.
 - Early prompt output contracts may remain text-based when a later milestone is expected to add structured parsing. That limitation must be documented explicitly rather than hidden behind fragile assumptions.
 - Application code should resolve prompts by stable logical prompt name through the registry instead of hardcoding prompt file paths.
+- Visual-direction prompt assets must remain provider-independent. They may describe composition, motion, overlays, and stylistic guidance, but they must not embed vendor-specific generation parameters or assume media has already been produced.
 
 Prompt engineering is part of system design and must be handled with the same care as source code.
 

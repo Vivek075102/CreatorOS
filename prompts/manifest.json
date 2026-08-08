@@ -123,6 +123,66 @@
         "owner": "creatoros",
         "provider_independent": true
       }
+    },
+    {
+      "name": "storyboard_scene_breakdown",
+      "version": 1,
+      "category": "storyboard",
+      "path": "storyboard/storyboard_scene_breakdown.v1.json",
+      "status": "active",
+      "description": "Convert a completed short-form gaming script into an ordered storyboard scene plan.",
+      "tags": [
+        "gaming",
+        "storyboard",
+        "scene"
+      ],
+      "checksum": "fd21ce849308ae4c848899234a8fcccc671474f58709efed992f868cf60ca852",
+      "metadata": {
+        "domain": "gaming",
+        "stage": "storyboard",
+        "owner": "creatoros",
+        "provider_independent": true
+      }
+    },
+    {
+      "name": "storyboard_timing_review",
+      "version": 1,
+      "category": "storyboard",
+      "path": "storyboard/storyboard_timing_review.v1.json",
+      "status": "active",
+      "description": "Review whether storyboard timing is appropriate for a supplied short-form gaming script.",
+      "tags": [
+        "gaming",
+        "storyboard",
+        "timing"
+      ],
+      "checksum": "34c58a35a4447604e9a7ecd1009fabbc0b39c0b3bbdd8ad650782388ed9a25cf",
+      "metadata": {
+        "domain": "gaming",
+        "stage": "storyboard",
+        "owner": "creatoros",
+        "provider_independent": true
+      }
+    },
+    {
+      "name": "storyboard_visual_direction",
+      "version": 1,
+      "category": "storyboard",
+      "path": "storyboard/storyboard_visual_direction.v1.json",
+      "status": "active",
+      "description": "Produce provider-independent visual direction for one storyboard scene.",
+      "tags": [
+        "gaming",
+        "storyboard",
+        "visual"
+      ],
+      "checksum": "a1a14cb7d3ba32ad780df7086cbde16a05063d188883b1234460a101bbdad212",
+      "metadata": {
+        "domain": "gaming",
+        "stage": "storyboard",
+        "owner": "creatoros",
+        "provider_independent": true
+      }
     }
   ],
   "metadata": {

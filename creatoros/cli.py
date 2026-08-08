@@ -31,6 +31,9 @@ from creatoros.prompts import (
     GAMING_CTA,
     GAMING_DISCOVER_TRENDS,
     GAMING_HOOK,
+    STORYBOARD_SCENE_BREAKDOWN,
+    STORYBOARD_TIMING_REVIEW,
+    STORYBOARD_VISUAL_DIRECTION,
     YOUTUBE_SHORTS_SCRIPT,
     PromptAssetDiscovery,
     PromptManifestLoader,
@@ -38,6 +41,9 @@ from creatoros.prompts import (
     render_gaming_cta,
     render_gaming_discover_trends,
     render_gaming_hook,
+    render_storyboard_scene_breakdown,
+    render_storyboard_timing_review,
+    render_storyboard_visual_direction,
     render_youtube_shorts_script,
 )
 from creatoros.providers import get_provider_registry
@@ -337,6 +343,26 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Hook direction input for the short-form script prompt.",
     )
     prompts_render.add_argument(
+        "--hook",
+        default="You probably missed this gaming detail.",
+        help="Hook input for the storyboard scene breakdown prompt.",
+    )
+    prompts_render.add_argument(
+        "--body",
+        default="Explain one clear gaming point with concise evidence and progression.",
+        help="Body input for the storyboard scene breakdown prompt.",
+    )
+    prompts_render.add_argument(
+        "--ending",
+        default="That is the quick breakdown.",
+        help="Ending input for the storyboard scene breakdown prompt.",
+    )
+    prompts_render.add_argument(
+        "--call-to-action",
+        default="What should we test next?",
+        help="Call to action input for the storyboard scene breakdown prompt.",
+    )
+    prompts_render.add_argument(
         "--signals",
         default="No live research supplied; deterministic local demonstration signal.",
         help="Supplied research signals for the render helper.",
@@ -350,6 +376,32 @@ def _build_parser() -> argparse.ArgumentParser:
         "--tone",
         default="natural and concise",
         help="Tone input for the CTA prompt.",
+    )
+    prompts_render.add_argument(
+        "--scene-number",
+        default=2,
+        type=int,
+        help="Scene number input for the storyboard visual direction prompt.",
+    )
+    prompts_render.add_argument(
+        "--scene-purpose",
+        default="Develop the main idea clearly",
+        help="Scene purpose input for the storyboard visual direction prompt.",
+    )
+    prompts_render.add_argument(
+        "--script-beat",
+        default="Explain the main myth or fact concisely",
+        help="Script beat input for the storyboard visual direction prompt.",
+    )
+    prompts_render.add_argument(
+        "--visual-summary",
+        default="Gameplay footage with concise supporting overlays",
+        help="Visual summary input for the storyboard visual direction prompt.",
+    )
+    prompts_render.add_argument(
+        "--scene-summary",
+        default="Scene 1: 5 seconds hook. Scene 2: 12 seconds explanation. Scene 3: 8 seconds example. Scene 4: 5 seconds ending.",
+        help="Scene timing summary input for the storyboard timing review prompt.",
     )
     prompts_render.add_argument(
         "--platform",
@@ -686,6 +738,37 @@ def _handle_prompts_render(
             topic=args.topic,
             platform=args.platform,
             tone=args.tone,
+        )
+    elif args.prompt_name == STORYBOARD_SCENE_BREAKDOWN:
+        rendered = render_storyboard_scene_breakdown(
+            registry,
+            title=args.title,
+            game=args.game,
+            platform=args.platform,
+            hook=args.hook,
+            body=args.body,
+            ending=args.ending,
+            call_to_action=args.call_to_action,
+            target_duration_seconds=args.duration,
+        )
+    elif args.prompt_name == STORYBOARD_VISUAL_DIRECTION:
+        rendered = render_storyboard_visual_direction(
+            registry,
+            game=args.game,
+            scene_number=args.scene_number,
+            scene_purpose=args.scene_purpose,
+            script_beat=args.script_beat,
+            visual_summary=args.visual_summary,
+            platform=args.platform,
+            duration_seconds=float(args.duration),
+        )
+    elif args.prompt_name == STORYBOARD_TIMING_REVIEW:
+        rendered = render_storyboard_timing_review(
+            registry,
+            title=args.title,
+            scene_summary=args.scene_summary,
+            target_duration_seconds=args.duration,
+            platform=args.platform,
         )
     else:
         raise CreatorOSValidationError(

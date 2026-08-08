@@ -1,0 +1,72 @@
+{
+  "name": "storyboard_visual_direction",
+  "version": 1,
+  "status": "active",
+  "description": "Produce provider-independent visual direction for one storyboard scene.",
+  "format": "text",
+  "messages": [
+    {
+      "role": "system",
+      "content": "You write concise visual direction for one gaming storyboard scene. Describe visual composition rather than provider settings. Do not use model-specific keywords or vendor-specific camera parameters. Do not invent unsupported game events. Distinguish optional stylistic direction from factual scene content."
+    },
+    {
+      "role": "user",
+      "content": "INPUTS\\nGAME: {game}\\nSCENE_NUMBER: {scene_number}\\nSCENE_PURPOSE: {scene_purpose}\\nSCRIPT_BEAT: {script_beat}\\nVISUAL_SUMMARY: {visual_summary}\\nPLATFORM: {platform}\\nDURATION_SECONDS: {duration_seconds}\\n\\nTASK\\nProduce provider-independent visual direction for the supplied storyboard scene.\\n\\nRULES\\n- Describe visual composition, not provider settings.\\n- No model-specific keywords.\\n- No camera metadata requiring a particular vendor.\\n- No copyrighted character assumptions beyond the supplied game context.\\n- Avoid inventing unsupported game events.\\n- Distinguish optional stylistic direction from factual scene content.\\n- Keep visual direction concise enough to become input for a downstream media provider.\\n- SCENE_NUMBER must remain the same as supplied.\\n\\nOUTPUT FORMAT\\nSCENE_NUMBER:\\n...\\n\\nPRIMARY_VISUAL:\\n...\\n\\nCOMPOSITION:\\n...\\n\\nMOTION:\\n...\\n\\nON_SCREEN_TEXT:\\n...\\n\\nSTYLE_NOTES:\\n...\\n\\nAVOID:\\n..."
+    }
+  ],
+  "variables": [
+    {
+      "name": "game",
+      "variable_type": "string",
+      "required": true,
+      "description": "The game context for the scene."
+    },
+    {
+      "name": "scene_number",
+      "variable_type": "integer",
+      "required": true,
+      "description": "The scene number that must remain stable."
+    },
+    {
+      "name": "scene_purpose",
+      "variable_type": "string",
+      "required": true,
+      "description": "The narrative purpose of the scene."
+    },
+    {
+      "name": "script_beat",
+      "variable_type": "string",
+      "required": true,
+      "description": "The script beat that this scene supports."
+    },
+    {
+      "name": "visual_summary",
+      "variable_type": "string",
+      "required": true,
+      "description": "A short summary of the intended visual."
+    },
+    {
+      "name": "platform",
+      "variable_type": "string",
+      "required": true,
+      "description": "The target platform identifier."
+    },
+    {
+      "name": "duration_seconds",
+      "variable_type": "float",
+      "required": true,
+      "description": "The target duration for the scene."
+    }
+  ],
+  "tags": [
+    "gaming",
+    "storyboard",
+    "visual"
+  ],
+  "metadata": {
+    "domain": "gaming",
+    "stage": "storyboard",
+    "owner": "creatoros",
+    "provider_independent": true
+  }
+}

@@ -520,12 +520,12 @@ def test_prompts_cli_does_not_print_prompt_contents(
     assert stderr == ""
 
 
-def test_prompts_list_shows_all_six_prompt_names(
+def test_prompts_list_shows_all_nine_prompt_names(
     cli_module,
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
-    """Builtin prompt listing should show the research and script prompt names."""
+    """Builtin prompt listing should show the research, script, and storyboard prompt names."""
 
     _copy_repo_prompt_structure(tmp_path)
     monkeypatch.setattr(
@@ -544,6 +544,9 @@ def test_prompts_list_shows_all_six_prompt_names(
         "gaming_evaluate_opportunity",
         "gaming_expand_keywords",
         "gaming_hook",
+        "storyboard_scene_breakdown",
+        "storyboard_timing_review",
+        "storyboard_visual_direction",
         "youtube_shorts_script",
     ]:
         assert prompt_name in stdout
@@ -823,6 +826,83 @@ def test_prompts_render_gaming_cta_succeeds(
     assert "prompt_name: gaming_cta" in stdout
     assert "CTA:" in stdout
     assert "ALTERNATIVE:" in stdout
+    assert stderr == ""
+
+
+def test_prompts_render_storyboard_scene_breakdown_succeeds(
+    cli_module,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Local prompt rendering should succeed for storyboard_scene_breakdown."""
+
+    _copy_repo_prompt_structure(tmp_path)
+    monkeypatch.setattr(
+        cli_module,
+        "create_builtin_prompt_registry",
+        lambda: create_builtin_prompt_registry(base_dir=tmp_path),
+    )
+
+    exit_code, stdout, stderr = run_cli(
+        cli_module,
+        ["prompts", "render", "storyboard_scene_breakdown"],
+    )
+
+    assert exit_code == 0
+    assert "prompt_name: storyboard_scene_breakdown" in stdout
+    assert "prompt_version: 1" in stdout
+    assert stderr == ""
+
+
+def test_prompts_render_storyboard_visual_direction_succeeds(
+    cli_module,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Local prompt rendering should succeed for storyboard_visual_direction."""
+
+    _copy_repo_prompt_structure(tmp_path)
+    monkeypatch.setattr(
+        cli_module,
+        "create_builtin_prompt_registry",
+        lambda: create_builtin_prompt_registry(base_dir=tmp_path),
+    )
+
+    exit_code, stdout, stderr = run_cli(
+        cli_module,
+        ["prompts", "render", "storyboard_visual_direction", "--show-content"],
+    )
+
+    assert exit_code == 0
+    assert "prompt_name: storyboard_visual_direction" in stdout
+    assert "SCENE_NUMBER:" in stdout
+    assert "AVOID:" in stdout
+    assert stderr == ""
+
+
+def test_prompts_render_storyboard_timing_review_succeeds(
+    cli_module,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Local prompt rendering should succeed for storyboard_timing_review."""
+
+    _copy_repo_prompt_structure(tmp_path)
+    monkeypatch.setattr(
+        cli_module,
+        "create_builtin_prompt_registry",
+        lambda: create_builtin_prompt_registry(base_dir=tmp_path),
+    )
+
+    exit_code, stdout, stderr = run_cli(
+        cli_module,
+        ["prompts", "render", "storyboard_timing_review", "--show-content"],
+    )
+
+    assert exit_code == 0
+    assert "prompt_name: storyboard_timing_review" in stdout
+    assert "DECISION:" in stdout
+    assert "RECOMMENDATIONS:" in stdout
     assert stderr == ""
 
 

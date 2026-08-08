@@ -63,6 +63,9 @@ def test_initial_repository_manifest_loads() -> None:
         "gaming_cta",
         "gaming_hook",
         "youtube_shorts_script",
+        "storyboard_scene_breakdown",
+        "storyboard_timing_review",
+        "storyboard_visual_direction",
     ]
 
 

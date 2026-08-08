@@ -1,0 +1,54 @@
+{
+  "name": "storyboard_timing_review",
+  "version": 1,
+  "status": "active",
+  "description": "Review whether storyboard timing is appropriate for a supplied short-form gaming script.",
+  "format": "text",
+  "messages": [
+    {
+      "role": "system",
+      "content": "You review storyboard timing for short-form gaming content. Evaluate only the supplied timing information. Do not invent missing durations or unsupported factual claims. Keep the assessment concise and decision-oriented."
+    },
+    {
+      "role": "user",
+      "content": "INPUTS\\nTITLE: {title}\\nSCENE_SUMMARY: {scene_summary}\\nTARGET_DURATION_SECONDS: {target_duration_seconds}\\nPLATFORM: {platform}\\n\\nTASK\\nReview whether the storyboard timing is appropriate for the supplied short-form script and target duration.\\n\\nRULES\\n- Evaluate only supplied timing information.\\n- Do not invent missing durations.\\n- Identify scenes that appear too long or too short.\\n- Check whether total duration reasonably matches target.\\n- Consider hook pacing and ending clarity.\\n- Recommendations must be concise.\\n- No hidden chain-of-thought.\\n- No unsupported factual claims.\\n\\nOUTPUT FORMAT\\nDECISION:\\naccept | revise\\n\\nTOTAL_DURATION_ASSESSMENT:\\n...\\n\\nPACING:\\n...\\n\\nSCENE_ISSUES:\\n...\\n\\nRECOMMENDATIONS:\\n..."
+    }
+  ],
+  "variables": [
+    {
+      "name": "title",
+      "variable_type": "string",
+      "required": true,
+      "description": "The storyboard or script title under review."
+    },
+    {
+      "name": "scene_summary",
+      "variable_type": "string",
+      "required": true,
+      "description": "A concise summary of the scene timing plan."
+    },
+    {
+      "name": "target_duration_seconds",
+      "variable_type": "integer",
+      "required": true,
+      "description": "The target total duration for the content."
+    },
+    {
+      "name": "platform",
+      "variable_type": "string",
+      "required": true,
+      "description": "The target platform identifier."
+    }
+  ],
+  "tags": [
+    "gaming",
+    "storyboard",
+    "timing"
+  ],
+  "metadata": {
+    "domain": "gaming",
+    "stage": "storyboard",
+    "owner": "creatoros",
+    "provider_independent": true
+  }
+}
