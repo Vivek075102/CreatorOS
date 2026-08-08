@@ -165,6 +165,7 @@ Build the Research Engine and Opportunity Engine capabilities required to gather
 - Application-layer final Short assembly service that converts typed storyboard output plus a generated-media package into a deterministic render request and delegates final composition through the existing render boundary
 - Application-layer approved media-execution pipeline that takes a completed publication-ready planning result plus explicit human approval, maps approved plans into provider-neutral generation requests, and coordinates media generation with final Short assembly
 - Local artifact materialization foundation with deterministic run-scoped workspaces, explicit MIME allowlisting, atomic writes, and typed materialized-artifact contracts for later render consumption
+- First explicit real local render adapter behind `RenderProvider`, using FFmpeg to consume materialized local scene assets and produce a local MP4 while keeping mock as the default
 - First explicit real image adapter behind `ImageProvider`, using the OpenAI SDK through the existing provider boundary while keeping mock as the default
 - First explicit real TTS adapter behind `TTSProvider`, using the OpenAI SDK through the existing provider boundary while keeping mock as the default
 - Opportunity scoring rules and ranking pipeline
@@ -211,6 +212,7 @@ Build the Research Engine and Opportunity Engine capabilities required to gather
 - Provider-independent render/composition contracts exist for future edited-output assembly without overloading `VideoProvider`, and current render execution remains deterministic mock-only
 - Provider-independent media-generation execution now exists as a separate application service that can coordinate mock or explicitly registered real adapters without file materialization or render invocation
 - Provider-independent local artifact materialization now exists as a separate application service that can convert supported generated media payloads into deterministic local workspace files without adding cloud storage, publishing, or render-side effects
+- Provider-independent rendering now includes a first real local FFmpeg adapter that can turn materialized scene assets plus optional narration into a playable local MP4 without network calls
 - A first real image adapter can be registered and exercised behind `ImageProvider` without changing the default mock runtime or triggering live API calls during automated tests
 - A first real TTS adapter can be registered and exercised behind `TTSProvider` without changing the default mock runtime or triggering live API calls during automated tests
 - Media-agent completion in this milestone means planning integration only. It does not mean image generation, video generation, narration synthesis, editing, rendering, storage upload, or publishing are complete
@@ -219,6 +221,7 @@ Build the Research Engine and Opportunity Engine capabilities required to gather
 - Media-provider-foundation completion in this milestone means contract and mock-provider readiness only. It does not mean real image generation, real speech synthesis, real video rendering, storage upload, or media execution inside the integrated pipeline are complete
 - Media-generation-service completion in this milestone means application-layer provider orchestration only. It does not mean pipeline integration, file materialization, storage upload, rendering, or publishing are complete
 - Artifact-materialization completion in this milestone means local runtime file preparation only. It does not mean durable storage, FFmpeg, MP4 rendering, cloud upload, publishing, or automatic cleanup policies beyond the current bounded workspace behavior are complete
+- FFmpeg-renderer completion in this milestone means first local MP4 composition only. It does not mean captions, subtitle timing, transitions, background music, GPU encoding, cloud rendering, publishing, or production-grade editing features are complete
 - Final-assembly completion in this milestone means typed storyboard-to-render-request conversion and render-service delegation only. It does not mean binary MP4 creation, FFmpeg, MoviePy, caption burn-in, audio mixing, pipeline integration, or publishing are complete
 - Approved-media-execution completion in this milestone means explicit post-approval orchestration only. It does not mean automatic execution after planning, binary MP4 creation, FFmpeg, MoviePy, file materialization, storage, or publishing are complete
 - Render-foundation completion in this milestone means contract, registry, service, and mock-provider readiness only. It does not mean FFmpeg execution, MoviePy, MP4 creation, audio mixing, caption burn-in, transition rendering, or pipeline media execution are complete
@@ -245,6 +248,7 @@ Build the Research Engine and Opportunity Engine capabilities required to gather
 - Integrated media-generation plus assembly orchestration inside the larger CreatorOS workflow only when Milestone 2.5G intentionally starts that work
 - Real artifact materialization, richer rendering, and downstream publishing integration only when later milestones intentionally start that work
 - Artifact workspace retention policies, durable storage integration, richer video payload handling, and real renderer file consumption only when later milestones intentionally start that work
+- Caption burn-in, text overlays, richer transitions, background music, and render-quality refinements only when later milestones intentionally start that work
 - Guarded live image smoke verification, binary materialization, and durable storage references only when later media milestones intentionally add those operational paths
 - Guarded live TTS smoke verification, binary audio materialization, and durable storage references only when later media milestones intentionally add those operational paths
 - Broader live-provider diagnostics only after the guarded smoke-test path proves operationally safe

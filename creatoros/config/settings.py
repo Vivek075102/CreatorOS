@@ -40,6 +40,7 @@ class Settings(BaseSettings):
     youtube_client_secret: str | None = Field(default=None, alias="YOUTUBE_CLIENT_SECRET")
     provider_timeout_seconds: float = Field(default=30.0, alias="PROVIDER_TIMEOUT_SECONDS")
     provider_max_retries: int = Field(default=3, alias="PROVIDER_MAX_RETRIES")
+    ffmpeg_path: Path | None = Field(default=None, alias="FFMPEG_PATH")
     artifact_root: Path = Field(default=PROJECT_ROOT / "artifacts", alias="ARTIFACT_ROOT")
     assets_dir: Path = Field(default=PROJECT_ROOT / "assets", alias="ASSETS_DIR")
     logs_dir: Path = Field(default=PROJECT_ROOT / "logs", alias="LOGS_DIR")
@@ -84,6 +85,24 @@ class Settings(BaseSettings):
         if not normalized_value:
             return None
         return normalized_value
+
+    @field_validator("ffmpeg_path", mode="before")
+    @classmethod
+    def normalize_optional_ffmpeg_path(cls, value: Path | str | None) -> Path | None:
+        """Normalize blank FFmpeg paths to ``None`` and resolve relative paths safely."""
+
+        if value is None:
+            return None
+        if isinstance(value, str):
+            normalized_value = value.strip()
+            if not normalized_value:
+                return None
+            value = normalized_value
+
+        path = Path(value)
+        if not path.is_absolute():
+            path = PROJECT_ROOT / path
+        return path
 
     @field_validator("log_level")
     @classmethod

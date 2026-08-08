@@ -309,6 +309,10 @@ The local artifact workspace is intentionally strict. Run identifiers are valida
 
 Provider-generated binary payload transport remains ephemeral. Current generated media contracts may carry provider-neutral `payload_bytes` fields that are excluded from normal serialization and logging. Provider adapters may populate those bytes when safe local materialization is needed, but providers still must not write files themselves, store raw payloads in ordinary metadata, or leak vendor SDK objects beyond the adapter boundary.
 
+CreatorOS now also includes its first real local renderer behind the existing `RenderProvider` contract. `FFmpegRenderProvider` consumes materialized local image, video, and optional narration files from the artifact workspace and produces a local MP4 in the same controlled workspace. This keeps the rendering boundary provider-driven while preserving the rule that rendering consumes platform-owned local files rather than provider-owned transient URLs.
+
+The current render scope is intentionally narrow. Image scenes become timed segments, local video clips are normalized for composition, narration may be muxed as a bounded audio track, and the final output is a local H.264/AAC MP4. Captions, background music, overlays, transitions beyond future intent, cloud rendering, and publishing remain outside this milestone.
+
 ## 10. Publishing Layer
 
 The Publishing Layer is responsible for preparing and delivering content to external distribution platforms. Its responsibilities include:
@@ -389,6 +393,8 @@ The current `LLMExecutionService` now owns that downstream prompt-to-provider-to
 CreatorOS now also has a dedicated application-layer `MediaGenerationService`. It owns provider selection and bounded execution for image generation, speech generation, and clip generation using the stable `ImageGenerationRequest`, `TTSGenerationRequest`, and `VideoGenerationRequest` contracts. It does not execute prompts, does not call planning agents, does not invoke the render boundary, and does not write files or upload artifacts. Its package-level output is a typed generated-media aggregate that can later feed the render layer.
 
 CreatorOS now also has a dedicated application-layer `ArtifactMaterializationService`. It sits after provider execution and before any future real render backend that needs controlled local files. It owns artifact workspace creation, MIME allowlisting, safe filename derivation, atomic writes, and typed local artifact references. It does not call providers, does not invoke render services, does not upload to durable storage, and does not publish content.
+
+CreatorOS now also has a real local render backend beneath `MediaRenderService`. `FFmpegRenderProvider` remains a provider adapter only: it resolves a local FFmpeg binary, validates local artifact paths under `artifact_root`, builds deterministic argv-based subprocess commands, and returns a normalized `RenderedVideo`. It does not generate media, execute prompts, access the network, or publish content.
 
 Live OpenAI execution remains intentionally isolated from normal runtime paths. The current platform allows it only through an explicit guarded CLI smoke-test command that registers the OpenAI provider for one invocation, routes the request through `LLMExecutionService`, requires typed parser success, and refuses to run without a manual live-call confirmation flag. Agents, workflows, imports, health checks, and default runtime configuration remain mock-first and offline by default.
 

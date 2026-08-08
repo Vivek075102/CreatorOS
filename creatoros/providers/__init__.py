@@ -25,6 +25,13 @@ from creatoros.providers.contracts import (
     VideoProvider,
     VoiceProvider,
 )
+from creatoros.providers.ffmpeg import (
+    DEFAULT_FFMPEG_RENDER_PROVIDER_NAME,
+    FFmpegCommandResult,
+    FFmpegRenderProvider,
+    register_ffmpeg_render_provider,
+    resolve_ffmpeg_binary,
+)
 from creatoros.providers.media import (
     GeneratedAudio,
     GeneratedImage,
@@ -64,12 +71,15 @@ from creatoros.providers.render import (
 )
 
 __all__ = [
+    "DEFAULT_FFMPEG_RENDER_PROVIDER_NAME",
     "DEFAULT_OPENAI_IMAGE_MODEL",
     "DEFAULT_OPENAI_IMAGE_PROVIDER_NAME",
     "DEFAULT_OPENAI_MODEL",
     "DEFAULT_OPENAI_TTS_MODEL",
     "DEFAULT_OPENAI_TTS_PROVIDER_NAME",
     "AnalyticsProvider",
+    "FFmpegCommandResult",
+    "FFmpegRenderProvider",
     "GeneratedAudio",
     "GeneratedImage",
     "GeneratedVideo",
@@ -106,6 +116,7 @@ __all__ = [
     "VoiceProvider",
     "create_provider_registry",
     "get_provider_registry",
+    "register_ffmpeg_render_provider",
     "register_openai_image_provider",
     "register_openai_provider",
     "register_openai_tts_provider",
@@ -114,4 +125,5 @@ __all__ = [
     "resolve_default_render_provider",
     "resolve_default_tts_provider",
     "resolve_default_video_provider",
+    "resolve_ffmpeg_binary",
 ]

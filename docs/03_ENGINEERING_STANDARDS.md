@@ -366,6 +366,8 @@ When a final-assembly application service is added, it must remain a mapping and
 
 When a post-approval media-execution pipeline is added, it must preserve the two-phase architecture explicitly. Content planning must still stop at publication-readiness review, and media execution must require a second explicit call with positive human approval. Publication readiness must never be treated as implicit approval, and no media-generation or render-provider calls may occur before both gates pass.
 
+When a real local render provider is added, it must remain a subprocess boundary only. It may validate local artifact paths, discover the configured FFmpeg executable, build argv-based commands, and normalize the resulting local MP4 into `RenderedVideo`, but it must not use `shell=True`, must not fetch remote assets, must not call media-generation providers, and must not introduce MoviePy or unrelated rendering frameworks without an explicit architectural decision.
+
 When a prompt output has a typed parser, it should be registered through a provider-independent parser registry using the same stable logical prompt name used by the prompt registry. Parser registration must declare the expected output model type explicitly, and builtin prompt/parser alignment should be validated through deterministic contract checks rather than informal assumptions.
 
 Review parsers must remain advisory only. Parsing a decision such as `ready_for_human_review` must never publish content, approve content on behalf of a human, or mutate workflow state automatically.
@@ -396,6 +398,8 @@ The following rules are mandatory:
 - MIME-to-extension mapping must be allowlisted explicitly rather than trusting provider-supplied filenames or extensions.
 - Ephemeral provider payload bytes must be excluded from normal serialization and logging.
 - Local artifact materialization is distinct from durable storage, cloud upload, publishing, and rendering.
+- Real local renderers must consume validated local files from the artifact workspace rather than provider-owned transient URLs.
+- FFmpeg command execution must use separate argv arguments with explicit timeouts and cleanup.
 
 File and asset operations should preserve traceability, reproducibility, and recovery.
 

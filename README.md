@@ -249,6 +249,19 @@ CreatorOS now also includes a provider-independent final assembly layer for Shor
 - No actual MP4, FFmpeg pipeline, MoviePy pipeline, caption burn-in, audio mixing, or integrated publishing flow exists yet.
 - Larger pipeline wiring between planning, generation, assembly, and publication remains a later milestone.
 
+## FFmpeg Render Provider
+
+CreatorOS now also includes `FFmpegRenderProvider` as the first real local render implementation.
+
+- It consumes local materialized scene files from the artifact workspace rather than provider-owned transient references or network URLs.
+- Static image scenes are converted into timed vertical video segments using FFmpeg scale-and-pad composition.
+- Local video scenes are normalized to the requested dimensions, FPS, and duration before final composition.
+- Optional narration can be muxed into the final output as a bounded audio track.
+- Final output is a local H.264/AAC MP4 at `artifacts/<run_id>/video/final_short.mp4`.
+- `MockRenderProvider` remains the default renderer, so normal tests and local workflows stay offline and deterministic unless `ffmpeg` is explicitly registered and selected.
+- FFmpeg must be installed separately or configured through `FFMPEG_PATH`.
+- This milestone still does not add captions, subtitle timing, transitions, background music, overlays, GPU encoding, cloud rendering, or publishing.
+
 ## Approved Media Execution
 
 CreatorOS now also includes an explicit post-approval media-execution pipeline:
@@ -261,7 +274,7 @@ CreatorOS now also includes an explicit post-approval media-execution pipeline:
 - Narration planning becomes a typed TTS request, and storyboard scenes become deterministic scene-image requests using existing approved planning data only.
 - Optional scene-video requests are created only when aligned typed scene-visual and scene-motion plans are actually available.
 - Default providers remain mock-first, so normal execution stays offline and deterministic unless real providers are explicitly registered and selected.
-- No real MP4, FFmpeg, MoviePy, file materialization, storage, or publishing exists in this milestone.
+- Media can now be materialized locally and rendered into a real local MP4 through the explicit FFmpeg render provider, but mock remains the default and no storage or publishing exists in this milestone.
 
 ## Controlled OpenAI Smoke Test
 
