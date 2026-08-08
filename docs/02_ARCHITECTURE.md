@@ -202,6 +202,8 @@ The provider boundary begins at `LLMRequest` and ends at `LLMResponse`. Provider
 
 The application-layer orchestration point for that handoff is now `LLMExecutionService`. It resolves prompt definitions, renders them with validated variables, selects a registered LLM provider, executes the normalized request, and resolves the typed parser registration by stable logical prompt name. This keeps prompt selection, provider routing, and typed parsing in platform-owned application code rather than scattering that orchestration across agents, engines, or provider adapters.
 
+The first application agent now uses that same platform-owned path directly. `GamingResearchAgent` depends on `LLMExecutionService`, invokes stable built-in research prompt names, and returns typed parsed research models without knowing anything about provider SDKs, prompt files, parser implementations, or raw provider text.
+
 Review and quality-control prompts are part of the prompt subsystem as advisory contracts, not as autonomous approval authorities. They may evaluate supplied artifacts for consistency, quality, and readiness signals, but they must not claim independent fact verification, platform approval, or publishing authority. Human approval remains authoritative under the Level 4 operating model.
 
 Prompt assets remain outside the Python package in the repository `prompts/` directory. They are organized by category, use canonical versioned filenames, and may be described by a validated manifest that supports discovery and verification without becoming a persistence system or runtime database.
@@ -359,6 +361,8 @@ The current `LLMExecutionService` now owns that downstream prompt-to-provider-to
 Live OpenAI execution remains intentionally isolated from normal runtime paths. The current platform allows it only through an explicit guarded CLI smoke-test command that registers the OpenAI provider for one invocation, routes the request through `LLMExecutionService`, requires typed parser success, and refuses to run without a manual live-call confirmation flag. Agents, workflows, imports, health checks, and default runtime configuration remain mock-first and offline by default.
 
 Structured observability for LLM execution may include safe operational usage metrics such as normalized token counts, request identifiers, provider names, models, durations, and parsed output model types. Those values are not treated as credentials. Secrets such as API keys, authorization values, access tokens, refresh tokens, client secrets, and credentials must still be redacted recursively, while rendered prompts, prompt variables, generated response text, and raw provider payloads remain excluded from normal logs.
+
+Current agent migration is intentionally narrow. Research-agent execution can now operate through the provider-independent prompt-to-parser service boundary using supplied research signals only. Real `TrendProvider` or `SearchProvider` integration, web research, and broader workflow migration remain separate future milestones.
 
 Provider SDK objects, raw transport payloads, and vendor-specific exception types must not escape the provider adapter boundary.
 

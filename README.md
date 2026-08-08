@@ -84,6 +84,17 @@ CreatorOS now includes an application-layer `LLMExecutionService` under `creator
 - Secret-style fields such as API keys, authorization values, access tokens, refresh tokens, client secrets, and credentials remain redacted in structured logs.
 - Normal logs still exclude rendered prompt text, prompt variables, generated output text, raw provider payloads, and monetary cost calculations.
 
+## Research Agent Integration
+
+CreatorOS now includes a first application research agent that uses the provider-independent execution path directly:
+
+- `GamingResearchAgent` depends on `LLMExecutionService` rather than calling providers, parsers, or prompt files directly.
+- It currently supports typed research operations for `gaming_discover_trends`, `gaming_evaluate_opportunity`, and `gaming_expand_keywords`.
+- The agent works only from supplied research signals and seed terms. It does not browse the web, call a real search provider, or perform live trend discovery.
+- Mock remains the default provider path for normal execution and tests.
+- Fake OpenAI agent tests prove that the same agent works through the OpenAI adapter without importing SDK types or changing agent logic.
+- Script, storyboard, media, and review agents remain unmigrated in this milestone.
+
 ## Controlled OpenAI Smoke Test
 
 CreatorOS now includes one explicit opt-in CLI path for a controlled live OpenAI smoke test:

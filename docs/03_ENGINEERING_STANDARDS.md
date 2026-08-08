@@ -284,6 +284,8 @@ If a live provider verification path is added for development diagnostics, it mu
 
 Usage observability in the current milestone is limited to safe operational metadata such as normalized token counts and request identifiers. Monetary cost estimation, persistence of usage data, analytics storage, and dashboards remain future work.
 
+The first migrated application agent now follows this rule directly. Research-agent code may call `LLMExecutionService`, but it must not call providers directly, must not load prompt files directly, must not invoke parser implementations directly, and must not branch on vendor-specific integrations such as OpenAI inside the agent module.
+
 ## 17. Prompt Engineering Standards
 
 Prompts are version-controlled product assets.
@@ -319,6 +321,8 @@ The following rules are mandatory:
 - Review prompt assets must remain advisory quality gates. They must use supplied evidence only, must not imply browsing or independent fact-checking, must not claim that content is approved for publication, and must not bypass the human approval model established by ADR-004.
 
 Typed parsers for prompt outputs should be added incrementally by prompt family. The current parsing layer now covers the built-in research, script, storyboard, media-support, and review prompt outputs. Agent or workflow migration to consume those parsers must remain explicit future work rather than an implicit side effect of parser implementation.
+
+When an application agent is migrated to typed prompt execution, it should accept normalized platform-owned input models, invoke stable logical prompt names through `LLMExecutionService`, and verify the returned typed output model explicitly. It must not inspect raw provider response text or couple itself to parser implementation details.
 
 When a prompt output has a typed parser, it should be registered through a provider-independent parser registry using the same stable logical prompt name used by the prompt registry. Parser registration must declare the expected output model type explicitly, and builtin prompt/parser alignment should be validated through deterministic contract checks rather than informal assumptions.
 
