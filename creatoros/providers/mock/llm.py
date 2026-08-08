@@ -4,9 +4,14 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ValidationError
 
-from creatoros.core import CreatorOSValidationError
-from creatoros.domain import generate_id
+from creatoros.core import CreatorOSValidationError, ProviderResponseError
+from creatoros.prompts.enums import PromptRole
+from creatoros.prompts.models import PromptMessage
 from creatoros.providers.base import (
+    LLMCapabilities,
+    LLMRequest,
+    LLMResponse,
+    LLMUsage,
     ProviderCapability,
     ProviderRequestContext,
     ProviderResult,
@@ -46,8 +51,10 @@ class MockLLMProvider(MockProviderBase):
     def __init__(
         self,
         *,
+        response_text: str | None = None,
         text_response: str = "Mock generated text.",
         structured_payload: dict[str, object] | None = None,
+        model_name: str = "mock-model",
         is_healthy: bool = True,
     ) -> None:
         super().__init__(
@@ -59,8 +66,45 @@ class MockLLMProvider(MockProviderBase):
             },
             is_healthy=is_healthy,
         )
-        self._text_response = text_response
+        self._response_text = text_response if response_text is None else response_text
         self._structured_payload = None if structured_payload is None else dict(structured_payload)
+        self._model_name = _validate_non_blank(model_name, field_name="model_name")
+        self._llm_capabilities = LLMCapabilities(
+            supports_temperature=True,
+            supports_max_output_tokens=True,
+            supports_system_messages=True,
+            supports_structured_text=True,
+        )
+
+    @property
+    def llm_capabilities(self) -> LLMCapabilities:
+        """Return deterministic mock LLM capability flags."""
+
+        return self._llm_capabilities.model_copy(deep=True)
+
+    async def generate(
+        self,
+        request: LLMRequest,
+        *,
+        context: ProviderRequestContext | None = None,
+    ) -> LLMResponse:
+        """Return a normalized deterministic LLM response without side effects."""
+
+        del context
+        input_tokens = _count_tokens([message.content for message in request.messages])
+        output_tokens = _count_tokens([self._response_text])
+        return LLMResponse(
+            text=self._response_text,
+            provider_name=self.info.name,
+            model=request.model,
+            finish_reason="stop",
+            usage=LLMUsage(
+                input_tokens=input_tokens,
+                output_tokens=output_tokens,
+                total_tokens=input_tokens + output_tokens,
+            ),
+            request_id="mock_request",
+        )
 
     async def generate_text(
         self,
@@ -68,14 +112,19 @@ class MockLLMProvider(MockProviderBase):
         *,
         context: ProviderRequestContext | None = None,
     ) -> ProviderResult[str]:
-        """Return deterministic text without exposing prompt content."""
+        """Return deterministic text through the normalized request boundary."""
 
-        _validate_non_blank(prompt, field_name="prompt")
+        request = LLMRequest(
+            messages=[PromptMessage(role=PromptRole.USER, content=_validate_non_blank(prompt, field_name="prompt"))],
+            model=self._model_name,
+            timeout_seconds=context.timeout_seconds if context is not None else None,
+        )
+        response = await self.generate(request, context=context)
         return ProviderResult[str](
-            data=self._text_response,
+            data=response.text,
             provider=self.info,
             usage=_zero_cost_usage(),
-            request_id=generate_id("mock_request"),
+            request_id=response.request_id,
         )
 
     async def generate_structured[TStructured: BaseModel](
@@ -93,9 +142,9 @@ class MockLLMProvider(MockProviderBase):
         try:
             data = response_model.model_validate(payload)
         except ValidationError as error:
-            raise CreatorOSValidationError(
-                "structured payload failed validation",
-                code="provider_invalid_structured_payload",
+            raise ProviderResponseError(
+                "provider response could not be normalized into the requested structured model",
+                code="provider_response_invalid",
                 details={"response_model": response_model.__name__},
             ) from error
 
@@ -103,7 +152,7 @@ class MockLLMProvider(MockProviderBase):
             data=data,
             provider=self.info,
             usage=_zero_cost_usage(),
-            request_id=generate_id("mock_request"),
+            request_id="mock_request",
         )
 
     def _build_structured_payload[TStructured: BaseModel](
@@ -142,3 +191,16 @@ class MockLLMProvider(MockProviderBase):
 
 
 __all__ = ["MockLLMProvider"]
+
+
+def _count_tokens(texts: list[str] | tuple[str, ...] | object) -> int:
+    """Return a simple deterministic token estimate for mock usage metadata."""
+
+    if not isinstance(texts, list | tuple):
+        raise TypeError("texts must be a list or tuple of strings")
+    total = 0
+    for text in texts:
+        if not isinstance(text, str):
+            raise TypeError("texts must contain only strings")
+        total += len(text.split())
+    return total

@@ -176,6 +176,8 @@ Build the Research Engine and Opportunity Engine capabilities required to gather
 - Prompt assets can be loaded, discovered, validated, registered, and rendered through platform-owned contracts
 - Structured provider text can be normalized, parsed, and adapted into validated CreatorOS models through a provider-independent parsing layer
 - Built-in prompt assets and typed parser registrations can be validated against one another deterministically across all 17 current builtin prompts
+- Provider-independent LLM execution foundation with normalized request and response contracts
+- Deterministic mock LLM provider upgraded to the normalized LLM execution boundary without live API calls
 - Built-in research and script prompt outputs can be converted into typed validated parser models without provider-specific logic
 - Built-in storyboard, media-support, and review prompt outputs can be converted into typed validated parser models without provider-specific logic or workflow side effects
 - Content opportunities can be ranked using explicit rules
@@ -188,6 +190,7 @@ Build the Research Engine and Opportunity Engine capabilities required to gather
 - Controlled experimentation on scoring models
 - Multi-language research support
 - Prompt-specific parsers and richer structured-output formats when justified by later milestones
+- First real LLM adapter implementation in Milestone 2.3B or later
 
 ## Milestone 3 — Content Intelligence
 

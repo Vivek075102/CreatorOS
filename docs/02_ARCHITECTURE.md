@@ -194,6 +194,12 @@ The prompt subsystem is responsible for:
 
 Prompt rendering belongs above the provider layer. Providers may adapt the rendered output to vendor-specific request formats, but they must not own the underlying task definition or prompt asset lifecycle.
 
+For LLM execution specifically, the stable handoff should be:
+
+`PromptRegistry -> PromptRenderer -> RenderedPrompt -> LLMRequest -> LLMProvider -> LLMResponse -> ParserRegistry -> typed CreatorOS output`
+
+The provider boundary begins at `LLMRequest` and ends at `LLMResponse`. Providers should receive rendered provider-independent messages, not prompt definitions, prompt registries, or parser registries.
+
 Review and quality-control prompts are part of the prompt subsystem as advisory contracts, not as autonomous approval authorities. They may evaluate supplied artifacts for consistency, quality, and readiness signals, but they must not claim independent fact verification, platform approval, or publishing authority. Human approval remains authoritative under the Level 4 operating model.
 
 Prompt assets remain outside the Python package in the repository `prompts/` directory. They are organized by category, use canonical versioned filenames, and may be described by a validated manifest that supports discovery and verification without becoming a persistence system or runtime database.
@@ -341,6 +347,10 @@ Providers translate between CreatorOS domain contracts and external APIs. No dom
 Prompts must remain provider-independent at the architecture level. A rendered prompt may later be passed to an `LLMProvider`, but prompt definitions, validation rules, and asset organization belong to CreatorOS rather than to any vendor SDK or provider implementation.
 
 When structured text is returned by a provider, the response should first pass through the provider-independent parsing layer before CreatorOS constructs downstream domain models. Raw provider text must not be treated as a trusted domain object.
+
+Providers must not parse application outputs on behalf of CreatorOS. They return normalized provider responses only. ParserRegistry resolution, typed parsing, and workflow-level interpretation remain downstream platform responsibilities.
+
+Provider SDK objects, raw transport payloads, and vendor-specific exception types must not escape the provider adapter boundary.
 
 ## 13. Provider Selection and Routing
 

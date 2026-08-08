@@ -19,6 +19,7 @@ from creatoros.core import (
     ProviderAuthenticationError,
     ProviderError,
     ProviderRateLimitError,
+    ProviderResponseError,
     ProviderTimeoutError,
     ProviderUnavailableError,
     PublishingError,
@@ -239,6 +240,7 @@ def test_exception_hierarchy_relationships_are_correct() -> None:
     assert issubclass(DuplicateParsedFieldError, StructuredOutputError)
     assert issubclass(ProviderAuthenticationError, ProviderError)
     assert issubclass(ProviderRateLimitError, ProviderError)
+    assert issubclass(ProviderResponseError, ProviderError)
     assert issubclass(ProviderTimeoutError, ProviderError)
     assert issubclass(ProviderUnavailableError, ProviderError)
     assert issubclass(PersistenceError, ApplicationError)

@@ -50,6 +50,22 @@ It performs no real trend research, creates no real media, and publishes only to
 Without `--approve`, it stops at the publishing approval gate.
 Real provider integrations belong to later milestones.
 
+## LLM Provider Foundation
+
+CreatorOS now includes a provider-independent LLM execution boundary under `creatoros/providers`.
+
+- Rendered prompt messages can be normalized into an `LLMRequest`.
+- LLM providers return a normalized `LLMResponse` with optional `LLMUsage`.
+- Providers receive `RenderedPrompt`-derived messages rather than prompt definitions or filesystem assets.
+- ParserRegistry remains downstream of provider execution and is not invoked inside providers.
+- Provider SDK objects must not escape provider adapters.
+- Prompt text, rendered messages, and LLM response text are not logged by default by the provider foundation.
+- The default provider and default model remain `mock` and `mock-model`.
+- No live LLM provider is active yet.
+- The deterministic mock LLM provider implements the new boundary without network calls.
+
+The first real adapter is intentionally deferred to Milestone 2.3B.
+
 ## Prompt Foundation
 
 CreatorOS now includes a provider-independent prompt-system foundation under `creatoros/prompts`.

@@ -11,7 +11,10 @@ from creatoros.core import (
     ProviderTypeMismatchError,
 )
 from creatoros.providers import (
+    LLMCapabilities,
     LLMProvider,
+    LLMRequest,
+    LLMResponse,
     ProviderCapability,
     ProviderInfo,
     create_provider_registry,
@@ -50,9 +53,25 @@ class FakeLLMProvider:
     def info(self) -> ProviderInfo:
         return self._info
 
+    @property
+    def llm_capabilities(self) -> LLMCapabilities:
+        return LLMCapabilities(
+            supports_temperature=True,
+            supports_max_output_tokens=True,
+            supports_system_messages=True,
+            supports_structured_text=True,
+        )
+
     async def health_check(self) -> bool:
         self.health_check_calls += 1
         return True
+
+    async def generate(self, request: LLMRequest, *, context=None) -> LLMResponse:
+        return LLMResponse(
+            text=request.messages[0].content,
+            provider_name=self._info.name,
+            model=request.model,
+        )
 
     async def generate_text(self, prompt: str, *, context=None):
         raise NotImplementedError

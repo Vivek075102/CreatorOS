@@ -1,6 +1,10 @@
 """Stable provider contracts and shared provider boundary models for CreatorOS."""
 
 from creatoros.providers.base import (
+    LLMCapabilities,
+    LLMRequest,
+    LLMResponse,
+    LLMUsage,
     ProviderCapability,
     ProviderInfo,
     ProviderRequestContext,
@@ -29,7 +33,11 @@ from creatoros.providers.registry import (
 __all__ = [
     "AnalyticsProvider",
     "ImageProvider",
+    "LLMCapabilities",
     "LLMProvider",
+    "LLMRequest",
+    "LLMResponse",
+    "LLMUsage",
     "Provider",
     "ProviderCapability",
     "ProviderInfo",

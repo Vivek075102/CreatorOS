@@ -16,7 +16,10 @@ from creatoros.domain import (
 from creatoros.providers import (
     AnalyticsProvider,
     ImageProvider,
+    LLMCapabilities,
     LLMProvider,
+    LLMRequest,
+    LLMResponse,
     Provider,
     ProviderCapability,
     ProviderInfo,
@@ -55,6 +58,22 @@ class FakeProvider:
 
 class FakeLLMProvider(FakeProvider):
     """Minimal fake object satisfying the LLMProvider protocol."""
+
+    @property
+    def llm_capabilities(self) -> LLMCapabilities:
+        return LLMCapabilities(
+            supports_temperature=True,
+            supports_max_output_tokens=True,
+            supports_system_messages=True,
+            supports_structured_text=True,
+        )
+
+    async def generate(self, request: LLMRequest, *, context=None) -> LLMResponse:
+        return LLMResponse(
+            text=request.messages[0].content,
+            provider_name=self.info.name,
+            model=request.model,
+        )
 
     async def generate_text(self, prompt: str, *, context=None) -> ProviderResult[str]:
         return ProviderResult[str](data=prompt, provider=self.info)

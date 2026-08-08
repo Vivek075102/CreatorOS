@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from typing import Protocol, TypeVar, runtime_checkable
 
-from pydantic import BaseModel
-
 from creatoros.domain import (
     GeneratedAsset,
     NarrationTrack,
@@ -13,9 +11,16 @@ from creatoros.domain import (
     PublishedPost,
     PublishingPackage,
 )
-from creatoros.providers.base import ProviderInfo, ProviderRequestContext, ProviderResult
+from creatoros.providers.base import (
+    LLMCapabilities,
+    LLMRequest,
+    LLMResponse,
+    ProviderInfo,
+    ProviderRequestContext,
+    ProviderResult,
+)
 
-TStructured = TypeVar("TStructured", bound=BaseModel)
+TStructured = TypeVar("TStructured")
 
 
 @runtime_checkable
@@ -32,7 +37,19 @@ class Provider(Protocol):
 
 @runtime_checkable
 class LLMProvider(Provider, Protocol):
-    """Provider contract for text and structured generation capabilities."""
+    """Provider contract for provider-independent LLM execution."""
+
+    @property
+    def llm_capabilities(self) -> LLMCapabilities:
+        """Return stable provider-neutral LLM capability flags."""
+
+    async def generate(
+        self,
+        request: LLMRequest,
+        *,
+        context: ProviderRequestContext | None = None,
+    ) -> LLMResponse:
+        """Generate normalized text from a provider-independent LLM request."""
 
     async def generate_text(
         self,
@@ -40,7 +57,7 @@ class LLMProvider(Provider, Protocol):
         *,
         context: ProviderRequestContext | None = None,
     ) -> ProviderResult[str]:
-        """Generate free-form text for a validated prompt."""
+        """Generate free-form text for compatibility with existing local demo flows."""
 
     async def generate_structured(
         self,
@@ -49,7 +66,7 @@ class LLMProvider(Provider, Protocol):
         response_model: type[TStructured],
         context: ProviderRequestContext | None = None,
     ) -> ProviderResult[TStructured]:
-        """Generate structured output validated against a Pydantic response model."""
+        """Generate structured output for compatibility with existing local tests."""
 
 
 @runtime_checkable

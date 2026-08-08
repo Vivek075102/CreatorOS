@@ -269,6 +269,8 @@ Every provider implementation must:
 
 Provider adapters exist to isolate external systems, not to become the primary location of business rules.
 
+LLM providers must accept provider-independent request contracts and return normalized response contracts. They must not accept prompt-definition objects, must not resolve prompt registries internally, must not invoke parser registries, and must not log prompt or response content by default.
+
 ## 17. Prompt Engineering Standards
 
 Prompts are version-controlled product assets.
@@ -308,6 +310,8 @@ Typed parsers for prompt outputs should be added incrementally by prompt family.
 When a prompt output has a typed parser, it should be registered through a provider-independent parser registry using the same stable logical prompt name used by the prompt registry. Parser registration must declare the expected output model type explicitly, and builtin prompt/parser alignment should be validated through deterministic contract checks rather than informal assumptions.
 
 Review parsers must remain advisory only. Parsing a decision such as `ready_for_human_review` must never publish content, approve content on behalf of a human, or mutate workflow state automatically.
+
+When prompt execution reaches an LLM provider, the request should already be rendered into provider-independent messages. Providers should consume those rendered messages through a normalized request contract rather than reconstructing prompt definitions internally.
 
 Prompt engineering is part of system design and must be handled with the same care as source code.
 

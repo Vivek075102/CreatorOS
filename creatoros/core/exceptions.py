@@ -200,6 +200,20 @@ class ProviderUnavailableError(ProviderError):
         super().__init__(message, code=code, details=details, retryable=retryable)
 
 
+class ProviderResponseError(ProviderError):
+    """Raised when provider output cannot be normalized safely."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        code: str | None = None,
+        details: dict[str, object] | None = None,
+        retryable: bool = False,
+    ) -> None:
+        super().__init__(message, code=code, details=details, retryable=retryable)
+
+
 class PersistenceError(ApplicationError):
     """Raised for persistence-layer failures."""
 
