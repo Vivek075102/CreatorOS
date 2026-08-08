@@ -391,6 +391,8 @@ CreatorOS now also has a first provider-independent media provider foundation be
 
 The first real media adapter is now the explicit `OpenAIImageProvider` registered under the stable image-provider name `openai-image`. It reuses the existing OpenAI credential path, translates the provider-neutral `ImageGenerationRequest` into the OpenAI images SDK interface, and normalizes results back into `GeneratedImage` without leaking SDK objects, temporary provider URLs, or raw image payloads across the adapter boundary. Mock remains the configured default, automated tests stay offline, and no current workflow invokes the real image adapter automatically.
 
+The first real speech adapter is now the explicit `OpenAITTSProvider` registered under the stable voice-provider name `openai-tts`. It reuses the same OpenAI credential path, translates the provider-neutral `TTSGenerationRequest` into the OpenAI speech SDK interface, and normalizes results back into `GeneratedAudio` without leaking SDK objects or raw audio payloads across the adapter boundary. Mock remains the configured default, automated tests stay offline, and no current workflow invokes the real TTS adapter automatically.
+
 Provider SDK objects, raw transport payloads, and vendor-specific exception types must not escape the provider adapter boundary.
 
 ## 13. Provider Selection and Routing

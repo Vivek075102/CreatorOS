@@ -298,6 +298,8 @@ The same rule now also applies to integrated pipeline orchestration. `GamingCont
 
 The same separation now also applies to future media execution. Media-generation providers may accept typed provider-neutral media requests and return typed provider-neutral results, but they must not contain content-planning logic, workflow mutation, publishing behavior, or vendor-specific assumptions in their calling code. The current mock media providers are deterministic contract implementations only, not real generators, and the first real `OpenAIImageProvider` must still keep OpenAI SDK objects, temporary provider URLs, and binary image payloads inside the adapter boundary.
 
+The same rule applies to real speech adapters. `OpenAITTSProvider` may use the OpenAI speech SDK internally, but it must keep SDK objects, binary audio payloads, and transport details inside the adapter boundary, must not write files opportunistically, and must not misrepresent an estimated duration as provider-reported audio duration.
+
 ## 17. Prompt Engineering Standards
 
 Prompts are version-controlled product assets.
@@ -349,6 +351,8 @@ When integrated content pipelines are added, they should coordinate only the min
 When media-provider foundations are added, they should reuse the shared provider registry and exception architecture where possible instead of creating parallel registries, hidden fallbacks, or capability-specific global state. Default provider selection belongs in configuration and explicit application composition, not inside provider implementations.
 
 When a real image provider is added before storage or materialization services exist, the adapter must normalize results into safe provider-owned references rather than writing files opportunistically, exposing temporary signed URLs broadly, or retaining large base64 payloads in ordinary metadata.
+
+When a real TTS provider is added before storage or materialization services exist, the adapter must normalize results into safe provider-owned references rather than writing audio files opportunistically, exposing raw binary payloads broadly, or retaining large audio blobs in ordinary metadata.
 
 When a prompt output has a typed parser, it should be registered through a provider-independent parser registry using the same stable logical prompt name used by the prompt registry. Parser registration must declare the expected output model type explicitly, and builtin prompt/parser alignment should be validated through deterministic contract checks rather than informal assumptions.
 

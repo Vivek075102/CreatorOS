@@ -12,6 +12,10 @@ from creatoros.providers.openai.llm import (
     OpenAILLMProvider,
     _AsyncOpenAIClient,
 )
+from creatoros.providers.openai.tts import (
+    OpenAITTSProvider,
+    _AsyncOpenAITTSClient,
+)
 from creatoros.providers.registry import ProviderRegistry
 
 
@@ -58,4 +62,30 @@ def register_openai_image_provider(
     return provider
 
 
-__all__ = ["register_openai_image_provider", "register_openai_provider"]
+def register_openai_tts_provider(
+    registry: ProviderRegistry,
+    *,
+    replace: bool = False,
+    api_key: str | None = None,
+    client: _AsyncOpenAITTSClient | None = None,
+    default_model: str | None = None,
+) -> OpenAITTSProvider:
+    """Register one OpenAI TTS provider without making any network requests."""
+
+    settings = get_settings()
+    provider = OpenAITTSProvider(
+        api_key=settings.openai_api_key if api_key is None else api_key,
+        client=client,
+        default_model=settings.default_tts_model if default_model is None else default_model,
+        timeout_seconds=settings.provider_timeout_seconds,
+        max_retries=settings.provider_max_retries,
+    )
+    registry.register(provider, replace=replace)
+    return provider
+
+
+__all__ = [
+    "register_openai_image_provider",
+    "register_openai_provider",
+    "register_openai_tts_provider",
+]

@@ -171,13 +171,17 @@ CreatorOS now also includes a provider-independent media provider foundation for
 - Default provider settings now include `default_image_provider`, `default_tts_provider`, and `default_video_provider`, each defaulting to `mock`.
 - The first real image adapter is now `OpenAIImageProvider`, registered explicitly under the stable image provider name `openai-image`.
 - `OPENAI_API_KEY` is reused for the OpenAI image adapter, and `DEFAULT_IMAGE_MODEL` must be configured explicitly before any live image request can succeed.
+- The first real TTS adapter is now `OpenAITTSProvider`, registered explicitly under the stable speech provider name `openai-tts`.
+- `OPENAI_API_KEY` is reused for the OpenAI TTS adapter, and `DEFAULT_TTS_MODEL` must be configured explicitly before any live TTS request can succeed.
 - Deterministic `MockImageProvider`, `MockTTSProvider`, and `MockVideoProvider` now return typed mock generation results without network calls, binary media generation, FFmpeg, file output, or vendor SDKs.
 - Mock remains the default image provider. Real OpenAI image generation is opt-in only and is not invoked automatically by `GamingMediaAgent`, the integrated content pipeline, or automated tests.
+- Mock remains the default TTS provider. Real OpenAI speech generation is opt-in only and is not invoked automatically by `GamingMediaAgent`, the integrated content pipeline, or automated tests.
 - OpenAI SDK client objects, temporary provider URLs, and binary image payloads remain inside the adapter boundary. No image files, storage uploads, or permanent asset materialization are created in this milestone.
+- OpenAI SDK client objects and binary speech payloads remain inside the adapter boundary. No narration files, storage uploads, or durable audio materialization are created in this milestone.
 - Capability-specific mock registry helpers now exist for image, TTS, and video provider setup in addition to the existing full mock registry bootstrap.
 - `GamingMediaAgent` remains planning-only and does not call these providers yet.
 - `GamingContentPipeline` remains unchanged in responsibility and still stops at the pre-publication human-review boundary.
-- Real speech and video providers remain later milestones, and a guarded live image smoke command is still deferred.
+- Real video providers remain later milestones, and guarded live image or TTS smoke commands are still deferred.
 
 ## Controlled OpenAI Smoke Test
 

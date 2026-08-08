@@ -60,6 +60,14 @@ def test_default_image_model_is_unset() -> None:
     assert settings.default_image_model is None
 
 
+def test_default_tts_model_is_unset() -> None:
+    """The real TTS model should remain unset until explicitly configured."""
+
+    settings = build_settings()
+
+    assert settings.default_tts_model is None
+
+
 def test_default_database_url_uses_postgresql_psycopg() -> None:
     """The default database URL should use the PostgreSQL psycopg format."""
 
@@ -154,6 +162,7 @@ def test_environment_variables_override_defaults() -> None:
             "DEFAULT_IMAGE_PROVIDER": "custom-image",
             "DEFAULT_IMAGE_MODEL": "gpt-image-1",
             "DEFAULT_TTS_PROVIDER": "custom-tts",
+            "DEFAULT_TTS_MODEL": "gpt-4o-mini-tts",
             "DEFAULT_VIDEO_PROVIDER": "custom-video",
             "PROVIDER_TIMEOUT_SECONDS": "45",
             "PROVIDER_MAX_RETRIES": "5",
@@ -173,6 +182,7 @@ def test_environment_variables_override_defaults() -> None:
     assert settings.default_image_provider == "custom-image"
     assert settings.default_image_model == "gpt-image-1"
     assert settings.default_tts_provider == "custom-tts"
+    assert settings.default_tts_model == "gpt-4o-mini-tts"
     assert settings.default_video_provider == "custom-video"
     assert settings.provider_timeout_seconds == 45.0
     assert settings.provider_max_retries == 5

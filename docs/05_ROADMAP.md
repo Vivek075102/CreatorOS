@@ -161,6 +161,7 @@ Build the Research Engine and Opportunity Engine capabilities required to gather
 - Provider-independent media provider foundation with typed request/result contracts for image, speech/TTS, and video generation
 - Deterministic mock image, TTS, and video providers registered through the shared provider architecture
 - First explicit real image adapter behind `ImageProvider`, using the OpenAI SDK through the existing provider boundary while keeping mock as the default
+- First explicit real TTS adapter behind `TTSProvider`, using the OpenAI SDK through the existing provider boundary while keeping mock as the default
 - Opportunity scoring rules and ranking pipeline
 - Research result persistence
 - Approval-ready content opportunity outputs
@@ -203,6 +204,7 @@ Build the Research Engine and Opportunity Engine capabilities required to gather
 - A provider-independent integrated content pipeline can coordinate those migrated agents in one bounded happy path starting from supplied research signals and stopping at publication-readiness review
 - Provider-independent media-generation request and result contracts exist for future binary media execution without yet wiring that execution into the planning agent or pipeline
 - A first real image adapter can be registered and exercised behind `ImageProvider` without changing the default mock runtime or triggering live API calls during automated tests
+- A first real TTS adapter can be registered and exercised behind `TTSProvider` without changing the default mock runtime or triggering live API calls during automated tests
 - Media-agent completion in this milestone means planning integration only. It does not mean image generation, video generation, narration synthesis, editing, rendering, storage upload, or publishing are complete
 - Review-agent completion in this milestone means advisory evaluation integration only. It does not mean automatic revision, approval, workflow mutation, or publishing are complete
 - Integrated-pipeline completion in this milestone means pre-publication orchestration only. It does not mean retries, checkpoints, resume behavior, binary media generation, publishing, or approval-state mutation are complete
@@ -226,6 +228,7 @@ Build the Research Engine and Opportunity Engine capabilities required to gather
 - Integrated-pipeline expansion into approval-state orchestration, persistence, retries, checkpoints, resume behavior, and publishing integration only when later milestones intentionally start that work
 - Real media-provider adapters, media execution services, storage integration, rendering, and pipeline media-generation wiring only when later 2.5 milestones intentionally start that work
 - Guarded live image smoke verification, binary materialization, and durable storage references only when later media milestones intentionally add those operational paths
+- Guarded live TTS smoke verification, binary audio materialization, and durable storage references only when later media milestones intentionally add those operational paths
 - Broader live-provider diagnostics only after the guarded smoke-test path proves operationally safe
 - Usage persistence, monetary cost estimation, and analytics storage only when later milestones justify them
 - Retry, repair, fallback, streaming, and workflow-state integration only when later milestones justify them

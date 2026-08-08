@@ -31,6 +31,7 @@ class Settings(BaseSettings):
     default_image_provider: str = Field(default="mock", alias="DEFAULT_IMAGE_PROVIDER")
     default_image_model: str | None = Field(default=None, alias="DEFAULT_IMAGE_MODEL")
     default_tts_provider: str = Field(default="mock", alias="DEFAULT_TTS_PROVIDER")
+    default_tts_model: str | None = Field(default=None, alias="DEFAULT_TTS_MODEL")
     default_video_provider: str = Field(default="mock", alias="DEFAULT_VIDEO_PROVIDER")
     openai_api_key: str | None = Field(default=None, alias="OPENAI_API_KEY")
     anthropic_api_key: str | None = Field(default=None, alias="ANTHROPIC_API_KEY")
@@ -68,10 +69,10 @@ class Settings(BaseSettings):
             raise ValueError("value must not be blank")
         return normalized_value
 
-    @field_validator("default_image_model", mode="before")
+    @field_validator("default_image_model", "default_tts_model", mode="before")
     @classmethod
-    def normalize_optional_default_image_model(cls, value: str | None) -> str | None:
-        """Normalize blank default image model values to ``None``."""
+    def normalize_optional_model_defaults(cls, value: str | None) -> str | None:
+        """Normalize blank optional provider-model values to ``None``."""
 
         if value is None:
             return None
