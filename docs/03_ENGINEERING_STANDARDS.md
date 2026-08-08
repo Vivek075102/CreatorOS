@@ -286,6 +286,8 @@ Usage observability in the current milestone is limited to safe operational meta
 
 The first migrated application agent now follows this rule directly. Research-agent code may call `LLMExecutionService`, but it must not call providers directly, must not load prompt files directly, must not invoke parser implementations directly, and must not branch on vendor-specific integrations such as OpenAI inside the agent module.
 
+The same rule now also applies to script-agent integration. Script-agent code may call `LLMExecutionService`, but it must not call providers directly, must not invoke parser implementations directly, must not access `PromptRegistry` or `PromptRenderer` directly, and must not hardcode vendor-specific branches.
+
 ## 17. Prompt Engineering Standards
 
 Prompts are version-controlled product assets.
@@ -323,6 +325,8 @@ The following rules are mandatory:
 Typed parsers for prompt outputs should be added incrementally by prompt family. The current parsing layer now covers the built-in research, script, storyboard, media-support, and review prompt outputs. Agent or workflow migration to consume those parsers must remain explicit future work rather than an implicit side effect of parser implementation.
 
 When an application agent is migrated to typed prompt execution, it should accept normalized platform-owned input models, invoke stable logical prompt names through `LLMExecutionService`, and verify the returned typed output model explicitly. It must not inspect raw provider response text or couple itself to parser implementation details.
+
+When script-generation agents are migrated, they should return typed parser output contracts first rather than collapsing directly into domain entities unless a separate explicit mapping layer is clearly owned at the application level. This keeps prompt-output contracts, domain entities, and workflow integration concerns decoupled while the migration pattern stabilizes.
 
 When a prompt output has a typed parser, it should be registered through a provider-independent parser registry using the same stable logical prompt name used by the prompt registry. Parser registration must declare the expected output model type explicitly, and builtin prompt/parser alignment should be validated through deterministic contract checks rather than informal assumptions.
 

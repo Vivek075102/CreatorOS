@@ -95,6 +95,18 @@ CreatorOS now includes a first application research agent that uses the provider
 - Fake OpenAI agent tests prove that the same agent works through the OpenAI adapter without importing SDK types or changing agent logic.
 - Script, storyboard, media, and review agents remain unmigrated in this milestone.
 
+## Script Agent Integration
+
+CreatorOS now also includes a provider-independent application script agent:
+
+- `GamingScriptAgent` depends on `LLMExecutionService` rather than calling providers, parsers, prompt registries, or prompt files directly.
+- It currently supports typed script operations for `youtube_shorts_script`, `gaming_hook`, and `gaming_cta`.
+- The agent returns typed parser outputs such as `YouTubeShortsScriptOutput`, `GamingHookOutput`, and `GamingCTAOutput` rather than prematurely collapsing them into domain `Script` entities.
+- Mock remains the default provider path for normal execution and tests.
+- Fake OpenAI script-agent tests prove that the same agent works unchanged through the OpenAI adapter without live API calls.
+- The script agent is not yet wired into the production workflow or orchestrator path.
+- Storyboard, media, and review agents remain unmigrated in this milestone.
+
 ## Controlled OpenAI Smoke Test
 
 CreatorOS now includes one explicit opt-in CLI path for a controlled live OpenAI smoke test:

@@ -9,14 +9,24 @@ from creatoros.agents.research import (
     GamingTrendDiscoveryRequest,
     ResearchExecutionOptions,
 )
+from creatoros.agents.script import (
+    GamingCTAGenerationRequest,
+    GamingHookGenerationRequest,
+    GamingScriptAgent,
+    GamingScriptGenerationRequest,
+)
 
 __all__ = [
     "AgentExecutionContext",
     "AgentResult",
     "BaseAgent",
+    "GamingCTAGenerationRequest",
+    "GamingHookGenerationRequest",
     "GamingKeywordExpansionRequest",
     "GamingOpportunityEvaluationRequest",
     "GamingResearchAgent",
+    "GamingScriptAgent",
+    "GamingScriptGenerationRequest",
     "GamingTrendDiscoveryRequest",
     "ResearchExecutionOptions",
 ]
