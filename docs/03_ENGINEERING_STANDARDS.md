@@ -360,6 +360,8 @@ When a render-provider foundation is added before real rendering infrastructure 
 
 When a media-generation application service is added, it must remain a provider coordinator only. It may resolve providers, forward typed generation requests, and aggregate normalized generated-media results, but it must not execute prompts, import planning agents, invoke render providers, materialize files, upload assets, or mutate workflow state. Planning, generation, and rendering are separate stages and should remain independently testable.
 
+When a final-assembly application service is added, it must remain a mapping and coordination layer only. It may accept typed storyboard and generated-media inputs, enforce deterministic scene-to-asset alignment, build a `ShortRenderRequest`, and delegate to `MediaRenderService`, but it must not call provider registries directly, generate images, generate narration, generate clips, invoke agents, execute prompts, write files, publish content, or silently repair invalid asset counts.
+
 When a prompt output has a typed parser, it should be registered through a provider-independent parser registry using the same stable logical prompt name used by the prompt registry. Parser registration must declare the expected output model type explicitly, and builtin prompt/parser alignment should be validated through deterministic contract checks rather than informal assumptions.
 
 Review parsers must remain advisory only. Parsing a decision such as `ready_for_human_review` must never publish content, approve content on behalf of a human, or mutate workflow state automatically.

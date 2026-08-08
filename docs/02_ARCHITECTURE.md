@@ -299,6 +299,8 @@ Within this layer, AI video generation and final edited-output composition are s
 
 Media planning is also separate from media execution. Planning agents may recommend thumbnail direction, scene visuals, motion ideas, and narration guidance, but a dedicated application service should translate those plans into typed media-generation requests and route them through provider interfaces. This keeps prompt execution, provider execution, and final rendering as distinct architectural stages.
 
+CreatorOS now includes that next stage as a separate application boundary. `ShortAssemblyService` accepts typed storyboard output plus a generated-media package, aligns scene assets deterministically, builds a `ShortRenderRequest`, and delegates final composition through `MediaRenderService`. This keeps media generation and final Short assembly distinct while proving that typed generated-media references can feed the render layer without introducing workflow, publishing, or storage coupling.
+
 ## 10. Publishing Layer
 
 The Publishing Layer is responsible for preparing and delivering content to external distribution platforms. Its responsibilities include:
@@ -403,6 +405,8 @@ The first real speech adapter is now the explicit `OpenAITTSProvider` registered
 Provider SDK objects, raw transport payloads, and vendor-specific exception types must not escape the provider adapter boundary.
 
 CreatorOS now also includes a separate provider-independent render/composition contract for final Short assembly. `VideoProvider` still represents future clip-generation work, while `RenderProvider` represents composition inputs such as timed scenes, prepared asset references, narration references, and simple transition intent. The current rendering milestone provides typed contracts, registry integration, a deterministic mock provider, and a small application-layer `MediaRenderService` only. It does not add FFmpeg execution, MoviePy, binary output creation, media-agent execution, or integrated-pipeline wiring.
+
+CreatorOS now also includes a thin application-layer `ShortAssemblyService` above that render boundary. It does not talk to provider registries, generation providers, agents, prompts, or parsers. Its job is only to convert typed storyboard scenes and `GeneratedMediaPackage` outputs into one deterministic `ShortRenderRequest`, preserve the distinction between thumbnail assets and timeline assets, and hand the result to `MediaRenderService`. The current state still stops at a typed `RenderedVideo` contract backed by deterministic mock rendering rather than a binary MP4.
 
 ## 13. Provider Selection and Routing
 

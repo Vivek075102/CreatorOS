@@ -211,6 +211,21 @@ CreatorOS now also includes an application-layer `MediaGenerationService` for pr
 - No files are written, no media is materialized to disk, and no final Short is rendered in this milestone.
 - The next media stage will assemble a `GeneratedMediaPackage` into a `ShortRenderRequest` for rendering rather than mixing generation and rendering together.
 
+## Final Short Assembly
+
+CreatorOS now also includes a provider-independent final assembly layer for Shorts:
+
+- `ShortAssemblyService` accepts typed storyboard scene output plus a `GeneratedMediaPackage` and builds a deterministic `ShortRenderRequest`.
+- Storyboard scenes align to generated scene images and scene videos strictly by index. Counts must either match the storyboard scene count exactly or remain empty.
+- Asset-count mismatches fail before rendering. The service does not silently drop assets, duplicate assets, or reuse the last asset.
+- Thumbnail output remains separate from the video timeline so it can be preserved for later publishing workflows without becoming an extra render scene.
+- Narration, when present, is forwarded as the existing typed `GeneratedAudio` reference. The assembly layer does not regenerate audio or invent missing duration values.
+- Scene captions currently come only from existing typed storyboard `on_screen_text` fields and remain render instructions only.
+- `MediaRenderService` remains the render boundary. `ShortAssemblyService` builds the request and delegates rendering through that existing application service.
+- The default render path remains the deterministic mock renderer, which returns a typed `RenderedVideo` reference only.
+- No actual MP4, FFmpeg pipeline, MoviePy pipeline, caption burn-in, audio mixing, or integrated publishing flow exists yet.
+- Larger pipeline wiring between planning, generation, assembly, and publication remains a later milestone.
+
 ## Controlled OpenAI Smoke Test
 
 CreatorOS now includes one explicit opt-in CLI path for a controlled live OpenAI smoke test:
