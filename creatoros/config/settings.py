@@ -32,6 +32,7 @@ class Settings(BaseSettings):
     default_image_model: str | None = Field(default=None, alias="DEFAULT_IMAGE_MODEL")
     default_tts_provider: str = Field(default="mock", alias="DEFAULT_TTS_PROVIDER")
     default_tts_model: str | None = Field(default=None, alias="DEFAULT_TTS_MODEL")
+    default_tts_voice: str = Field(default="alloy", alias="DEFAULT_TTS_VOICE")
     default_video_provider: str = Field(default="mock", alias="DEFAULT_VIDEO_PROVIDER")
     default_render_provider: str = Field(default="mock", alias="DEFAULT_RENDER_PROVIDER")
     openai_api_key: str | None = Field(default=None, alias="OPENAI_API_KEY")
@@ -66,6 +67,7 @@ class Settings(BaseSettings):
         "default_llm_provider",
         "default_llm_model",
         "default_tts_provider",
+        "default_tts_voice",
         "default_video_provider",
         "default_render_provider",
         "database_url",

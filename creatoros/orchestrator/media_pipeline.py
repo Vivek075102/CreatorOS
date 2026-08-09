@@ -34,6 +34,7 @@ from creatoros.providers import (
     TTSGenerationRequest,
     VideoGenerationRequest,
 )
+from creatoros.providers.openai.tts import SUPPORTED_OPENAI_TTS_VOICES
 from creatoros.services import (
     ArtifactMaterializationService,
     GeneratedMediaPackage,
@@ -68,6 +69,18 @@ def _validate_non_blank(value: str, *, field_name: str) -> str:
     normalized_value = value.strip()
     if not normalized_value:
         raise ValueError(f"{field_name} must not be blank")
+    return normalized_value
+
+
+def _normalize_optional_text(value: object) -> str | None:
+    """Normalize optional text-like values to stripped strings or ``None``."""
+
+    if not isinstance(value, str):
+        return None
+
+    normalized_value = value.strip()
+    if not normalized_value:
+        return None
     return normalized_value
 
 
@@ -331,6 +344,10 @@ class MediaExecutionPipeline:
 
         self._verify_publication_readiness(request.content_result)
         self._verify_human_approval(request.approval)
+        narration_direction = request.content_result.media_plans.narration_direction
+        narration_voice = self._resolve_narration_voice(
+            narration_direction=narration_direction,
+        )
 
         scene_visuals = self._build_aligned_scene_visuals(request.content_result)
         scene_motions = self._build_aligned_scene_motions(request.content_result)
@@ -367,7 +384,8 @@ class MediaExecutionPipeline:
                     prompt=_build_thumbnail_prompt(request.content_result)
                 ),
                 narration_request=TTSGenerationRequest(
-                    text=request.content_result.media_plans.narration_direction.narration_text,
+                    text=narration_direction.narration_text,
+                    voice=narration_voice,
                 ),
                 scene_image_requests=scene_image_requests,
                 scene_video_requests=scene_video_requests,
@@ -549,7 +567,7 @@ class MediaExecutionPipeline:
             video_provider=effective_video_provider,
             render_provider=effective_render_provider,
         )
-        self._validate_live_provider_configuration(plan)
+        self._validate_live_provider_configuration(plan, media_request=media_generation_request)
         self._validate_workspace_integrity(request)
         self._validate_assembly_preflight(request, media_generation_request)
 
@@ -781,6 +799,8 @@ class MediaExecutionPipeline:
     def _validate_live_provider_configuration(
         self,
         plan: ProductionExecutionPlan,
+        *,
+        media_request: MediaGenerationPackageRequest,
     ) -> None:
         """Validate configuration required for explicit live providers without any network calls."""
 
@@ -811,6 +831,37 @@ class MediaExecutionPipeline:
                     code="media_execution_missing_live_configuration",
                     details={"provider_name": plan.tts_provider, "field": "default_tts_model"},
                 )
+            narration_request = media_request.narration_request
+            voice = None if narration_request is None else _normalize_optional_text(narration_request.voice)
+            if voice is None:
+                raise ConfigurationError(
+                    "DEFAULT_TTS_VOICE is required for live narration generation",
+                    code="media_execution_missing_live_configuration",
+                    details={"provider_name": plan.tts_provider, "field": "default_tts_voice"},
+                )
+            normalized_voice = voice.lower()
+            if normalized_voice not in SUPPORTED_OPENAI_TTS_VOICES:
+                raise CreatorOSValidationError(
+                    "voice is not supported by the OpenAI TTS adapter",
+                    code="media_execution_invalid_voice",
+                    details={
+                        "provider_name": plan.tts_provider,
+                        "field": "voice",
+                        "supported_voices": sorted(SUPPORTED_OPENAI_TTS_VOICES),
+                    },
+                )
+
+    def _resolve_narration_voice(
+        self,
+        *,
+        narration_direction: object,
+    ) -> str | None:
+        """Resolve narration voice using plan data first, then configured defaults."""
+
+        explicit_voice = _normalize_optional_text(getattr(narration_direction, "voice", None))
+        if explicit_voice is not None:
+            return explicit_voice
+        return _normalize_optional_text(self.media_generation_service.settings.default_tts_voice)
 
     def _validate_workspace_integrity(self, request: ApprovedMediaExecutionRequest) -> None:
         """Validate that the run workspace stays bounded and protected under artifact_root."""

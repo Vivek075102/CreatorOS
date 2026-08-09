@@ -103,6 +103,7 @@ def build_settings(
     openai_api_key: str | None = None,
     default_image_model: str | None = None,
     default_tts_model: str | None = None,
+    default_tts_voice: str = "alloy",
 ) -> Settings:
     """Create isolated settings for media-production tests."""
 
@@ -126,6 +127,7 @@ def build_settings(
             if default_tts_model is not None or default_tts_provider == "mock"
             else "gpt-4o-mini-tts"
         ),
+        default_tts_voice=default_tts_voice,
         default_video_provider=default_video_provider,
         default_render_provider=default_render_provider,
         openai_api_key=openai_api_key,
@@ -767,6 +769,126 @@ def test_live_provider_plan_reports_live_call_counts_without_confirmation(tmp_pa
     assert plan.video_generation_count == 0
     assert plan.live_media_call_count == 5
     assert plan.will_use_live_media is True
+    assert generation_service.package_calls == 0
+    assert materializer.calls == 0
+    assert assembly_service.calls == 0
+
+
+def test_media_generation_request_includes_default_tts_voice(tmp_path: Path) -> None:
+    """Production request mapping should include the configured default narration voice."""
+
+    settings = build_settings(tmp_path)
+    pipeline, *_ = build_spy_pipeline(tmp_path, settings=settings)
+
+    media_request = pipeline.build_media_generation_request(build_request())
+
+    assert media_request.narration_request is not None
+    assert media_request.narration_request.voice == "alloy"
+    assert media_request.narration_request.text == (
+        "You probably still believe this Roblox myth. "
+        "Here is the quick evidence-backed explanation. "
+        "That is the quick Roblox breakdown."
+    )
+
+
+def test_media_generation_request_honors_configured_default_tts_voice(tmp_path: Path) -> None:
+    """Production request mapping should honor an explicitly configured default narration voice."""
+
+    settings = build_settings(tmp_path, default_tts_voice="nova")
+    pipeline, *_ = build_spy_pipeline(tmp_path, settings=settings)
+
+    media_request = pipeline.build_media_generation_request(build_request())
+
+    assert media_request.narration_request is not None
+    assert media_request.narration_request.voice == "nova"
+
+
+def test_openai_tts_preflight_rejects_missing_voice_before_any_media_generation(tmp_path: Path) -> None:
+    """Live narration should fail preflight before any image or TTS call when voice is missing."""
+
+    settings = build_settings(
+        tmp_path,
+        default_image_provider="openai-image",
+        default_tts_provider="openai-tts",
+        openai_api_key="sk-test-secret",
+        default_tts_voice="   ",
+    )
+    pipeline, generation_service, materializer, assembly_service = build_spy_pipeline(
+        tmp_path,
+        settings=settings,
+    )
+    request = build_request(
+        provider_selection=MediaProviderSelection(
+            image_provider_name="openai-image",
+            tts_provider_name="openai-tts",
+        ),
+        confirm_live_media_calls=True,
+    )
+
+    with pytest.raises(ConfigurationError) as exc_info:
+        run_async(pipeline.execute(request))
+
+    assert exc_info.value.code == "media_execution_missing_live_configuration"
+    assert generation_service.package_calls == 0
+    assert generation_service.image_calls == 0
+    assert generation_service.audio_calls == 0
+    assert materializer.calls == 0
+    assert assembly_service.calls == 0
+    assert "sk-test-secret" not in str(exc_info.value)
+
+
+def test_openai_tts_preflight_rejects_unsupported_voice_before_any_media_generation(
+    tmp_path: Path,
+) -> None:
+    """Unsupported live narration voices should fail before any paid image or TTS work begins."""
+
+    settings = build_settings(
+        tmp_path,
+        default_image_provider="openai-image",
+        default_tts_provider="openai-tts",
+        openai_api_key="sk-test-secret",
+        default_tts_voice="robot",
+    )
+    pipeline, generation_service, materializer, assembly_service = build_spy_pipeline(
+        tmp_path,
+        settings=settings,
+    )
+    request = build_request(
+        provider_selection=MediaProviderSelection(
+            image_provider_name="openai-image",
+            tts_provider_name="openai-tts",
+        ),
+        confirm_live_media_calls=True,
+    )
+
+    with pytest.raises(CreatorOSValidationError) as exc_info:
+        run_async(pipeline.execute(request))
+
+    assert exc_info.value.code == "media_execution_invalid_voice"
+    assert generation_service.package_calls == 0
+    assert generation_service.image_calls == 0
+    assert generation_service.audio_calls == 0
+    assert materializer.calls == 0
+    assert assembly_service.calls == 0
+
+
+def test_openai_tts_preflight_accepts_supported_voice_without_generation(tmp_path: Path) -> None:
+    """Supported live narration voices should pass plan-time preflight cleanly."""
+
+    settings = build_settings(
+        tmp_path,
+        default_tts_provider="openai-tts",
+        openai_api_key="sk-test-secret",
+        default_tts_voice="nova",
+    )
+    pipeline, generation_service, materializer, assembly_service = build_spy_pipeline(
+        tmp_path,
+        settings=settings,
+    )
+
+    plan = pipeline.build_execution_plan(build_request())
+
+    assert plan.tts_provider == "openai-tts"
     assert generation_service.package_calls == 0
     assert materializer.calls == 0
     assert assembly_service.calls == 0

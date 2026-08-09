@@ -61,6 +61,7 @@ _SUPPORTED_VOICES = frozenset(
         "verse",
     }
 )
+SUPPORTED_OPENAI_TTS_VOICES = _SUPPORTED_VOICES
 _LOGGER = get_logger("providers.openai.tts")
 
 
@@ -514,5 +515,6 @@ class OpenAITTSProvider:
 __all__ = [
     "DEFAULT_OPENAI_TTS_MODEL",
     "DEFAULT_OPENAI_TTS_PROVIDER_NAME",
+    "SUPPORTED_OPENAI_TTS_VOICES",
     "OpenAITTSProvider",
 ]
