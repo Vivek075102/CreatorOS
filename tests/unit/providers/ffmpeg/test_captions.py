@@ -17,25 +17,30 @@ from creatoros.providers.ffmpeg.captions import (
     normalize_caption_text,
     wrap_caption_text,
 )
-from creatoros.providers.render import CaptionOverlay, CaptionPosition, RenderScene
+from creatoros.providers.render import CaptionOverlay, CaptionPosition, ProductionTimelineScene
 
 
 def build_scene(
     *,
     scene_number: int,
+    start_seconds: float,
     duration_seconds: float,
     caption: CaptionOverlay | None,
-) -> RenderScene:
+) -> ProductionTimelineScene:
     """Create one render scene for pure caption-helper tests."""
 
-    return RenderScene(
+    return ProductionTimelineScene(
         scene_number=scene_number,
+        start_seconds=start_seconds,
+        end_seconds=round(start_seconds + duration_seconds, 6),
         duration_seconds=duration_seconds,
-        visual_asset_ref=GeneratedAsset(
+        source_asset_ref=GeneratedAsset(
             asset_type=AssetType.IMAGE,
             uri=f"mock://generated/image/{scene_number}.png",
         ),
-        caption=caption,
+        caption_text=None if caption is None else caption.text,
+        caption_position=CaptionPosition.BOTTOM if caption is None else caption.position,
+        caption_max_lines=2 if caption is None else caption.max_lines,
     )
 
 
@@ -94,16 +99,19 @@ def test_build_timed_captions_accumulates_scene_timeline_and_skips_missing_capti
         [
             build_scene(
                 scene_number=1,
+                start_seconds=0.0,
                 duration_seconds=2.0,
                 caption=CaptionOverlay(text="Caption one"),
             ),
             build_scene(
                 scene_number=2,
+                start_seconds=2.0,
                 duration_seconds=3.5,
                 caption=None,
             ),
             build_scene(
                 scene_number=3,
+                start_seconds=5.5,
                 duration_seconds=4.0,
                 caption=CaptionOverlay(text="Caption two", position=CaptionPosition.TOP),
             ),
@@ -132,6 +140,7 @@ def test_build_ass_subtitle_document_is_utf8_safe_and_escapes_ass_control_chars(
             [
                 build_scene(
                     scene_number=1,
+                    start_seconds=0.0,
                     duration_seconds=2.0,
                     caption=CaptionOverlay(
                         text=r"Funny {myths} [v1]: 100% \ filter ; , & π",

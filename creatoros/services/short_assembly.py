@@ -2,15 +2,148 @@
 
 from __future__ import annotations
 
+from decimal import ROUND_HALF_UP, Decimal
+
 from pydantic import Field, field_validator
 
 from creatoros.config import Settings
 from creatoros.core import CreatorOSValidationError
 from creatoros.domain import CreatorOSModel
 from creatoros.parsing.storyboard import StoryboardSceneBreakdownOutput
-from creatoros.providers import CaptionOverlay, RenderedVideo, RenderScene, ShortRenderRequest
+from creatoros.providers import (
+    CaptionOverlay,
+    ProductionTimeline,
+    ProductionTimelineScene,
+    RenderedVideo,
+    RenderScene,
+    ShortRenderRequest,
+)
 from creatoros.services.media_generation import GeneratedMediaPackage
 from creatoros.services.media_render import MediaRenderService, create_media_render_service
+
+_TIMELINE_SCALE = Decimal(1000000)
+
+
+def _quantize_seconds(value: Decimal) -> float:
+    """Convert one Decimal microsecond duration into a stable float seconds value."""
+
+    return float((value / _TIMELINE_SCALE).quantize(Decimal("0.000001"), rounding=ROUND_HALF_UP))
+
+
+def _calculate_paced_scene_durations(
+    *,
+    source_durations: tuple[float, ...],
+    target_duration_seconds: float,
+) -> tuple[float, ...]:
+    """Build one deterministic paced scene-duration tuple that sums to the target exactly."""
+
+    if not source_durations:
+        raise CreatorOSValidationError(
+            "storyboard must contain at least one scene",
+            code="short_assembly_timeline_invalid",
+        )
+
+    target_units = int(
+        (Decimal(str(target_duration_seconds)) * _TIMELINE_SCALE).quantize(Decimal(1), rounding=ROUND_HALF_UP)
+    )
+    if target_units < len(source_durations):
+        raise CreatorOSValidationError(
+            "target duration is too small for the scene count",
+            code="short_assembly_timeline_invalid",
+            details={"scene_count": len(source_durations), "target_duration_seconds": target_duration_seconds},
+        )
+
+    source_unit_weights = tuple(
+        int((Decimal(str(duration)) * _TIMELINE_SCALE).quantize(Decimal(1), rounding=ROUND_HALF_UP))
+        for duration in source_durations
+    )
+    total_source_units = sum(source_unit_weights)
+    if total_source_units <= 0:
+        raise CreatorOSValidationError(
+            "storyboard scene durations must be greater than zero",
+            code="short_assembly_timeline_invalid",
+        )
+
+    remaining_distributable_units = target_units - len(source_durations)
+    paced_units: list[int] = []
+    allocated_units = 0
+    for source_units in source_unit_weights[:-1]:
+        extra_units = (remaining_distributable_units * source_units) // total_source_units
+        scene_units = 1 + extra_units
+        paced_units.append(scene_units)
+        allocated_units += scene_units
+
+    last_scene_units = target_units - allocated_units
+    if last_scene_units <= 0:
+        raise CreatorOSValidationError(
+            "timeline pacing produced a non-positive final scene duration",
+            code="short_assembly_timeline_invalid",
+        )
+    paced_units.append(last_scene_units)
+    return tuple(_quantize_seconds(Decimal(scene_units)) for scene_units in paced_units)
+
+
+def _build_production_timeline(
+    *,
+    storyboard: StoryboardSceneBreakdownOutput,
+    generated_media: GeneratedMediaPackage,
+) -> ProductionTimeline:
+    """Build one deterministic provider-neutral production timeline from storyboard order and target duration."""
+
+    target_duration_seconds = storyboard.total_estimated_duration_seconds
+    paced_durations = _calculate_paced_scene_durations(
+        source_durations=tuple(scene.duration_seconds for scene in storyboard.scenes),
+        target_duration_seconds=target_duration_seconds,
+    )
+    narration_duration = (
+        None if generated_media.narration is None else generated_media.narration.estimated_duration_seconds
+    )
+    if narration_duration is not None and narration_duration > target_duration_seconds + 1e-6:
+        raise CreatorOSValidationError(
+            "generated narration duration exceeds the target short duration",
+            code="short_assembly_narration_too_long",
+            details={
+                "narration_duration_seconds": narration_duration,
+                "target_duration_seconds": target_duration_seconds,
+            },
+        )
+
+    timeline_scenes: list[ProductionTimelineScene] = []
+    current_start = 0.0
+    for index, (storyboard_scene, paced_duration) in enumerate(
+        zip(storyboard.scenes, paced_durations, strict=True),
+    ):
+        current_end = round(current_start + paced_duration, 6)
+        source_asset_ref = (
+            generated_media.scene_videos[index].artifact.model_copy(deep=True)
+            if generated_media.scene_videos
+            else generated_media.scene_images[index].artifact.model_copy(deep=True)
+        )
+        narration_start_seconds = None
+        narration_end_seconds = None
+        if narration_duration is not None:
+            overlap_start = current_start
+            overlap_end = min(current_end, narration_duration)
+            if overlap_end > overlap_start:
+                narration_start_seconds = overlap_start
+                narration_end_seconds = overlap_end
+        timeline_scenes.append(
+            ProductionTimelineScene(
+                scene_number=storyboard_scene.scene_number,
+                start_seconds=current_start,
+                end_seconds=current_end,
+                duration_seconds=round(paced_duration, 6),
+                source_asset_ref=source_asset_ref,
+                caption_text=storyboard_scene.on_screen_text,
+                narration_start_seconds=narration_start_seconds,
+                narration_end_seconds=narration_end_seconds,
+            )
+        )
+        current_start = current_end
+    return ProductionTimeline(
+        scenes=timeline_scenes,
+        target_duration_seconds=target_duration_seconds,
+    )
 
 
 def _copy_model[TModel: CreatorOSModel](value: TModel) -> TModel:
@@ -86,10 +219,14 @@ class ShortAssemblyService:
                 details={"scene_count": scene_count},
             )
 
+        production_timeline = _build_production_timeline(
+            storyboard=request.storyboard,
+            generated_media=generated_media,
+        )
         render_scenes = [
             RenderScene(
                 scene_number=scene.scene_number,
-                duration_seconds=scene.duration_seconds,
+                duration_seconds=production_timeline.scenes[index].duration_seconds,
                 visual_asset_ref=(
                     None
                     if not generated_media.scene_images
@@ -111,6 +248,7 @@ class ShortAssemblyService:
 
         return ShortRenderRequest(
             scenes=render_scenes,
+            production_timeline=production_timeline,
             narration=(
                 None
                 if generated_media.narration is None

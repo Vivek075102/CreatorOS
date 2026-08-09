@@ -256,9 +256,11 @@ CreatorOS now also includes a provider-independent final assembly layer for Shor
 - `ShortAssemblyService` accepts typed storyboard scene output plus a `GeneratedMediaPackage` and builds a deterministic `ShortRenderRequest`.
 - Storyboard scenes align to generated scene images and scene videos strictly by index. Counts must either match the storyboard scene count exactly or remain empty.
 - Asset-count mismatches fail before rendering. The service does not silently drop assets, duplicate assets, or reuse the last asset.
+- `ShortAssemblyService` now also builds a provider-neutral `ProductionTimeline` before final rendering so pacing decisions are explicit platform behavior rather than renderer-specific behavior.
 - Thumbnail output remains separate from the video timeline so it can be preserved for later publishing workflows without becoming an extra render scene.
 - Narration, when present, is forwarded as the existing typed `GeneratedAudio` reference. The assembly layer does not regenerate audio or invent missing duration values.
-- The video scene timeline remains authoritative. Narration is composition input only and does not extend or shorten the visual timeline.
+- The production timeline remains authoritative. Scene pacing is deterministic, preserves approved storyboard order, and safely absorbs harmless rounding in the final scene rather than mutating approved input models.
+- Narration is composition input only and does not extend or shorten the approved visual timeline. If known narration duration exceeds the allowed Short duration, assembly fails clearly before final rendering.
 - Scene captions currently come only from existing typed storyboard `on_screen_text` fields and remain render instructions only.
 - `MediaRenderService` remains the render boundary. `ShortAssemblyService` builds the request and delegates rendering through that existing application service.
 - The default render path remains the deterministic mock renderer, which returns a typed `RenderedVideo` reference only.
@@ -273,6 +275,7 @@ CreatorOS now also includes `FFmpegRenderProvider` as the first real local rende
 - Static image scenes are converted into timed vertical video segments using FFmpeg scale-and-pad composition.
 - Local video scenes are normalized to the requested dimensions, FPS, and duration before final composition.
 - Optional narration can be muxed into the final output as a bounded audio track.
+- FFmpeg now consumes the explicit provider-neutral production timeline from `ShortRenderRequest` rather than inventing scene timing internally.
 - Final output is a local H.264/AAC MP4 at `artifacts/<run_id>/video/final_short.mp4`.
 - Scene-level caption overlays can now be rendered as timed ASS subtitles derived from typed `RenderScene.caption` data.
 - Caption text is treated as renderer input only. The renderer does not generate, rewrite, or transcribe captions.
@@ -280,10 +283,11 @@ CreatorOS now also includes `FFmpegRenderProvider` as the first real local rende
 - Caption positioning currently supports provider-neutral `bottom`, `center`, and `top` anchors with vertical-video-safe margins.
 - Local caption font selection is configurable through `CAPTION_FONT_NAME` and optional `CAPTION_FONT_FILE`.
 - Narration audio is normalized to AAC at 48 kHz stereo when present.
-- The visual timeline remains authoritative. Shorter narration is padded with silence, longer narration is trimmed to the video duration, and missing narration-duration metadata does not invent a measured runtime.
+- The production timeline remains authoritative. Shorter narration may end before the visual timeline, known narration that exceeds the approved timeline is rejected earlier during assembly, and missing narration-duration metadata does not invent a measured runtime.
 - When narration is absent, the final MP4 currently has no audio stream rather than a fabricated silent track.
 - `MockRenderProvider` remains the default renderer, so normal tests and local workflows stay offline and deterministic unless `ffmpeg` is explicitly registered and selected.
 - FFmpeg must be installed separately or configured through `FFMPEG_PATH`.
+- Timeline and pacing remain provider-independent. Premium motion providers such as Kling, Higgsfield, or later alternatives may supply scene assets in future milestones, but they do not define the final edit timeline.
 - This milestone still does not add word-level timing, animated captions, background music, overlays beyond simple text, STT, GPU encoding, cloud rendering, or publishing.
 
 ### Manual Caption Smoke Path

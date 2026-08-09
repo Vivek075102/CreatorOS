@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 
 from pydantic import Field, computed_field, field_validator, model_validator
 
+from creatoros.core import CreatorOSValidationError
 from creatoros.domain import AssetType, CreatorOSModel, GeneratedAsset
 from creatoros.providers.media import GeneratedAudio
 
@@ -77,6 +78,152 @@ class CaptionOverlay(CreatorOSModel):
         """Trim and reject blank caption text."""
 
         return _validate_non_blank(value, field_name="text")
+
+
+class ProductionTimelineScene(CreatorOSModel):
+    """One explicit paced scene interval on the final provider-neutral production timeline."""
+
+    scene_number: int
+    start_seconds: float
+    end_seconds: float
+    duration_seconds: float
+    source_asset_ref: GeneratedAsset
+    trim_start_seconds: float | None = None
+    trim_end_seconds: float | None = None
+    caption_text: str | None = None
+    caption_position: CaptionPosition = CaptionPosition.BOTTOM
+    caption_max_lines: int = Field(default=2, gt=0)
+    narration_start_seconds: float | None = None
+    narration_end_seconds: float | None = None
+
+    @field_validator(
+        "start_seconds",
+        "end_seconds",
+        "duration_seconds",
+        "trim_start_seconds",
+        "trim_end_seconds",
+        "narration_start_seconds",
+        "narration_end_seconds",
+    )
+    @classmethod
+    def validate_optional_positive_floats(cls, value: float | None, info) -> float | None:
+        """Require finite non-negative timing values when supplied."""
+
+        if value is None:
+            return None
+        if not math.isfinite(value):
+            raise ValueError(f"{info.field_name} must be finite")
+        if value < 0:
+            raise ValueError(f"{info.field_name} must be zero or greater")
+        return value
+
+    @field_validator("caption_text")
+    @classmethod
+    def normalize_caption_text(cls, value: str | None, info) -> str | None:
+        """Normalize optional caption text for timeline-only relationship metadata."""
+
+        return _normalize_optional_string(value, field_name=info.field_name)
+
+    @model_validator(mode="after")
+    def validate_scene_timing(self) -> ProductionTimelineScene:
+        """Require internally consistent scene timing and asset type semantics."""
+
+        if self.scene_number <= 0:
+            raise ValueError("scene_number must be greater than zero")
+        if self.end_seconds <= self.start_seconds:
+            raise ValueError("end_seconds must be greater than start_seconds")
+        if not math.isclose(
+            self.end_seconds - self.start_seconds,
+            self.duration_seconds,
+            rel_tol=0.0,
+            abs_tol=1e-6,
+        ):
+            raise ValueError("duration_seconds must equal end_seconds - start_seconds")
+        if self.source_asset_ref.asset_type not in {AssetType.IMAGE, AssetType.VIDEO}:
+            raise ValueError("source_asset_ref.asset_type must be image or video")
+        if self.trim_start_seconds is not None and self.trim_start_seconds >= self.duration_seconds:
+            raise ValueError("trim_start_seconds must be smaller than duration_seconds")
+        if self.trim_end_seconds is not None and self.trim_end_seconds > self.duration_seconds:
+            raise ValueError("trim_end_seconds must not exceed duration_seconds")
+        if (
+            self.trim_start_seconds is not None
+            and self.trim_end_seconds is not None
+            and self.trim_end_seconds <= self.trim_start_seconds
+        ):
+            raise ValueError("trim_end_seconds must be greater than trim_start_seconds")
+        if self.narration_start_seconds is not None and self.narration_start_seconds < self.start_seconds:
+            raise ValueError("narration_start_seconds must fall within the scene interval")
+        if self.narration_end_seconds is not None and self.narration_end_seconds > self.end_seconds:
+            raise ValueError("narration_end_seconds must fall within the scene interval")
+        if (
+            self.narration_start_seconds is not None
+            and self.narration_end_seconds is not None
+            and self.narration_end_seconds <= self.narration_start_seconds
+        ):
+            raise ValueError("narration_end_seconds must be greater than narration_start_seconds")
+        return self
+
+
+class ProductionTimeline(CreatorOSModel):
+    """Explicit provider-neutral scene pacing for final Short rendering."""
+
+    scenes: list[ProductionTimelineScene]
+    target_duration_seconds: float
+
+    @field_validator("scenes")
+    @classmethod
+    def validate_scenes_present(cls, value: list[ProductionTimelineScene]) -> list[ProductionTimelineScene]:
+        """Require at least one timed scene."""
+
+        if not value:
+            raise ValueError("scenes must contain at least one scene")
+        return value
+
+    @field_validator("target_duration_seconds")
+    @classmethod
+    def validate_target_duration_seconds(cls, value: float) -> float:
+        """Require a positive finite target duration."""
+
+        return _validate_positive_finite_float(value, field_name="target_duration_seconds")
+
+    @model_validator(mode="after")
+    def validate_scene_sequence(self) -> ProductionTimeline:
+        """Require monotonic contiguous scene timing across the full timeline."""
+
+        expected_numbers = list(range(1, len(self.scenes) + 1))
+        scene_numbers = [scene.scene_number for scene in self.scenes]
+        if scene_numbers != expected_numbers:
+            raise ValueError("timeline scene numbers must be sequential starting at 1")
+
+        expected_start = 0.0
+        for scene in self.scenes:
+            if not math.isclose(scene.start_seconds, expected_start, rel_tol=0.0, abs_tol=1e-6):
+                raise ValueError("timeline scenes must be contiguous and monotonically ordered")
+            expected_start = scene.end_seconds
+
+        if not math.isclose(
+            self.total_duration_seconds,
+            self.target_duration_seconds,
+            rel_tol=0.0,
+            abs_tol=1e-6,
+        ):
+            raise ValueError("timeline total duration must equal target_duration_seconds")
+        return self
+
+    if TYPE_CHECKING:
+
+        @property
+        def total_duration_seconds(self) -> float:
+            """Return the deterministic total production timeline duration."""
+
+    else:
+
+        @computed_field(return_type=float)
+        @property
+        def total_duration_seconds(self) -> float:
+            """Return the deterministic total production timeline duration."""
+
+            return round(sum(scene.duration_seconds for scene in self.scenes), 6)
 
 
 class AudioCompositionPolicy(CreatorOSModel):
@@ -173,6 +320,7 @@ class ShortRenderRequest(CreatorOSModel):
     """Provider-neutral request for deterministic future Short composition."""
 
     scenes: list[RenderScene]
+    production_timeline: ProductionTimeline | None = None
     narration: GeneratedAudio | None = None
     audio_policy: AudioCompositionPolicy = Field(default_factory=AudioCompositionPolicy)
     width: int = Field(default=1080, gt=0)
@@ -206,19 +354,29 @@ class ShortRenderRequest(CreatorOSModel):
 
     @model_validator(mode="after")
     def validate_timeline(self) -> ShortRenderRequest:
-        """Require sequential scenes and bounded narration duration when present."""
+        """Require sequential scenes, explicit production timing, and safe narration bounds."""
 
         scene_numbers = [scene.scene_number for scene in self.scenes]
         expected_numbers = list(range(1, len(self.scenes) + 1))
         if scene_numbers != expected_numbers:
             raise ValueError("scene numbers must be sequential starting at 1")
 
+        if self.production_timeline is None:
+            self.production_timeline = _build_legacy_production_timeline(
+                scenes=self.scenes,
+                narration=self.narration,
+            )
+        else:
+            timeline_scene_numbers = [scene.scene_number for scene in self.production_timeline.scenes]
+            if timeline_scene_numbers != expected_numbers:
+                raise ValueError("production timeline scene numbers must match render scene numbers")
+
         narration_duration = (
             None if self.narration is None else self.narration.estimated_duration_seconds
         )
-        if narration_duration is not None and narration_duration > self.total_duration_seconds + 1.0:
+        if narration_duration is not None and narration_duration > self.total_duration_seconds + 1e-6:
             raise ValueError(
-                "narration estimated_duration_seconds must not exceed total_duration_seconds by more than 1.0",
+                "narration estimated_duration_seconds must not exceed total_duration_seconds",
             )
         return self
 
@@ -235,7 +393,64 @@ class ShortRenderRequest(CreatorOSModel):
         def total_duration_seconds(self) -> float:
             """Return the deterministic sum of scene durations."""
 
+            if self.production_timeline is not None:
+                return self.production_timeline.total_duration_seconds
             return round(sum(scene.duration_seconds for scene in self.scenes), 6)
+
+
+def _build_legacy_production_timeline(
+    *,
+    scenes: list[RenderScene],
+    narration: GeneratedAudio | None,
+) -> ProductionTimeline:
+    """Derive one backward-compatible timeline directly from render-scene durations."""
+
+    narration_duration = None if narration is None else narration.estimated_duration_seconds
+    timeline_scenes: list[ProductionTimelineScene] = []
+    current_start = 0.0
+    for scene in scenes:
+        current_end = round(current_start + scene.duration_seconds, 6)
+        if scene.video_asset_ref is not None:
+            source_asset_ref = scene.video_asset_ref.model_copy(deep=True)
+        elif scene.visual_asset_ref is not None:
+            source_asset_ref = scene.visual_asset_ref.model_copy(deep=True)
+        else:
+            raise CreatorOSValidationError(
+                "render scene must include one visual or video asset reference",
+                code="render_scene_missing_asset",
+                details={"scene_number": scene.scene_number},
+            )
+        narration_start_seconds = None
+        narration_end_seconds = None
+        if narration_duration is not None:
+            overlap_start = current_start
+            overlap_end = min(current_end, narration_duration)
+            if overlap_end > overlap_start:
+                narration_start_seconds = overlap_start
+                narration_end_seconds = overlap_end
+        timeline_scenes.append(
+            ProductionTimelineScene(
+                scene_number=scene.scene_number,
+                start_seconds=current_start,
+                end_seconds=current_end,
+                duration_seconds=scene.duration_seconds,
+                source_asset_ref=source_asset_ref,
+                caption_text=scene.caption_text,
+                caption_position=(
+                    CaptionPosition.BOTTOM
+                    if scene.caption is None
+                    else scene.caption.position
+                ),
+                caption_max_lines=2 if scene.caption is None else scene.caption.max_lines,
+                narration_start_seconds=narration_start_seconds,
+                narration_end_seconds=narration_end_seconds,
+            )
+        )
+        current_start = current_end
+    return ProductionTimeline(
+        scenes=timeline_scenes,
+        target_duration_seconds=round(sum(scene.duration_seconds for scene in scenes), 6),
+    )
 
 
 class RenderedVideo(CreatorOSModel):
@@ -286,6 +501,8 @@ __all__ = [
     "CaptionOverlay",
     "CaptionPosition",
     "NarrationTimingPolicy",
+    "ProductionTimeline",
+    "ProductionTimelineScene",
     "RenderScene",
     "RenderTransition",
     "RenderedVideo",

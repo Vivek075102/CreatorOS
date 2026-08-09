@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Final
 
-from creatoros.providers.render import CaptionPosition, RenderScene
+from creatoros.providers.render import CaptionPosition, ProductionTimelineScene
 
 DEFAULT_CAPTION_MAX_CHARS_PER_LINE: Final[int] = 32
 _DEFAULT_MIN_FONT_SIZE: Final[int] = 28
@@ -96,25 +96,24 @@ def wrap_caption_text(
     return tuple(lines)
 
 
-def build_timed_captions(scenes: tuple[RenderScene, ...] | list[RenderScene]) -> tuple[TimedCaption, ...]:
-    """Convert scene-level caption overlays into final timeline intervals."""
+def build_timed_captions(
+    scenes: tuple[ProductionTimelineScene, ...] | list[ProductionTimelineScene],
+) -> tuple[TimedCaption, ...]:
+    """Convert production-timeline caption relationships into final timeline intervals."""
 
     timed_captions: list[TimedCaption] = []
-    current_start = 0.0
 
     for scene in scenes:
-        scene_end = round(current_start + scene.duration_seconds, 6)
-        if scene.caption is not None:
+        if scene.caption_text is not None:
             timed_captions.append(
                 TimedCaption(
-                    text=normalize_caption_text(scene.caption.text),
-                    start_seconds=current_start,
-                    end_seconds=scene_end,
-                    position=scene.caption.position,
-                    max_lines=scene.caption.max_lines,
+                    text=normalize_caption_text(scene.caption_text),
+                    start_seconds=scene.start_seconds,
+                    end_seconds=scene.end_seconds,
+                    position=scene.caption_position,
+                    max_lines=scene.caption_max_lines,
                 )
             )
-        current_start = scene_end
 
     return tuple(timed_captions)
 

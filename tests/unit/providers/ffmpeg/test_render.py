@@ -22,6 +22,8 @@ from creatoros.domain import AssetType, GeneratedAsset
 from creatoros.providers import (
     DEFAULT_FFMPEG_RENDER_PROVIDER_NAME,
     GeneratedAudio,
+    ProductionTimeline,
+    ProductionTimelineScene,
     ProviderCapability,
     ProviderRequestContext,
     RenderProvider,
@@ -649,6 +651,48 @@ def test_caption_filter_preserves_multiple_scene_order(tmp_path: Path) -> None:
     assert "0:00:00.00,0:00:02.00" in subtitle_contents
     assert "0:00:02.00,0:00:05.00" in subtitle_contents
     assert subtitle_contents.index("CreatorOS caption") < subtitle_contents.index("Second caption")
+
+
+def test_ffmpeg_render_uses_explicit_production_timeline_when_supplied(tmp_path: Path) -> None:
+    """Explicit production timeline timing should drive segment and caption timing."""
+
+    artifact_root, image_path, video_path, _narration_path = create_workspace_files(tmp_path)
+    ffmpeg_binary = tmp_path / "ffmpeg.exe"
+    ffmpeg_binary.write_text("binary", encoding="utf-8")
+    runner = RecordingFFmpegRunner()
+    provider = build_provider(artifact_root=artifact_root, ffmpeg_path=ffmpeg_binary, command_runner=runner)
+    request = build_request(image_path=image_path, video_path=video_path)
+    request.production_timeline = ProductionTimeline(
+        scenes=[
+            ProductionTimelineScene(
+                scene_number=1,
+                start_seconds=0.0,
+                end_seconds=1.25,
+                duration_seconds=1.25,
+                source_asset_ref=GeneratedAsset(asset_type=AssetType.IMAGE, uri=str(image_path)),
+                caption_text="CreatorOS caption",
+            ),
+            ProductionTimelineScene(
+                scene_number=2,
+                start_seconds=1.25,
+                end_seconds=5.0,
+                duration_seconds=3.75,
+                source_asset_ref=GeneratedAsset(asset_type=AssetType.VIDEO, uri=str(video_path)),
+                caption_text="Second caption",
+            ),
+        ],
+        target_duration_seconds=5.0,
+    )
+
+    run_async(provider.render(request))
+
+    first_scene_call = runner.calls[0]
+    second_scene_call = runner.calls[1]
+    subtitle_contents = runner.subtitle_file_contents[-1]
+    assert "-t" in first_scene_call and "1.25" in first_scene_call
+    assert "-t" in second_scene_call and "3.75" in second_scene_call
+    assert "0:00:00.00,0:00:01.25" in subtitle_contents
+    assert "0:00:01.25,0:00:05.00" in subtitle_contents
 
 
 def test_invalid_caption_font_file_fails_safely_before_final_render(tmp_path: Path) -> None:

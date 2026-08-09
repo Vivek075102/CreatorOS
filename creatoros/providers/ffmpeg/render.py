@@ -35,7 +35,11 @@ from creatoros.providers.ffmpeg.captions import (
     build_subtitles_filter_arg,
     build_timed_captions,
 )
-from creatoros.providers.render import RenderedVideo, RenderScene, ShortRenderRequest
+from creatoros.providers.render import (
+    ProductionTimelineScene,
+    RenderedVideo,
+    ShortRenderRequest,
+)
 
 DEFAULT_FFMPEG_RENDER_PROVIDER_NAME = "ffmpeg"
 _LOGGER = get_logger("providers.ffmpeg.render")
@@ -254,8 +258,9 @@ class FFmpegRenderProvider:
         scene_sources: list[Path] = []
         run_id: str | None = None
 
-        for scene in request.scenes:
-            source_path = self._resolve_scene_source_path(scene)
+        assert request.production_timeline is not None
+        for timeline_scene in request.production_timeline.scenes:
+            source_path = self._resolve_scene_source_path(timeline_scene)
             scene_sources.append(source_path)
             resolved_run_id = self._extract_run_id(source_path)
             if run_id is None:
@@ -292,18 +297,18 @@ class FFmpegRenderProvider:
         workspace_video_dir.mkdir(parents=True, exist_ok=True)
         return run_id, workspace_video_dir, scene_sources, narration_path
 
-    def _resolve_scene_source_path(self, scene: RenderScene) -> Path:
+    def _resolve_scene_source_path(self, scene: ProductionTimelineScene) -> Path:
         """Resolve the preferred local source path for one render scene."""
 
-        if scene.video_asset_ref is not None:
+        if scene.source_asset_ref.asset_type is AssetType.VIDEO:
             return self._resolve_local_asset_path(
-                scene.video_asset_ref.uri,
+                scene.source_asset_ref.uri,
                 asset_label=f"scene_{scene.scene_number}_video",
                 expected_asset_type=AssetType.VIDEO,
             )
-        if scene.visual_asset_ref is not None:
+        if scene.source_asset_ref.asset_type is AssetType.IMAGE:
             return self._resolve_local_asset_path(
-                scene.visual_asset_ref.uri,
+                scene.source_asset_ref.uri,
                 asset_label=f"scene_{scene.scene_number}_image",
                 expected_asset_type=AssetType.IMAGE,
             )
@@ -395,7 +400,8 @@ class FFmpegRenderProvider:
         """Render normalized intermediate MP4 segments for every scene."""
 
         rendered_segments: list[Path] = []
-        for scene, source_path in zip(request.scenes, scene_sources, strict=True):
+        assert request.production_timeline is not None
+        for scene, source_path in zip(request.production_timeline.scenes, scene_sources, strict=True):
             segment_path = (working_directory / f"scene_{scene.scene_number:03d}.mp4").resolve()
             command = self._build_scene_command(
                 scene,
@@ -417,7 +423,7 @@ class FFmpegRenderProvider:
 
     def _build_scene_command(
         self,
-        scene: RenderScene,
+        scene: ProductionTimelineScene,
         *,
         source_path: Path,
         segment_path: Path,
@@ -433,7 +439,7 @@ class FFmpegRenderProvider:
             f"pad={width}:{height}:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1"
         )
         base_command = [str(ffmpeg_binary), "-y"]
-        if scene.video_asset_ref is not None:
+        if scene.source_asset_ref.asset_type is AssetType.VIDEO:
             base_command.extend(
                 [
                     "-i",
@@ -591,7 +597,8 @@ class FFmpegRenderProvider:
     ) -> Path | None:
         """Write one temporary ASS subtitle file when timed captions are present."""
 
-        timed_captions = build_timed_captions(request.scenes)
+        assert request.production_timeline is not None
+        timed_captions = build_timed_captions(request.production_timeline.scenes)
         if not timed_captions:
             return None
 
@@ -718,6 +725,30 @@ class FFmpegRenderProvider:
     def _build_request_digest(request: ShortRenderRequest) -> str:
         """Create one stable digest for request-local identifiers."""
 
+        production_timeline = None
+        if request.production_timeline is not None:
+            production_timeline = {
+                "target_duration_seconds": request.production_timeline.target_duration_seconds,
+                "scenes": [
+                    {
+                        "scene_number": scene.scene_number,
+                        "start_seconds": scene.start_seconds,
+                        "end_seconds": scene.end_seconds,
+                        "duration_seconds": scene.duration_seconds,
+                        "source_asset_type": scene.source_asset_ref.asset_type.value,
+                        "source_asset_uri": scene.source_asset_ref.uri,
+                        "trim_start_seconds": scene.trim_start_seconds,
+                        "trim_end_seconds": scene.trim_end_seconds,
+                        "caption_text": scene.caption_text,
+                        "caption_position": scene.caption_position.value,
+                        "caption_max_lines": scene.caption_max_lines,
+                        "narration_start_seconds": scene.narration_start_seconds,
+                        "narration_end_seconds": scene.narration_end_seconds,
+                    }
+                    for scene in request.production_timeline.scenes
+                ],
+            }
+
         payload = {
             "scenes": [
                 {
@@ -729,6 +760,7 @@ class FFmpegRenderProvider:
                 }
                 for scene in request.scenes
             ],
+            "production_timeline": production_timeline,
             "narration_uri": None if request.narration is None else request.narration.artifact.uri,
             "audio_policy": request.audio_policy.model_dump(mode="json"),
             "width": request.width,

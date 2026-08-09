@@ -20,7 +20,12 @@ from creatoros.providers import (
     create_provider_registry,
 )
 from creatoros.providers.mock import MockRenderProvider
-from creatoros.providers.render import RenderedVideo, RenderTransition, ShortRenderRequest
+from creatoros.providers.render import (
+    ProductionTimeline,
+    RenderedVideo,
+    RenderTransition,
+    ShortRenderRequest,
+)
 from creatoros.services import (
     GeneratedMediaPackage,
     MediaRenderService,
@@ -263,10 +268,13 @@ def test_single_storyboard_scene_maps_to_one_scene_image() -> None:
     render_request = service.build_render_request(build_request(scene_count=1, include_videos=False))
 
     assert len(render_request.scenes) == 1
+    assert render_request.production_timeline is not None
     assert render_request.scenes[0].scene_number == 1
     assert render_request.scenes[0].duration_seconds == 3.0
+    assert render_request.production_timeline.scenes[0].duration_seconds == 3.0
     assert render_request.scenes[0].visual_asset_ref is not None
     assert render_request.scenes[0].visual_asset_ref.uri == "mock://generated/image/1.png"
+    assert render_request.production_timeline.scenes[0].source_asset_ref.uri == "mock://generated/image/1.png"
     assert render_request.scenes[0].video_asset_ref is None
     assert render_request.scenes[0].caption is not None
     assert render_request.scenes[0].caption.position.value == "bottom"
@@ -284,6 +292,8 @@ def test_multiple_scenes_map_in_deterministic_order_without_drops_or_duplicates(
     render_request = service.build_render_request(build_request(include_videos=True))
 
     assert [scene.scene_number for scene in render_request.scenes] == [1, 2]
+    assert render_request.production_timeline is not None
+    assert [scene.scene_number for scene in render_request.production_timeline.scenes] == [1, 2]
     assert [scene.visual_asset_ref.uri for scene in render_request.scenes if scene.visual_asset_ref is not None] == [
         "mock://generated/image/1.png",
         "mock://generated/image/2.png",
@@ -294,6 +304,10 @@ def test_multiple_scenes_map_in_deterministic_order_without_drops_or_duplicates(
     ]
     assert len({scene.visual_asset_ref.uri for scene in render_request.scenes if scene.visual_asset_ref is not None}) == 2
     assert len({scene.video_asset_ref.uri for scene in render_request.scenes if scene.video_asset_ref is not None}) == 2
+    assert [scene.source_asset_ref.uri for scene in render_request.production_timeline.scenes] == [
+        "mock://generated/video/1.mp4",
+        "mock://generated/video/2.mp4",
+    ]
 
 
 def test_incompatible_image_count_is_rejected_before_rendering() -> None:
@@ -365,8 +379,12 @@ def test_narration_maps_without_inventing_duration() -> None:
     assert with_duration.narration is not None
     assert with_duration.narration.artifact.uri == "mock://generated/audio/narration.wav"
     assert with_duration.narration.estimated_duration_seconds == 7.0
+    assert with_duration.production_timeline is not None
+    assert with_duration.production_timeline.scenes[-1].narration_end_seconds == 7.0
     assert without_duration.narration is not None
     assert without_duration.narration.estimated_duration_seconds is None
+    assert without_duration.production_timeline is not None
+    assert all(scene.narration_end_seconds is None for scene in without_duration.production_timeline.scenes)
 
 
 def test_build_render_request_is_deterministic_and_does_not_mutate_source_request() -> None:
@@ -382,8 +400,139 @@ def test_build_render_request_is_deterministic_and_does_not_mutate_source_reques
 
     assert first == second
     assert isinstance(first, ShortRenderRequest)
+    assert isinstance(first.production_timeline, ProductionTimeline)
     assert first.total_duration_seconds == 7.0
     assert request.model_dump(mode="json") == original_dump
+
+
+def test_production_timeline_preserves_scene_order() -> None:
+    """The production timeline should preserve the approved storyboard order exactly."""
+
+    render_service, _provider = build_render_service()
+    service = ShortAssemblyService(render_service)
+
+    render_request = service.build_render_request(build_request(scene_count=3))
+
+    assert render_request.production_timeline is not None
+    assert [scene.scene_number for scene in render_request.production_timeline.scenes] == [1, 2, 3]
+
+
+def test_production_timeline_total_duration_matches_target_exactly() -> None:
+    """Paced scene durations should sum exactly to the approved target duration."""
+
+    render_service, _provider = build_render_service()
+    service = ShortAssemblyService(render_service)
+
+    render_request = service.build_render_request(build_request(scene_count=3))
+
+    assert render_request.production_timeline is not None
+    assert render_request.production_timeline.total_duration_seconds == 12.0
+    assert render_request.total_duration_seconds == 12.0
+
+
+def test_rounding_is_handled_deterministically_and_last_scene_absorbs_difference() -> None:
+    """The last scene should absorb harmless rounding so the timeline stays exact."""
+
+    render_service, _provider = build_render_service()
+    service = ShortAssemblyService(render_service)
+    storyboard = StoryboardSceneBreakdownOutput(
+        storyboard_title="Rounding",
+        scenes=(
+            StoryboardScenePlan(
+                scene_number=1,
+                purpose="One",
+                script_beat="One",
+                visual="One",
+                on_screen_text="One",
+                duration_seconds=3.3333333,
+            ),
+            StoryboardScenePlan(
+                scene_number=2,
+                purpose="Two",
+                script_beat="Two",
+                visual="Two",
+                on_screen_text="Two",
+                duration_seconds=3.3333333,
+            ),
+            StoryboardScenePlan(
+                scene_number=3,
+                purpose="Three",
+                script_beat="Three",
+                visual="Three",
+                on_screen_text="Three",
+                duration_seconds=3.3333334,
+            ),
+        ),
+        final_scene_count=3,
+        total_estimated_duration_seconds=10.0,
+    )
+    request = ShortAssemblyRequest(
+        storyboard=storyboard,
+        generated_media=build_generated_media_package(scene_count=3, narration_duration=10.0),
+    )
+
+    render_request = service.build_render_request(request)
+
+    assert render_request.production_timeline is not None
+    durations = [scene.duration_seconds for scene in render_request.production_timeline.scenes]
+    assert durations == [3.333333, 3.333333, 3.333334]
+    assert sum(durations) == 10.0
+
+
+def test_production_timeline_rejects_narration_longer_than_target_duration() -> None:
+    """Known narration that exceeds the target timeline should fail before rendering."""
+
+    render_service, _provider = build_render_service()
+    service = ShortAssemblyService(render_service)
+
+    with pytest.raises(CreatorOSValidationError) as exc_info:
+        service.build_render_request(build_request(narration_duration=8.0))
+
+    assert exc_info.value.code == "short_assembly_narration_too_long"
+
+
+def test_shorter_narration_is_supported_without_stretching_timeline() -> None:
+    """Shorter narration should leave later visual pacing untouched."""
+
+    render_service, _provider = build_render_service()
+    service = ShortAssemblyService(render_service)
+
+    render_request = service.build_render_request(build_request(narration_duration=5.0))
+
+    assert render_request.production_timeline is not None
+    assert render_request.production_timeline.scenes[0].narration_end_seconds == 3.0
+    assert render_request.production_timeline.scenes[1].narration_end_seconds == 5.0
+    assert render_request.production_timeline.scenes[1].end_seconds == 7.0
+
+
+def test_exact_narration_match_is_supported_cleanly() -> None:
+    """Narration that matches the target duration should align exactly."""
+
+    render_service, _provider = build_render_service()
+    service = ShortAssemblyService(render_service)
+
+    render_request = service.build_render_request(build_request(narration_duration=7.0))
+
+    assert render_request.production_timeline is not None
+    assert render_request.production_timeline.scenes[-1].narration_end_seconds == 7.0
+
+
+def test_timeline_supports_image_only_video_only_and_mixed_paths() -> None:
+    """The production timeline should support still-image, video-only, and mixed source media."""
+
+    render_service, _provider = build_render_service()
+    service = ShortAssemblyService(render_service)
+
+    image_only = service.build_render_request(build_request(include_images=True, include_videos=False))
+    video_only = service.build_render_request(build_request(include_images=False, include_videos=True))
+    mixed = service.build_render_request(build_request(include_images=True, include_videos=True))
+
+    assert image_only.production_timeline is not None
+    assert all(scene.source_asset_ref.asset_type is AssetType.IMAGE for scene in image_only.production_timeline.scenes)
+    assert video_only.production_timeline is not None
+    assert all(scene.source_asset_ref.asset_type is AssetType.VIDEO for scene in video_only.production_timeline.scenes)
+    assert mixed.production_timeline is not None
+    assert all(scene.source_asset_ref.asset_type is AssetType.VIDEO for scene in mixed.production_timeline.scenes)
 
 
 def test_assemble_invokes_media_render_service_once_and_forwards_override() -> None:
@@ -404,6 +553,8 @@ def test_assemble_invokes_media_render_service_once_and_forwards_override() -> N
     assert alternate_provider.calls == 1
     assert default_provider.calls == 0
     assert alternate_provider.last_request == result.render_request
+    assert alternate_provider.last_request is not None
+    assert alternate_provider.last_request.production_timeline is not None
     assert result.scene_count == 2
     assert result.total_duration_seconds == 7.0
 

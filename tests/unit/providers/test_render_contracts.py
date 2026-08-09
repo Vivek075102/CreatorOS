@@ -12,6 +12,8 @@ from creatoros.providers import (
     CaptionPosition,
     GeneratedAudio,
     NarrationTimingPolicy,
+    ProductionTimeline,
+    ProductionTimelineScene,
     RenderedVideo,
     RenderScene,
     RenderTransition,
@@ -59,6 +61,36 @@ def build_scene(
         motion_instruction=" Slow push in ",
         transition=RenderTransition.CUT,
     )
+
+
+def build_timeline(
+    *,
+    durations: tuple[float, ...] = (3.0,),
+    assets: tuple[GeneratedAsset, ...] | None = None,
+) -> ProductionTimeline:
+    """Create a reusable production timeline for render-contract tests."""
+
+    resolved_assets = (
+        tuple(build_image_asset(f"mock://generated/image/{index}.png") for index in range(1, len(durations) + 1))
+        if assets is None
+        else assets
+    )
+    scenes: list[ProductionTimelineScene] = []
+    current_start = 0.0
+    for index, duration in enumerate(durations, start=1):
+        current_end = round(current_start + duration, 6)
+        scenes.append(
+            ProductionTimelineScene(
+                scene_number=index,
+                start_seconds=current_start,
+                end_seconds=current_end,
+                duration_seconds=duration,
+                source_asset_ref=resolved_assets[index - 1],
+                caption_text=f"Caption {index}",
+            )
+        )
+        current_start = current_end
+    return ProductionTimeline(scenes=scenes, target_duration_seconds=sum(durations))
 
 
 def test_valid_render_scene_is_accepted() -> None:
@@ -149,6 +181,7 @@ def test_valid_short_render_request_is_accepted() -> None:
 
     request = ShortRenderRequest(
         scenes=[build_scene(scene_number=1, duration_seconds=3.0), build_scene(scene_number=2, duration_seconds=4.5)],
+        production_timeline=build_timeline(durations=(3.0, 4.5)),
         narration=build_audio(duration=7.0),
     )
 
@@ -193,10 +226,52 @@ def test_request_mutable_defaults_are_isolated() -> None:
     assert second.metadata == {}
 
 
+def test_request_derives_legacy_timeline_when_one_is_not_supplied() -> None:
+    """Legacy render requests should still gain an explicit production timeline deterministically."""
+
+    request = ShortRenderRequest(scenes=[build_scene(duration_seconds=3.0), build_scene(scene_number=2, duration_seconds=4.0)])
+
+    assert request.production_timeline is not None
+    assert [scene.scene_number for scene in request.production_timeline.scenes] == [1, 2]
+    assert request.production_timeline.total_duration_seconds == 7.0
+
+
+def test_explicit_production_timeline_must_match_scene_order() -> None:
+    """Timeline scenes should align exactly with render-scene numbering."""
+
+    with pytest.raises(ValidationError):
+        ShortRenderRequest(
+            scenes=[build_scene(scene_number=1), build_scene(scene_number=2)],
+            production_timeline=ProductionTimeline(
+                scenes=[
+                    ProductionTimelineScene(
+                        scene_number=1,
+                        start_seconds=0.0,
+                        end_seconds=3.0,
+                        duration_seconds=3.0,
+                        source_asset_ref=build_image_asset("mock://generated/image/1.png"),
+                    ),
+                    ProductionTimelineScene(
+                        scene_number=3,
+                        start_seconds=3.0,
+                        end_seconds=6.0,
+                        duration_seconds=3.0,
+                        source_asset_ref=build_image_asset("mock://generated/image/3.png"),
+                    ),
+                ],
+                target_duration_seconds=6.0,
+            ),
+        )
+
+
 def test_narration_duration_may_be_absent_without_fabrication() -> None:
     """Missing narration duration should remain unset and still validate."""
 
-    request = ShortRenderRequest(scenes=[build_scene()], narration=build_audio(duration=None))
+    request = ShortRenderRequest(
+        scenes=[build_scene()],
+        production_timeline=build_timeline(durations=(3.0,)),
+        narration=build_audio(duration=None),
+    )
 
     assert request.narration is not None
     assert request.narration.estimated_duration_seconds is None
@@ -206,7 +281,27 @@ def test_narration_duration_cannot_exceed_scene_duration_by_large_margin() -> No
     """Known narration duration should remain within the documented tolerance."""
 
     with pytest.raises(ValidationError):
-        ShortRenderRequest(scenes=[build_scene(duration_seconds=3.0)], narration=build_audio(duration=4.5))
+        ShortRenderRequest(
+            scenes=[build_scene(duration_seconds=3.0)],
+            production_timeline=build_timeline(durations=(3.0,)),
+            narration=build_audio(duration=4.5),
+        )
+
+
+def test_timeline_scene_rejects_provider_specific_fields_in_payload() -> None:
+    """The provider-neutral timeline model should not accept FFmpeg-specific fields."""
+
+    with pytest.raises(ValidationError):
+        ProductionTimelineScene.model_validate(
+            {
+                "scene_number": 1,
+                "start_seconds": 0.0,
+                "end_seconds": 3.0,
+                "duration_seconds": 3.0,
+                "source_asset_ref": build_image_asset().model_dump(mode="json"),
+                "ffmpeg_filter": "scale=1080:1920",
+            }
+        )
 
 
 def test_valid_rendered_video_is_accepted() -> None:
