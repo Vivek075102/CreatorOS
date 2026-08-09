@@ -37,6 +37,7 @@ from creatoros.parsing import (
 )
 from creatoros.services import (
     GeneratedMediaPackage,
+    MaterializedMediaPackage,
     MediaProviderSelection,
     ShortAssemblyResult,
 )
@@ -186,16 +187,35 @@ class ApprovedMediaExecutionRequest(CreatorOSModel):
 
     content_result: GamingContentPipelineResult
     approval: HumanApproval
+    run_id: str
     provider_selection: MediaProviderSelection | None = None
     render_provider_name: str | None = None
+    confirm_live_media_calls: bool = False
+    width: int = Field(default=1080, gt=0)
+    height: int = Field(default=1920, gt=0)
+    fps: float = Field(default=30.0, gt=0)
+    output_format: str = "mp4"
+
+    @field_validator("run_id")
+    @classmethod
+    def validate_run_id(cls, value: str) -> str:
+        """Reuse artifact workspace run-id validation for production requests."""
+
+        from creatoros.services.artifact_materialization import ArtifactWorkspace
+
+        return ArtifactWorkspace.validate_run_id(value)
 
 
 class MediaExecutionResult(CreatorOSModel):
     """Typed post-approval aggregate result for media execution."""
 
+    run_id: str
     content_result: GamingContentPipelineResult
     approval: HumanApproval
+    provider_selection: MediaProviderSelection | None = None
+    render_provider_name: str | None = None
     generated_media: GeneratedMediaPackage
+    materialized_media: MaterializedMediaPackage
     assembly: ShortAssemblyResult
 
 

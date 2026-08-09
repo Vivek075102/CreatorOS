@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import cast
+
 from pydantic import ValidationError
 
 from creatoros.core import (
@@ -18,10 +20,21 @@ from creatoros.orchestrator.models import (
     MediaExecutionResult,
 )
 from creatoros.parsing import GamingSceneMotionOutput, GamingSceneVisualOutput, StoryboardScenePlan
-from creatoros.providers import ImageGenerationRequest, TTSGenerationRequest, VideoGenerationRequest
+from creatoros.providers import (
+    GeneratedAudio,
+    GeneratedImage,
+    GeneratedVideo,
+    ImageGenerationRequest,
+    TTSGenerationRequest,
+    VideoGenerationRequest,
+)
 from creatoros.services import (
+    ArtifactMaterializationService,
+    GeneratedMediaPackage,
+    MaterializedMediaPackage,
     MediaGenerationPackageRequest,
     MediaGenerationService,
+    MediaProviderSelection,
     ShortAssemblyRequest,
     ShortAssemblyService,
 )
@@ -31,7 +44,10 @@ STAGE_VALIDATE_REQUEST = "validate_request"
 STAGE_VERIFY_PUBLICATION_READINESS = "verify_publication_readiness"
 STAGE_VERIFY_HUMAN_APPROVAL = "verify_human_approval"
 STAGE_BUILD_MEDIA_REQUESTS = "build_media_requests"
+STAGE_VERIFY_LIVE_CALL_POLICY = "verify_live_call_policy"
 STAGE_MEDIA_GENERATION = "media_generation"
+STAGE_ARTIFACT_MATERIALIZATION = "artifact_materialization"
+STAGE_BUILD_ASSEMBLY_INPUTS = "build_assembly_inputs"
 STAGE_SHORT_ASSEMBLY = "short_assembly"
 
 
@@ -128,6 +144,119 @@ def _build_scene_video_prompt(
     )
 
 
+def _is_mock_provider_name(value: str | None) -> bool:
+    """Return whether a provider name represents the deterministic mock path."""
+
+    if value is None:
+        return False
+    return value.strip().casefold() == "mock"
+
+
+def _materialize_generated_media_for_assembly(
+    generated_media: GeneratedMediaPackage,
+    materialized_media: MaterializedMediaPackage,
+) -> GeneratedMediaPackage:
+    """Rebuild generated-media contracts so assembly uses local materialized artifact URIs."""
+
+    if (generated_media.thumbnail is None) != (materialized_media.thumbnail is None):
+        raise CreatorOSValidationError(
+            "thumbnail materialization did not match generated media",
+            code="media_execution_materialization_mismatch",
+            details={"asset_name": "thumbnail"},
+        )
+    if (generated_media.narration is None) != (materialized_media.narration is None):
+        raise CreatorOSValidationError(
+            "narration materialization did not match generated media",
+            code="media_execution_materialization_mismatch",
+            details={"asset_name": "narration"},
+        )
+    if len(generated_media.scene_images) != len(materialized_media.scene_images):
+        raise CreatorOSValidationError(
+            "scene image materialization count did not match generated media",
+            code="media_execution_materialization_mismatch",
+            details={"asset_name": "scene_images"},
+        )
+    if len(generated_media.scene_videos) != len(materialized_media.scene_videos):
+        raise CreatorOSValidationError(
+            "scene video materialization count did not match generated media",
+            code="media_execution_materialization_mismatch",
+            details={"asset_name": "scene_videos"},
+        )
+
+    def _with_local_artifact(
+        media: GeneratedImage | GeneratedAudio | GeneratedVideo,
+        path: str,
+    ) -> GeneratedImage | GeneratedAudio | GeneratedVideo:
+        return cast(
+            GeneratedImage | GeneratedAudio | GeneratedVideo,
+            media.model_copy(
+                update={
+                    "artifact": media.artifact.model_copy(
+                        update={
+                            "uri": path,
+                            "metadata": {
+                                **dict(media.artifact.metadata),
+                                "local": True,
+                                "workspace_run_id": materialized_media.workspace.run_id,
+                            },
+                        }
+                    ),
+                    "payload_bytes": None,
+                    "metadata": {
+                        **dict(media.metadata),
+                        "local": True,
+                        "materialized_path": path,
+                        "workspace_run_id": materialized_media.workspace.run_id,
+                    },
+                }
+            ),
+        )
+
+    thumbnail = None
+    if generated_media.thumbnail is not None and materialized_media.thumbnail is not None:
+        thumbnail = cast(
+            GeneratedImage,
+            _with_local_artifact(
+                generated_media.thumbnail,
+                str(materialized_media.thumbnail.path),
+            ),
+        )
+
+    narration = None
+    if generated_media.narration is not None and materialized_media.narration is not None:
+        narration = cast(
+            GeneratedAudio,
+            _with_local_artifact(
+                generated_media.narration,
+                str(materialized_media.narration.path),
+            ),
+        )
+
+    scene_images = tuple(
+        cast(GeneratedImage, _with_local_artifact(image, str(materialized.path)))
+        for image, materialized in zip(
+            generated_media.scene_images,
+            materialized_media.scene_images,
+            strict=True,
+        )
+    )
+    scene_videos = tuple(
+        cast(GeneratedVideo, _with_local_artifact(video, str(materialized.path)))
+        for video, materialized in zip(
+            generated_media.scene_videos,
+            materialized_media.scene_videos,
+            strict=True,
+        )
+    )
+
+    return GeneratedMediaPackage(
+        thumbnail=thumbnail,
+        narration=narration,
+        scene_images=scene_images,
+        scene_videos=scene_videos,
+    )
+
+
 class MediaExecutionPipeline:
     """Execute approved media generation and final Short assembly after planning stops."""
 
@@ -135,12 +264,18 @@ class MediaExecutionPipeline:
         self,
         *,
         media_generation_service: MediaGenerationService,
+        artifact_materialization_service: ArtifactMaterializationService,
         short_assembly_service: ShortAssemblyService,
     ) -> None:
         self.media_generation_service = self._validate_dependency(
             media_generation_service,
             MediaGenerationService,
             dependency_name="media_generation_service",
+        )
+        self.artifact_materialization_service = self._validate_dependency(
+            artifact_materialization_service,
+            ArtifactMaterializationService,
+            dependency_name="artifact_materialization_service",
         )
         self.short_assembly_service = self._validate_dependency(
             short_assembly_service,
@@ -224,18 +359,58 @@ class MediaExecutionPipeline:
             active_stage = STAGE_BUILD_MEDIA_REQUESTS
             media_generation_request = self.build_media_generation_request(request)
 
+            active_stage = STAGE_VERIFY_LIVE_CALL_POLICY
+            self._verify_live_call_policy(request, media_generation_request)
+
             active_stage = STAGE_MEDIA_GENERATION
             generated_media = await self.media_generation_service.generate_package(
                 media_generation_request
+            )
+            self.logger.info(
+                "media_execution_stage_completed",
+                pipeline_name=PIPELINE_NAME,
+                stage=STAGE_MEDIA_GENERATION,
+                run_id=request.run_id,
+                success=True,
+            )
+
+            active_stage = STAGE_ARTIFACT_MATERIALIZATION
+            materialized_media = self.artifact_materialization_service.materialize_package(
+                generated_media,
+                run_id=request.run_id,
+            )
+            self.logger.info(
+                "media_execution_stage_completed",
+                pipeline_name=PIPELINE_NAME,
+                stage=STAGE_ARTIFACT_MATERIALIZATION,
+                run_id=request.run_id,
+                success=True,
+            )
+
+            active_stage = STAGE_BUILD_ASSEMBLY_INPUTS
+            assembly_media = _materialize_generated_media_for_assembly(
+                generated_media,
+                materialized_media,
             )
 
             active_stage = STAGE_SHORT_ASSEMBLY
             assembly = await self.short_assembly_service.assemble(
                 ShortAssemblyRequest(
                     storyboard=request.content_result.storyboard,
-                    generated_media=generated_media,
+                    generated_media=assembly_media,
+                    width=request.width,
+                    height=request.height,
+                    fps=request.fps,
+                    output_format=request.output_format,
                 ),
                 render_provider_name=request.render_provider_name,
+            )
+            self.logger.info(
+                "media_execution_stage_completed",
+                pipeline_name=PIPELINE_NAME,
+                stage=STAGE_SHORT_ASSEMBLY,
+                run_id=request.run_id,
+                success=True,
             )
         except CreatorOSError:
             self.logger.exception(
@@ -257,14 +432,19 @@ class MediaExecutionPipeline:
             ) from error
 
         result = MediaExecutionResult(
+            run_id=request.run_id,
             content_result=request.content_result,
             approval=request.approval,
+            provider_selection=request.provider_selection,
+            render_provider_name=request.render_provider_name,
             generated_media=generated_media,
+            materialized_media=materialized_media,
             assembly=assembly,
         )
         self.logger.info(
             "media_execution_completed",
             pipeline_name=PIPELINE_NAME,
+            run_id=request.run_id,
             success=True,
             scene_count=result.assembly.scene_count,
         )
@@ -288,6 +468,53 @@ class MediaExecutionPipeline:
                 "explicit human approval is required before media execution",
                 code="media_execution_approval_required",
                 details={"approved": approval.approved},
+            )
+
+    def _verify_live_call_policy(
+        self,
+        request: ApprovedMediaExecutionRequest,
+        media_request: MediaGenerationPackageRequest,
+    ) -> None:
+        """Require explicit confirmation before any non-mock media provider can be used."""
+
+        selection = (
+            MediaProviderSelection()
+            if request.provider_selection is None
+            else request.provider_selection
+        )
+        defaults = self.media_generation_service.settings
+        effective_image_provider = (
+            defaults.default_image_provider
+            if selection.image_provider_name is None
+            else selection.image_provider_name
+        )
+        effective_tts_provider = (
+            defaults.default_tts_provider
+            if selection.tts_provider_name is None
+            else selection.tts_provider_name
+        )
+        effective_video_provider = (
+            defaults.default_video_provider
+            if selection.video_provider_name is None
+            else selection.video_provider_name
+        )
+
+        live_media_providers: list[str] = []
+        if (
+            (media_request.thumbnail_request is not None or media_request.scene_image_requests)
+            and not _is_mock_provider_name(effective_image_provider)
+        ):
+            live_media_providers.append(effective_image_provider)
+        if media_request.narration_request is not None and not _is_mock_provider_name(effective_tts_provider):
+            live_media_providers.append(effective_tts_provider)
+        if media_request.scene_video_requests and not _is_mock_provider_name(effective_video_provider):
+            live_media_providers.append(effective_video_provider)
+
+        if live_media_providers and not request.confirm_live_media_calls:
+            raise ApprovalRequiredError(
+                "explicit live media confirmation is required before non-mock media generation",
+                code="media_execution_live_confirmation_required",
+                details={"provider_names": tuple(dict.fromkeys(live_media_providers))},
             )
 
     def _build_aligned_scene_visuals(
@@ -385,37 +612,64 @@ class MediaExecutionPipeline:
 
 def create_media_execution_pipeline(
     *,
+    provider_registry=None,
     media_generation_service: MediaGenerationService | None = None,
+    artifact_materialization_service: ArtifactMaterializationService | None = None,
     short_assembly_service: ShortAssemblyService | None = None,
     settings=None,
 ) -> MediaExecutionPipeline:
     """Create a safe mock-first approved media-execution pipeline."""
 
-    from creatoros.services import create_media_generation_service, create_short_assembly_service
+    from creatoros.services import (
+        create_artifact_materialization_service,
+        create_media_generation_service,
+        create_media_render_service,
+        create_short_assembly_service,
+    )
 
     resolved_media_generation_service = (
-        create_media_generation_service(settings=settings)
+        create_media_generation_service(
+            provider_registry=provider_registry,
+            settings=settings,
+        )
         if media_generation_service is None
         else media_generation_service
     )
+    resolved_artifact_materialization_service = (
+        create_artifact_materialization_service(settings=settings)
+        if artifact_materialization_service is None
+        else artifact_materialization_service
+    )
     resolved_short_assembly_service = (
-        create_short_assembly_service(settings=settings)
+        create_short_assembly_service(
+            media_render_service=create_media_render_service(
+                provider_registry=provider_registry,
+                settings=settings,
+            )
+            if provider_registry is not None
+            else None,
+            settings=settings,
+        )
         if short_assembly_service is None
         else short_assembly_service
     )
     return MediaExecutionPipeline(
         media_generation_service=resolved_media_generation_service,
+        artifact_materialization_service=resolved_artifact_materialization_service,
         short_assembly_service=resolved_short_assembly_service,
     )
 
 
 __all__ = [
     "PIPELINE_NAME",
+    "STAGE_ARTIFACT_MATERIALIZATION",
+    "STAGE_BUILD_ASSEMBLY_INPUTS",
     "STAGE_BUILD_MEDIA_REQUESTS",
     "STAGE_MEDIA_GENERATION",
     "STAGE_SHORT_ASSEMBLY",
     "STAGE_VALIDATE_REQUEST",
     "STAGE_VERIFY_HUMAN_APPROVAL",
+    "STAGE_VERIFY_LIVE_CALL_POLICY",
     "STAGE_VERIFY_PUBLICATION_READINESS",
     "MediaExecutionPipeline",
     "create_media_execution_pipeline",

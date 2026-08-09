@@ -370,6 +370,8 @@ When a final-assembly application service is added, it must remain a mapping and
 
 When a post-approval media-execution pipeline is added, it must preserve the two-phase architecture explicitly. Content planning must still stop at publication-readiness review, and media execution must require a second explicit call with positive human approval. Publication readiness must never be treated as implicit approval, and no media-generation or render-provider calls may occur before both gates pass.
 
+When that post-approval production path can select live media providers, explicit confirmation is mandatory. The existence of configured API keys, default provider names, or successful mock execution must not be treated as authorization for paid external calls. Live image or TTS generation must fail before provider execution unless the caller has intentionally opted in, while local FFmpeg rendering remains outside that paid-call confirmation gate.
+
 When a real local render provider is added, it must remain a subprocess boundary only. It may validate local artifact paths, discover the configured FFmpeg executable, build argv-based commands, and normalize the resulting local MP4 into `RenderedVideo`, but it must not use `shell=True`, must not fetch remote assets, must not call media-generation providers, and must not introduce MoviePy or unrelated rendering frameworks without an explicit architectural decision.
 
 When a prompt output has a typed parser, it should be registered through a provider-independent parser registry using the same stable logical prompt name used by the prompt registry. Parser registration must declare the expected output model type explicitly, and builtin prompt/parser alignment should be validated through deterministic contract checks rather than informal assumptions.
@@ -406,6 +408,7 @@ The following rules are mandatory:
 - FFmpeg command execution must use separate argv arguments with explicit timeouts and cleanup.
 - Subtitle and caption temp files must stay inside the controlled render working directory, use UTF-8 encoding, and be cleaned on success or failure.
 - Audio filter graphs must be deterministic, avoid hidden looping, and normalize source narration into explicit output codec, sample-rate, and channel settings when audio is included in the final MP4.
+- One validated run ID should own the complete local production workspace so generated media, materialized files, and final local render output stay traceable to the same execution.
 
 File and asset operations should preserve traceability, reproducibility, and recovery.
 

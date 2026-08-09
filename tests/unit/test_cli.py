@@ -36,12 +36,19 @@ class StubSettings:
     database_url: str = "postgresql+psycopg://user:secret@localhost:5432/creatoros_dev"
     default_llm_provider: str = "mock"
     default_llm_model: str = "mock-model"
+    default_image_provider: str = "mock"
+    default_image_model: str | None = None
+    default_tts_provider: str = "mock"
+    default_tts_model: str | None = None
+    default_video_provider: str = "mock"
+    default_render_provider: str = "mock"
     openai_api_key: str | None = "openai-secret"
     anthropic_api_key: str | None = "anthropic-secret"
     youtube_client_id: str | None = "youtube-client"
     youtube_client_secret: str | None = "youtube-secret"
     provider_timeout_seconds: float = 30.0
     provider_max_retries: int = 3
+    artifact_root: str = "C:/GamingAIFactory/artifacts"
     assets_dir: str = "C:/GamingAIFactory/assets"
     logs_dir: str = "C:/GamingAIFactory/logs"
     prompts_dir: str = "C:/GamingAIFactory/prompts"
@@ -493,6 +500,217 @@ def test_run_gaming_accepts_explicit_game_and_topic(cli_module) -> None:
     assert "Roblox" in stdout
     assert "Funny Myths" in stdout
     assert "Elden Ring" not in stdout
+
+
+def test_run_help_displays_short_command(cli_module) -> None:
+    """Run help should include the short-production command."""
+
+    exit_code, stdout, stderr = run_cli(cli_module, ["run", "--help"])
+
+    assert exit_code == 0
+    assert "short" in stdout
+    assert stderr == ""
+
+
+def test_run_short_requires_explicit_approval(cli_module, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Short production must require explicit approval before execution begins."""
+
+    monkeypatch.setattr(cli_module, "get_settings", lambda: StubSettings())
+
+    exit_code, stdout, stderr = run_cli(cli_module, ["run", "short"])
+
+    assert exit_code == 3
+    assert stdout == ""
+    assert "--approve" in stderr
+
+
+def test_run_short_mock_execution_reports_summary(cli_module, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Offline short production should print a high-level success summary."""
+
+    from creatoros import orchestrator
+
+    captured: dict[str, object] = {}
+
+    class FakePipeline:
+        async def execute(self, request):
+            captured["request"] = request
+            return cast(
+                object,
+                type(
+                    "FakeResult",
+                    (),
+                    {
+                        "run_id": request.run_id,
+                        "approval": type("Approval", (), {"approved_by": request.approval.approved_by})(),
+                        "content_result": type(
+                            "ContentResult",
+                            (),
+                            {"script": type("Script", (), {"title": request.content_result.script.title})()},
+                        )(),
+                        "provider_selection": request.provider_selection,
+                        "render_provider_name": request.render_provider_name,
+                        "materialized_media": type(
+                            "MaterializedMedia",
+                            (),
+                            {
+                                "workspace": type(
+                                    "Workspace",
+                                    (),
+                                    {"workspace_path": Path(f"C:/GamingAIFactory/artifacts/{request.run_id}")},
+                                )()
+                            },
+                        )(),
+                        "assembly": type(
+                            "Assembly",
+                            (),
+                            {
+                                "scene_count": 3,
+                                "total_duration_seconds": 30.0,
+                                "rendered_video": type(
+                                    "RenderedVideo",
+                                    (),
+                                    {
+                                        "artifact": type(
+                                            "Artifact",
+                                            (),
+                                            {"uri": "mock://rendered/video/demo.mp4"},
+                                        )(),
+                                        "metadata": {"output_format": "mp4"},
+                                    },
+                                )(),
+                            },
+                        )(),
+                    },
+                )(),
+            )
+
+    monkeypatch.setattr(cli_module, "get_settings", lambda: StubSettings())
+    monkeypatch.setattr(orchestrator, "create_media_execution_pipeline", lambda **kwargs: FakePipeline())
+
+    exit_code, stdout, stderr = run_cli(
+        cli_module,
+        ["run", "short", "--game", "Roblox", "--topic", "funny myths", "--approve"],
+    )
+
+    request = captured["request"]
+    assert exit_code == 0
+    assert "workflow: controlled short production" in stdout
+    assert "run_id: short_roblox_funny_myths" in stdout
+    assert "title: Roblox: Funny Myths" in stdout
+    assert "final_video: mock://rendered/video/demo.mp4" in stdout
+    assert "materialized_workspace: C:\\GamingAIFactory\\artifacts\\short_roblox_funny_myths" in stdout or "materialized_workspace: C:/GamingAIFactory/artifacts/short_roblox_funny_myths" in stdout
+    assert "live_media_confirmed: false" in stdout
+    assert stderr == ""
+    assert request.confirm_live_media_calls is False
+
+
+def test_run_short_live_media_requires_confirmation(cli_module, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Live media providers should be blocked without explicit confirmation."""
+
+    monkeypatch.setattr(cli_module, "get_settings", lambda: StubSettings())
+
+    exit_code, stdout, stderr = run_cli(
+        cli_module,
+        ["run", "short", "--approve", "--image-provider", "openai-image"],
+    )
+
+    assert exit_code == 3
+    assert stdout == ""
+    assert "--confirm-live-calls" in stderr
+
+
+def test_run_short_live_media_requires_api_key(cli_module, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Explicit live media still requires configured credentials."""
+
+    monkeypatch.setattr(
+        cli_module,
+        "get_settings",
+        lambda: StubSettings(openai_api_key=None),
+    )
+
+    exit_code, stdout, stderr = run_cli(
+        cli_module,
+        ["run", "short", "--approve", "--image-provider", "openai-image", "--confirm-live-calls"],
+    )
+
+    assert exit_code == 3
+    assert stdout == ""
+    assert "OPENAI_API_KEY is not configured" in stderr
+
+
+def test_run_short_ffmpeg_render_does_not_require_live_media_confirmation(
+    cli_module,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Selecting FFmpeg alone should still allow offline execution."""
+
+    from creatoros import orchestrator
+
+    class FakePipeline:
+        async def execute(self, request):
+            return cast(
+                object,
+                type(
+                    "FakeResult",
+                    (),
+                    {
+                        "run_id": request.run_id,
+                        "approval": type("Approval", (), {"approved_by": request.approval.approved_by})(),
+                        "content_result": type(
+                            "ContentResult",
+                            (),
+                            {"script": type("Script", (), {"title": request.content_result.script.title})()},
+                        )(),
+                        "provider_selection": request.provider_selection,
+                        "render_provider_name": request.render_provider_name,
+                        "materialized_media": type(
+                            "MaterializedMedia",
+                            (),
+                            {
+                                "workspace": type(
+                                    "Workspace",
+                                    (),
+                                    {"workspace_path": Path(f"C:/GamingAIFactory/artifacts/{request.run_id}")},
+                                )()
+                            },
+                        )(),
+                        "assembly": type(
+                            "Assembly",
+                            (),
+                            {
+                                "scene_count": 3,
+                                "total_duration_seconds": 30.0,
+                                "rendered_video": type(
+                                    "RenderedVideo",
+                                    (),
+                                    {
+                                        "artifact": type(
+                                            "Artifact",
+                                            (),
+                                            {"uri": f"C:/GamingAIFactory/artifacts/{request.run_id}/video/final_short.mp4"},
+                                        )(),
+                                        "metadata": {"output_format": "mp4"},
+                                    },
+                                )(),
+                            },
+                        )(),
+                    },
+                )(),
+            )
+
+    monkeypatch.setattr(cli_module, "get_settings", lambda: StubSettings())
+    monkeypatch.setattr(cli_module, "_build_short_provider_registry", lambda args: object())
+    monkeypatch.setattr(orchestrator, "create_media_execution_pipeline", lambda **kwargs: FakePipeline())
+
+    exit_code, stdout, stderr = run_cli(
+        cli_module,
+        ["run", "short", "--approve", "--render-provider", "ffmpeg"],
+    )
+
+    assert exit_code == 0
+    assert "render_provider: ffmpeg" in stdout
+    assert "success: true" in stdout
+    assert stderr == ""
 
 
 def test_openai_check_succeeds_without_network(cli_module, monkeypatch: pytest.MonkeyPatch) -> None:

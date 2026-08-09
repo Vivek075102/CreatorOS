@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import logging
+import re
 import sys
 from contextlib import redirect_stderr, redirect_stdout
 from dataclasses import dataclass
@@ -593,7 +594,7 @@ def _build_parser() -> argparse.ArgumentParser:
         handler=_handle_parsers_validate,
     )
 
-    run_parser = subparsers.add_parser("run", help="Run deterministic local demo workflows.")
+    run_parser = subparsers.add_parser("run", help="Run deterministic demos and controlled short-production workflows.")
     run_subparsers = run_parser.add_subparsers(dest="command_name")
 
     run_gaming = run_subparsers.add_parser(
@@ -617,6 +618,66 @@ def _build_parser() -> argparse.ArgumentParser:
         command_group="run",
         command_name="gaming",
         handler=_handle_run_gaming,
+    )
+
+    run_short = run_subparsers.add_parser(
+        "short",
+        help="Run the controlled end-to-end short-production workflow from a deterministic approved package.",
+    )
+    run_short.add_argument("--game", default="Minecraft", help="Game name for the approved short package.")
+    run_short.add_argument("--topic", default="gaming facts", help="Topic for the approved short package.")
+    run_short.add_argument(
+        "--run-id",
+        default=None,
+        help="Stable artifact workspace run ID. If omitted, a deterministic safe run ID is derived.",
+    )
+    run_short.add_argument(
+        "--approved-by",
+        default="cli_operator",
+        help="Human approver identifier recorded on the production request.",
+    )
+    run_short.add_argument(
+        "--approve",
+        action="store_true",
+        help="Required explicit approval acknowledgement before production execution starts.",
+    )
+    run_short.add_argument(
+        "--image-provider",
+        default="mock",
+        choices=["mock", "openai-image"],
+        help="Image provider for thumbnail and scene images.",
+    )
+    run_short.add_argument(
+        "--tts-provider",
+        default="mock",
+        choices=["mock", "openai-tts"],
+        help="TTS provider for narration generation.",
+    )
+    run_short.add_argument(
+        "--video-provider",
+        default="mock",
+        choices=["mock"],
+        help="Video provider for optional scene clips.",
+    )
+    run_short.add_argument(
+        "--render-provider",
+        default="mock",
+        choices=["mock", "ffmpeg"],
+        help="Render provider for final short composition.",
+    )
+    run_short.add_argument(
+        "--confirm-live-calls",
+        action="store_true",
+        help="Required acknowledgement before any live non-mock media provider is used.",
+    )
+    run_short.add_argument("--width", default=1080, type=int, help="Final short width in pixels.")
+    run_short.add_argument("--height", default=1920, type=int, help="Final short height in pixels.")
+    run_short.add_argument("--fps", default=30.0, type=float, help="Final short frame rate.")
+    run_short.add_argument("--output-format", default="mp4", help="Final short output format identifier.")
+    run_short.set_defaults(
+        command_group="run",
+        command_name="short",
+        handler=_handle_run_short,
     )
 
     return parser
@@ -1196,6 +1257,304 @@ def _handle_run_gaming(
             rows.append(("published_post_id", result.published_post.id))
             rows.append(("published_url", result.published_post.url))
 
+    _write_rows(stdout, rows)
+    return EXIT_SUCCESS
+
+
+def _normalize_cli_text(value: str, *, field_name: str) -> str:
+    """Trim CLI text values and reject blanks safely."""
+
+    normalized_value = value.strip()
+    if not normalized_value:
+        raise CreatorOSValidationError(
+            f"{field_name} must not be blank",
+            code="cli_invalid_text_input",
+            details={"field_name": field_name},
+        )
+    return normalized_value
+
+
+def _format_short_title(*, game: str, topic: str) -> str:
+    """Build one deterministic readable title for the CLI short-production package."""
+
+    normalized_game = _normalize_cli_text(game, field_name="game")
+    normalized_topic = " ".join(_normalize_cli_text(topic, field_name="topic").split()).title()
+    return f"{normalized_game}: {normalized_topic}"
+
+
+def _build_default_short_run_id(*, game: str, topic: str) -> str:
+    """Create one deterministic safe run ID from the CLI short inputs."""
+
+    seed = f"{_normalize_cli_text(game, field_name='game')} {_normalize_cli_text(topic, field_name='topic')}"
+    normalized_seed = re.sub(r"[^0-9A-Za-z._-]+", "_", seed.strip().lower())
+    normalized_seed = re.sub(r"_+", "_", normalized_seed).strip("._-")
+    if not normalized_seed:
+        normalized_seed = "short"
+    return f"short_{normalized_seed}"
+
+
+def _build_demo_approved_media_execution_request(args: argparse.Namespace):
+    """Build one deterministic approved short-production request from CLI inputs."""
+
+    from creatoros.orchestrator import ApprovedMediaExecutionRequest
+    from creatoros.services import MediaProviderSelection
+
+    normalized_game = _normalize_cli_text(args.game, field_name="game")
+    normalized_topic = _normalize_cli_text(args.topic, field_name="topic")
+    title = _format_short_title(game=normalized_game, topic=normalized_topic)
+    run_id = (
+        _normalize_cli_text(args.run_id, field_name="run_id")
+        if args.run_id is not None
+        else _build_default_short_run_id(game=normalized_game, topic=normalized_topic)
+    )
+
+    return ApprovedMediaExecutionRequest.model_validate(
+        {
+            "content_result": {
+                "trend_discovery": {
+                    "title": title,
+                    "game": normalized_game,
+                    "topic": normalized_topic,
+                    "angle": f"Explain one clear {normalized_topic} angle for {normalized_game}.",
+                    "why_now": f"The {normalized_topic} topic remains useful for deterministic short production validation.",
+                    "source_summary": "Deterministic CLI-approved package for controlled short production.",
+                    "confidence": "high",
+                },
+                "opportunity_evaluation": {
+                    "decision": "accept",
+                    "score": 84,
+                    "strengths": "The topic is concise, reusable, and easy to validate end to end.",
+                    "risks": "Claims should remain tied to the deterministic approved package only.",
+                    "recommended_angle": f"Focus on one clean {normalized_topic} explanation for {normalized_game}.",
+                    "hook_direction": f"Challenge a common {normalized_game} assumption quickly.",
+                    "reason": "The package is intentionally shaped for controlled short-production execution.",
+                },
+                "opportunity": {
+                    "title": title,
+                    "game": normalized_game,
+                    "topic": normalized_topic,
+                    "source": "deterministic_cli_approved_package",
+                    "opportunity_score": 84,
+                    "reasoning": "Deterministic approved short package for local production execution.",
+                    "estimated_duration_seconds": 30,
+                    "references": [
+                        "Deterministic CLI-approved package.",
+                        f"Game: {normalized_game}",
+                        f"Topic: {normalized_topic}",
+                    ],
+                },
+                "script": {
+                    "title": title,
+                    "hook": f"You probably still believe this {normalized_game} point.",
+                    "body": f"Here is one concise {normalized_topic} explanation built for controlled CreatorOS production.",
+                    "ending": f"That is the quick {normalized_game} breakdown.",
+                    "call_to_action": f"What {normalized_game} topic should CreatorOS test next?",
+                    "estimated_duration_seconds": 30,
+                    "evidence_note": "Deterministic CLI package only.",
+                },
+                "storyboard": {
+                    "storyboard_title": title,
+                    "scenes": [
+                        {
+                            "scene_number": 1,
+                            "purpose": "Open with the core hook.",
+                            "script_beat": f"You probably still believe this {normalized_game} point.",
+                            "visual": f"Fast {normalized_game} visual opener tied to {normalized_topic}.",
+                            "on_screen_text": title,
+                            "duration_seconds": 10.0,
+                        },
+                        {
+                            "scene_number": 2,
+                            "purpose": "Deliver the explanation clearly.",
+                            "script_beat": f"Here is one concise {normalized_topic} explanation built for controlled CreatorOS production.",
+                            "visual": f"Readable evidence-style explanation frame for {normalized_game}.",
+                            "on_screen_text": "Quick Breakdown",
+                            "duration_seconds": 12.0,
+                        },
+                        {
+                            "scene_number": 3,
+                            "purpose": "Close with the CTA.",
+                            "script_beat": f"That is the quick {normalized_game} breakdown. What {normalized_game} topic should CreatorOS test next?",
+                            "visual": f"Closing branded frame for {normalized_game}.",
+                            "on_screen_text": "What Next?",
+                            "duration_seconds": 8.0,
+                        },
+                    ],
+                    "final_scene_count": 3,
+                    "total_estimated_duration_seconds": 30.0,
+                },
+                "media_plans": {
+                    "thumbnail_concept": {
+                        "concept": f"Readable contrast thumbnail for {title}.",
+                        "focal_subject": f"One clear {normalized_game} focal subject.",
+                        "background": f"Recognizable {normalized_game} gameplay-inspired backdrop.",
+                        "composition": "Large subject with clean readable contrast.",
+                        "expression_or_action": "Focused reaction that supports the topic.",
+                        "on_image_text": title,
+                        "style_direction": "Clean, readable, vertical-short friendly composition.",
+                        "avoid": "Clutter and unsupported claims.",
+                        "evidence_note": "Deterministic CLI package only.",
+                    },
+                    "narration_direction": {
+                        "narration_text": (
+                            f"You probably still believe this {normalized_game} point. "
+                            f"Here is one concise {normalized_topic} explanation built for controlled CreatorOS production. "
+                            f"That is the quick {normalized_game} breakdown."
+                        ),
+                        "tone": "Clear and engaging.",
+                        "pace": "Brisk but readable.",
+                        "emphasis": f"Stress the {normalized_game} topic and the key correction.",
+                        "pause_guidance": "Pause briefly before the explanation lands.",
+                        "pronunciation_notes": f"Pronounce {normalized_game} clearly.",
+                        "target_duration_seconds": 30,
+                    },
+                    "scene_visuals": [],
+                    "scene_motions": [],
+                },
+                "review_results": {
+                    "script_quality": {
+                        "decision": "accept",
+                        "summary": "The deterministic script is concise and production-ready.",
+                        "hook_review": "The hook is clear and immediate.",
+                        "clarity_review": "The wording is easy to narrate.",
+                        "structure_review": "The flow remains simple and ordered.",
+                        "factual_restraint": "The package avoids unsupported expansion.",
+                        "pacing_review": "The pacing fits a short-form render target.",
+                        "ending_review": "The ending closes cleanly.",
+                        "issues": "None.",
+                        "recommendations": "Preserve the deterministic structure.",
+                    },
+                    "evidence_consistency": {
+                        "decision": "consistent",
+                        "summary": "The deterministic package stays internally consistent.",
+                        "supported_claims": "The package uses only its own approved content.",
+                        "unsupported_claims": "None.",
+                        "contradictions": "None.",
+                        "uncertainties": "None.",
+                        "overstatements": "None.",
+                        "recommendations": "Keep the package bounded to the approved request.",
+                    },
+                    "storyboard_quality": {
+                        "decision": "accept",
+                        "summary": "The storyboard supports the script structure clearly.",
+                        "script_fidelity": "Scenes match the approved script beats.",
+                        "hook_scene": "The first scene supports the opening hook.",
+                        "scene_sequence": "The sequence remains clear and sequential.",
+                        "visual_clarity": "The visuals are easy to interpret.",
+                        "pacing": "Scene timing fits the production target.",
+                        "ending_scene": "The ending scene closes the short cleanly.",
+                        "unsupported_visuals": "None.",
+                        "issues": "None.",
+                        "recommendations": "Keep the same scene order and timing.",
+                    },
+                },
+                "publication_readiness": {
+                    "decision": "ready_for_human_review",
+                    "summary": "The deterministic short package is ready for explicit human approval and production execution.",
+                    "artifact_alignment": "Opportunity, script, storyboard, and media plans are aligned.",
+                    "evidence_status": "No unresolved evidence conflicts exist in the deterministic package.",
+                    "missing_or_incomplete": "None.",
+                    "blockers": "None.",
+                    "non_blocking_improvements": "Future live packages may replace the deterministic copy.",
+                    "human_review_focus": "Confirm the package should enter production execution.",
+                },
+            },
+            "approval": {
+                "approved": True,
+                "approved_by": _normalize_cli_text(args.approved_by, field_name="approved_by"),
+            },
+            "run_id": run_id,
+            "provider_selection": MediaProviderSelection(
+                image_provider_name=args.image_provider,
+                tts_provider_name=args.tts_provider,
+                video_provider_name=args.video_provider,
+            ),
+            "render_provider_name": args.render_provider,
+            "confirm_live_media_calls": args.confirm_live_calls,
+            "width": args.width,
+            "height": args.height,
+            "fps": args.fps,
+            "output_format": args.output_format,
+        }
+    )
+
+
+def _build_short_provider_registry(args: argparse.Namespace):
+    """Create the provider registry for one controlled short-production execution."""
+
+    from creatoros.providers import (
+        register_ffmpeg_render_provider,
+        register_openai_image_provider,
+        register_openai_tts_provider,
+    )
+
+    provider_registry = create_mock_provider_registry()
+    if args.image_provider == "openai-image":
+        register_openai_image_provider(provider_registry)
+    if args.tts_provider == "openai-tts":
+        register_openai_tts_provider(provider_registry)
+    if args.render_provider == "ffmpeg":
+        register_ffmpeg_render_provider(provider_registry)
+    return provider_registry
+
+
+def _handle_run_short(
+    args: argparse.Namespace,
+    *,
+    stdout: TextIO,
+    stderr: TextIO,
+) -> int:
+    """Run the controlled end-to-end short-production workflow."""
+
+    from creatoros.orchestrator import create_media_execution_pipeline
+
+    if not args.approve:
+        _write_error(
+            stderr,
+            "Error: run short requires --approve before production execution can start.",
+        )
+        return EXIT_CONFIGURATION_ERROR
+
+    live_media_requested = args.image_provider != "mock" or args.tts_provider != "mock" or args.video_provider != "mock"
+    if live_media_requested and not args.confirm_live_calls:
+        _write_error(
+            stderr,
+            "Error: non-mock media providers require --confirm-live-calls before execution.",
+        )
+        return EXIT_CONFIGURATION_ERROR
+
+    settings = get_settings()
+    if live_media_requested and not _is_configured(settings.openai_api_key):
+        _write_error(
+            stderr,
+            "Error: OPENAI_API_KEY is not configured. Set it manually before running live media generation.",
+        )
+        return EXIT_CONFIGURATION_ERROR
+
+    request = _build_demo_approved_media_execution_request(args)
+    pipeline = create_media_execution_pipeline(
+        provider_registry=_build_short_provider_registry(args),
+        settings=settings,
+    )
+    result = asyncio.run(pipeline.execute(request))
+
+    rows: list[tuple[str, object]] = [
+        ("workflow", "controlled short production"),
+        ("run_id", result.run_id),
+        ("approved_by", result.approval.approved_by),
+        ("title", result.content_result.script.title),
+        ("image_provider", result.provider_selection.image_provider_name if result.provider_selection is not None else settings.default_image_provider),
+        ("tts_provider", result.provider_selection.tts_provider_name if result.provider_selection is not None else settings.default_tts_provider),
+        ("video_provider", result.provider_selection.video_provider_name if result.provider_selection is not None else settings.default_video_provider),
+        ("render_provider", result.render_provider_name or settings.default_render_provider),
+        ("storyboard_scenes", result.assembly.scene_count),
+        ("materialized_workspace", result.materialized_media.workspace.workspace_path),
+        ("final_video", result.assembly.rendered_video.artifact.uri),
+        ("duration_seconds", result.assembly.total_duration_seconds),
+        ("output_format", result.assembly.rendered_video.metadata.get("output_format", request.output_format)),
+        ("live_media_confirmed", request.confirm_live_media_calls),
+        ("success", True),
+    ]
     _write_rows(stdout, rows)
     return EXIT_SUCCESS
 

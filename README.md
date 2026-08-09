@@ -26,7 +26,7 @@ CreatorOS now includes a local runtime artifact materialization layer for provid
 - Workspaces are deterministic and run-scoped, for example `artifacts/run_001/images/`, `artifacts/run_001/audio/`, and `artifacts/run_001/video/`.
 - Filenames are sanitized, MIME types are allowlisted, path traversal is rejected, and writes use a temporary file plus `os.replace` for atomic finalization.
 - Raw payload bytes remain ephemeral on generated media contracts and are excluded from normal serialization and logging.
-- Provider adapters still do not write files directly, and this milestone does not add cloud storage, FFmpeg, MP4 rendering, or publishing.
+- Provider adapters still do not write files directly, and the artifact workspace now feeds the local FFmpeg render path without adding cloud storage or publishing.
 
 ## CLI
 
@@ -247,8 +247,8 @@ CreatorOS now also includes a provider-independent final assembly layer for Shor
 - Scene captions currently come only from existing typed storyboard `on_screen_text` fields and remain render instructions only.
 - `MediaRenderService` remains the render boundary. `ShortAssemblyService` builds the request and delegates rendering through that existing application service.
 - The default render path remains the deterministic mock renderer, which returns a typed `RenderedVideo` reference only.
-- No actual MP4, FFmpeg pipeline, MoviePy pipeline, caption burn-in, audio mixing, or integrated publishing flow exists yet.
-- Larger pipeline wiring between planning, generation, assembly, and publication remains a later milestone.
+- Real local MP4 rendering now exists through the FFmpeg provider path, while mock remains the default for offline development and automated tests.
+- Publishing, scheduling, analytics, cloud storage, and broader operational hardening remain later milestones.
 
 ## FFmpeg Render Provider
 
@@ -290,12 +290,31 @@ CreatorOS now also includes an explicit post-approval media-execution pipeline:
 - `GamingContentPipeline` remains phase 1 only. It still stops after publication-readiness review and does not generate media automatically.
 - `MediaExecutionPipeline` is a separate phase 2 entry point. The caller must pass both a completed `GamingContentPipelineResult` and explicit positive `HumanApproval`.
 - Publication readiness does not equal human approval. Both gates must pass before any media-generation or render calls begin.
-- The execution path is `GamingContentPipelineResult -> MediaGenerationService -> GeneratedMediaPackage -> ShortAssemblyService -> MediaRenderService -> RenderedVideo`.
+- The execution path is `GamingContentPipelineResult -> MediaGenerationService -> GeneratedMediaPackage -> ArtifactMaterializationService -> ShortAssemblyService -> MediaRenderService -> RenderedVideo`.
 - Thumbnail planning becomes a thumbnail-generation request and remains outside the video timeline for later publishing work.
 - Narration planning becomes a typed TTS request, and storyboard scenes become deterministic scene-image requests using existing approved planning data only.
 - Optional scene-video requests are created only when aligned typed scene-visual and scene-motion plans are actually available.
 - Default providers remain mock-first, so normal execution stays offline and deterministic unless real providers are explicitly registered and selected.
+- Live non-mock media generation requires explicit confirmation before execution. API-key presence alone is not authorization.
+- One validated run ID owns the complete workspace from generated media through materialized files and the final local MP4 path when FFmpeg rendering is used.
 - Media can now be materialized locally and rendered into a real local MP4 through the explicit FFmpeg render provider, but mock remains the default and no storage or publishing exists in this milestone.
+
+## Controlled Short Production CLI
+
+CreatorOS now includes a small controlled CLI surface for end-to-end short production:
+
+```bash
+python -m creatoros run short --approve
+python -m creatoros run short --game Roblox --topic "funny myths" --approve
+python -m creatoros run short --game Roblox --topic "funny myths" --approve --render-provider ffmpeg
+python -m creatoros run short --game Roblox --topic "funny myths" --approve --image-provider openai-image --tts-provider openai-tts --confirm-live-calls
+```
+
+- `run short` builds a deterministic approved package and executes the post-approval production pipeline.
+- Offline execution remains easy because mock media providers and the mock render provider are still the defaults.
+- Live image or TTS generation is opt-in only and requires `--confirm-live-calls`.
+- FFmpeg is treated as a local render backend, not a paid live media provider.
+- The command does not publish, schedule, upload, or run analytics.
 
 ## Controlled OpenAI Smoke Test
 

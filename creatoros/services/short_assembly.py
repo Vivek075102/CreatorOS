@@ -24,6 +24,10 @@ class ShortAssemblyRequest(CreatorOSModel):
 
     storyboard: StoryboardSceneBreakdownOutput
     generated_media: GeneratedMediaPackage
+    width: int = Field(default=1080, gt=0)
+    height: int = Field(default=1920, gt=0)
+    fps: float = Field(default=30.0, gt=0)
+    output_format: str = "mp4"
 
     @field_validator("storyboard", "generated_media", mode="before")
     @classmethod
@@ -112,6 +116,10 @@ class ShortAssemblyService:
                 if generated_media.narration is None
                 else generated_media.narration.model_copy(deep=True)
             ),
+            width=request.width,
+            height=request.height,
+            fps=request.fps,
+            output_format=request.output_format,
         )
 
     async def assemble(
