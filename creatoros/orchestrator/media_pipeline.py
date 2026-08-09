@@ -2,22 +2,28 @@
 
 from __future__ import annotations
 
+import math
+from pathlib import Path
 from typing import cast
 
 from pydantic import ValidationError
 
 from creatoros.core import (
     ApprovalRequiredError,
+    ArtifactAlreadyExistsError,
+    ConfigurationError,
     CreatorOSError,
     CreatorOSValidationError,
     WorkflowError,
 )
+from creatoros.domain import AssetType, GeneratedAsset
 from creatoros.observability import get_logger
 from creatoros.orchestrator.models import (
     ApprovedMediaExecutionRequest,
     GamingContentPipelineResult,
     HumanApproval,
     MediaExecutionResult,
+    ProductionExecutionPlan,
 )
 from creatoros.parsing import GamingSceneMotionOutput, GamingSceneVisualOutput, StoryboardScenePlan
 from creatoros.providers import (
@@ -41,6 +47,7 @@ from creatoros.services import (
 
 PIPELINE_NAME = "approved_media_execution_pipeline"
 STAGE_VALIDATE_REQUEST = "validate_request"
+STAGE_PREFLIGHT = "preflight"
 STAGE_VERIFY_PUBLICATION_READINESS = "verify_publication_readiness"
 STAGE_VERIFY_HUMAN_APPROVAL = "verify_human_approval"
 STAGE_BUILD_MEDIA_REQUESTS = "build_media_requests"
@@ -49,6 +56,10 @@ STAGE_MEDIA_GENERATION = "media_generation"
 STAGE_ARTIFACT_MATERIALIZATION = "artifact_materialization"
 STAGE_BUILD_ASSEMBLY_INPUTS = "build_assembly_inputs"
 STAGE_SHORT_ASSEMBLY = "short_assembly"
+STAGE_RESULT_VALIDATION = "result_validation"
+
+SUPPORTED_OUTPUT_FORMATS = frozenset({"mp4"})
+PROTECTED_FINAL_OUTPUT_FILENAME = "final_short.mp4"
 
 
 def _validate_non_blank(value: str, *, field_name: str) -> str:
@@ -150,6 +161,34 @@ def _is_mock_provider_name(value: str | None) -> bool:
     if value is None:
         return False
     return value.strip().casefold() == "mock"
+
+
+def _is_live_provider_name(value: str | None) -> bool:
+    """Return whether a provider name represents a non-mock live path."""
+
+    return not _is_mock_provider_name(value)
+
+
+def _normalize_output_format(value: str) -> str:
+    """Normalize a symbolic output format for explicit validation."""
+
+    return _validate_non_blank(value.lower(), field_name="output_format")
+
+
+def _failure_category_for_stage(stage: str) -> str:
+    """Map one internal stage name to a safe public failure category."""
+
+    if stage == STAGE_PREFLIGHT:
+        return "preflight_failed"
+    if stage == STAGE_MEDIA_GENERATION:
+        return "media_generation_failed"
+    if stage == STAGE_ARTIFACT_MATERIALIZATION:
+        return "materialization_failed"
+    if stage == STAGE_BUILD_ASSEMBLY_INPUTS:
+        return "assembly_failed"
+    if stage in {STAGE_SHORT_ASSEMBLY, STAGE_RESULT_VALIDATION}:
+        return "render_failed"
+    return "workflow_failed"
 
 
 def _materialize_generated_media_for_assembly(
@@ -340,6 +379,15 @@ class MediaExecutionPipeline:
                 code="media_execution_mapping_invalid",
             ) from error
 
+    def build_execution_plan(
+        self,
+        request: ApprovedMediaExecutionRequest,
+    ) -> ProductionExecutionPlan:
+        """Build one deterministic production execution plan without generating media."""
+
+        plan, _ = self._run_preflight(request, require_live_confirmation=False)
+        return plan
+
     async def execute(
         self,
         request: ApprovedMediaExecutionRequest,
@@ -350,17 +398,11 @@ class MediaExecutionPipeline:
         self.logger.info("media_execution_started", pipeline_name=PIPELINE_NAME)
 
         try:
-            active_stage = STAGE_VERIFY_PUBLICATION_READINESS
-            self._verify_publication_readiness(request.content_result)
-
-            active_stage = STAGE_VERIFY_HUMAN_APPROVAL
-            self._verify_human_approval(request.approval)
-
-            active_stage = STAGE_BUILD_MEDIA_REQUESTS
-            media_generation_request = self.build_media_generation_request(request)
-
-            active_stage = STAGE_VERIFY_LIVE_CALL_POLICY
-            self._verify_live_call_policy(request, media_generation_request)
+            active_stage = STAGE_PREFLIGHT
+            plan, media_generation_request = self._run_preflight(
+                request,
+                require_live_confirmation=True,
+            )
 
             active_stage = STAGE_MEDIA_GENERATION
             generated_media = await self.media_generation_service.generate_package(
@@ -412,43 +454,129 @@ class MediaExecutionPipeline:
                 run_id=request.run_id,
                 success=True,
             )
-        except CreatorOSError:
+
+            active_stage = STAGE_RESULT_VALIDATION
+            result = MediaExecutionResult(
+                run_id=request.run_id,
+                content_result=request.content_result,
+                approval=request.approval,
+                provider_selection=request.provider_selection,
+                render_provider_name=request.render_provider_name,
+                generated_media=generated_media,
+                materialized_media=materialized_media,
+                assembly=assembly,
+            )
+            self._validate_result_integrity(result, request=request)
+        except CreatorOSError as error:
+            error.details.setdefault("stage", active_stage)
+            error.details.setdefault(
+                "failure_category",
+                _failure_category_for_stage(active_stage),
+            )
             self.logger.exception(
                 "media_execution_failed",
                 pipeline_name=PIPELINE_NAME,
                 stage=active_stage,
+                failure_category=error.details["failure_category"],
             )
             raise
         except Exception as error:
+            failure_category = _failure_category_for_stage(active_stage)
             self.logger.exception(
                 "media_execution_failed",
                 pipeline_name=PIPELINE_NAME,
                 stage=active_stage,
+                failure_category=failure_category,
             )
             raise WorkflowError(
                 "approved media execution pipeline failed",
                 code="approved_media_execution_pipeline_failed",
-                details={"stage": active_stage},
+                details={
+                    "stage": active_stage,
+                    "failure_category": failure_category,
+                },
             ) from error
 
-        result = MediaExecutionResult(
-            run_id=request.run_id,
-            content_result=request.content_result,
-            approval=request.approval,
-            provider_selection=request.provider_selection,
-            render_provider_name=request.render_provider_name,
-            generated_media=generated_media,
-            materialized_media=materialized_media,
-            assembly=assembly,
-        )
         self.logger.info(
             "media_execution_completed",
             pipeline_name=PIPELINE_NAME,
             run_id=request.run_id,
             success=True,
-            scene_count=result.assembly.scene_count,
+            scene_count=plan.scene_count,
         )
         return result
+
+    def _run_preflight(
+        self,
+        request: ApprovedMediaExecutionRequest,
+        *,
+        require_live_confirmation: bool,
+    ) -> tuple[ProductionExecutionPlan, MediaGenerationPackageRequest]:
+        """Validate a production request fully before any media provider call occurs."""
+
+        self.logger.info(
+            "production_preflight_started",
+            pipeline_name=PIPELINE_NAME,
+            run_id=request.run_id,
+        )
+
+        self._validate_request_fields(request)
+        self._verify_publication_readiness(request.content_result)
+        self._verify_human_approval(request.approval)
+        media_generation_request = self.build_media_generation_request(request)
+
+        (
+            effective_image_provider,
+            effective_tts_provider,
+            effective_video_provider,
+            effective_render_provider,
+        ) = self._resolve_effective_provider_names(request)
+        plan = self._build_execution_plan(
+            request=request,
+            media_request=media_generation_request,
+            image_provider=effective_image_provider,
+            tts_provider=effective_tts_provider,
+            video_provider=effective_video_provider,
+            render_provider=effective_render_provider,
+        )
+
+        if require_live_confirmation:
+            self._verify_live_call_policy(request, media_generation_request)
+        self._validate_registered_providers(
+            media_request=media_generation_request,
+            image_provider=effective_image_provider,
+            tts_provider=effective_tts_provider,
+            video_provider=effective_video_provider,
+            render_provider=effective_render_provider,
+        )
+        self._validate_live_provider_configuration(plan)
+        self._validate_workspace_integrity(request)
+        self._validate_assembly_preflight(request, media_generation_request)
+
+        self.logger.info(
+            "production_preflight_completed",
+            pipeline_name=PIPELINE_NAME,
+            run_id=plan.run_id,
+            scene_count=plan.scene_count,
+            image_generation_count=plan.image_generation_count,
+            tts_generation_count=plan.tts_generation_count,
+            video_generation_count=plan.video_generation_count,
+            uses_live_media=plan.will_use_live_media,
+            render_provider=plan.render_provider,
+            success=True,
+        )
+        self.logger.info(
+            "production_plan_created",
+            pipeline_name=PIPELINE_NAME,
+            run_id=plan.run_id,
+            scene_count=plan.scene_count,
+            image_generation_count=plan.image_generation_count,
+            tts_generation_count=plan.tts_generation_count,
+            video_generation_count=plan.video_generation_count,
+            uses_live_media=plan.will_use_live_media,
+            render_provider=plan.render_provider,
+        )
+        return plan, media_generation_request
 
     def _verify_publication_readiness(self, result: GamingContentPipelineResult) -> None:
         """Require positive publication readiness before any media work begins."""
@@ -516,6 +644,349 @@ class MediaExecutionPipeline:
                 code="media_execution_live_confirmation_required",
                 details={"provider_names": tuple(dict.fromkeys(live_media_providers))},
             )
+
+    def _resolve_effective_provider_names(
+        self,
+        request: ApprovedMediaExecutionRequest,
+    ) -> tuple[str, str, str, str]:
+        """Resolve the effective provider names used for plan and preflight validation."""
+
+        selection = (
+            MediaProviderSelection()
+            if request.provider_selection is None
+            else request.provider_selection
+        )
+        settings = self.media_generation_service.settings
+        image_provider = (
+            settings.default_image_provider
+            if selection.image_provider_name is None
+            else selection.image_provider_name
+        )
+        tts_provider = (
+            settings.default_tts_provider
+            if selection.tts_provider_name is None
+            else selection.tts_provider_name
+        )
+        video_provider = (
+            settings.default_video_provider
+            if selection.video_provider_name is None
+            else selection.video_provider_name
+        )
+        render_provider = (
+            self.short_assembly_service.media_render_service.settings.default_render_provider
+            if request.render_provider_name is None
+            else request.render_provider_name
+        )
+        return image_provider, tts_provider, video_provider, render_provider
+
+    def _build_execution_plan(
+        self,
+        *,
+        request: ApprovedMediaExecutionRequest,
+        media_request: MediaGenerationPackageRequest,
+        image_provider: str,
+        tts_provider: str,
+        video_provider: str,
+        render_provider: str,
+    ) -> ProductionExecutionPlan:
+        """Summarize one approved production request without exposing prompts or content bodies."""
+
+        image_generation_count = (
+            (1 if media_request.thumbnail_request is not None else 0)
+            + len(media_request.scene_image_requests)
+        )
+        tts_generation_count = 1 if media_request.narration_request is not None else 0
+        video_generation_count = len(media_request.scene_video_requests)
+        live_media_call_count = 0
+        if _is_live_provider_name(image_provider):
+            live_media_call_count += image_generation_count
+        if _is_live_provider_name(tts_provider):
+            live_media_call_count += tts_generation_count
+        if _is_live_provider_name(video_provider):
+            live_media_call_count += video_generation_count
+
+        workspace = self.artifact_materialization_service.create_workspace(run_id=request.run_id)
+        return ProductionExecutionPlan(
+            run_id=request.run_id,
+            approved=request.approval.approved,
+            image_provider=image_provider,
+            tts_provider=tts_provider,
+            video_provider=video_provider,
+            render_provider=render_provider,
+            scene_count=len(request.content_result.storyboard.scenes),
+            image_generation_count=image_generation_count,
+            tts_generation_count=tts_generation_count,
+            video_generation_count=video_generation_count,
+            live_media_call_count=live_media_call_count,
+            will_use_live_media=live_media_call_count > 0,
+            final_width=request.width,
+            final_height=request.height,
+            fps=request.fps,
+            output_format=_normalize_output_format(request.output_format),
+            workspace_path=str(workspace.workspace_path),
+            execution_started=False,
+        )
+
+    def _validate_request_fields(self, request: ApprovedMediaExecutionRequest) -> None:
+        """Validate request fields explicitly so preflight catches unsafe constructed models."""
+
+        from creatoros.services.artifact_materialization import ArtifactWorkspace
+
+        ArtifactWorkspace.validate_run_id(request.run_id)
+        if request.width <= 0:
+            raise CreatorOSValidationError(
+                "width must be greater than zero",
+                code="media_execution_invalid_dimensions",
+                details={"field": "width"},
+            )
+        if request.height <= 0:
+            raise CreatorOSValidationError(
+                "height must be greater than zero",
+                code="media_execution_invalid_dimensions",
+                details={"field": "height"},
+            )
+        if not math.isfinite(request.fps) or request.fps <= 0:
+            raise CreatorOSValidationError(
+                "fps must be a positive finite value",
+                code="media_execution_invalid_fps",
+                details={"field": "fps"},
+            )
+        output_format = _normalize_output_format(request.output_format)
+        if output_format not in SUPPORTED_OUTPUT_FORMATS:
+            raise CreatorOSValidationError(
+                "output_format is not supported",
+                code="media_execution_output_format_unsupported",
+                details={"output_format": output_format},
+            )
+
+    def _validate_registered_providers(
+        self,
+        *,
+        media_request: MediaGenerationPackageRequest,
+        image_provider: str,
+        tts_provider: str,
+        video_provider: str,
+        render_provider: str,
+    ) -> None:
+        """Validate that every effective provider can be resolved before execution begins."""
+
+        if media_request.thumbnail_request is not None or media_request.scene_image_requests:
+            self.media_generation_service._resolve_image_provider(image_provider)
+        if media_request.narration_request is not None:
+            self.media_generation_service._resolve_tts_provider(tts_provider)
+        if media_request.scene_video_requests:
+            self.media_generation_service._resolve_video_provider(video_provider)
+        self.short_assembly_service.media_render_service._resolve_provider(render_provider)
+
+    def _validate_live_provider_configuration(
+        self,
+        plan: ProductionExecutionPlan,
+    ) -> None:
+        """Validate configuration required for explicit live providers without any network calls."""
+
+        settings = self.media_generation_service.settings
+        if plan.image_generation_count > 0 and plan.image_provider == "openai-image":
+            if settings.openai_api_key is None or not settings.openai_api_key.strip():
+                raise ConfigurationError(
+                    "OPENAI_API_KEY is required for live image generation",
+                    code="media_execution_missing_live_configuration",
+                    details={"provider_name": plan.image_provider, "field": "openai_api_key"},
+                )
+            if settings.default_image_model is None or not settings.default_image_model.strip():
+                raise ConfigurationError(
+                    "DEFAULT_IMAGE_MODEL is required for live image generation",
+                    code="media_execution_missing_live_configuration",
+                    details={"provider_name": plan.image_provider, "field": "default_image_model"},
+                )
+        if plan.tts_generation_count > 0 and plan.tts_provider == "openai-tts":
+            if settings.openai_api_key is None or not settings.openai_api_key.strip():
+                raise ConfigurationError(
+                    "OPENAI_API_KEY is required for live narration generation",
+                    code="media_execution_missing_live_configuration",
+                    details={"provider_name": plan.tts_provider, "field": "openai_api_key"},
+                )
+            if settings.default_tts_model is None or not settings.default_tts_model.strip():
+                raise ConfigurationError(
+                    "DEFAULT_TTS_MODEL is required for live narration generation",
+                    code="media_execution_missing_live_configuration",
+                    details={"provider_name": plan.tts_provider, "field": "default_tts_model"},
+                )
+
+    def _validate_workspace_integrity(self, request: ApprovedMediaExecutionRequest) -> None:
+        """Validate that the run workspace stays bounded and protected under artifact_root."""
+
+        workspace = self.artifact_materialization_service.create_workspace(run_id=request.run_id)
+        workspace_root = workspace.root_path
+        try:
+            workspace_root.mkdir(parents=True, exist_ok=True)
+        except OSError as error:
+            raise WorkflowError(
+                "artifact root is not usable for production execution",
+                code="media_execution_artifact_root_unusable",
+            ) from error
+
+        if not workspace_root.is_dir():
+            raise WorkflowError(
+                "artifact root is not a directory",
+                code="media_execution_artifact_root_unusable",
+            )
+
+        workspace_path = workspace.workspace_path.resolve()
+        if not workspace_path.is_relative_to(workspace_root.resolve()):
+            raise WorkflowError(
+                "workspace path escaped the configured artifact root",
+                code="media_execution_workspace_outside_artifact_root",
+                details={"run_id": request.run_id},
+            )
+
+        protected_output_path = workspace.video_dir / PROTECTED_FINAL_OUTPUT_FILENAME
+        if protected_output_path.exists():
+            raise ArtifactAlreadyExistsError(
+                "final rendered output already exists for this run",
+                code="media_execution_final_output_exists",
+                details={"run_id": request.run_id, "filename": PROTECTED_FINAL_OUTPUT_FILENAME},
+            )
+
+    def _validate_assembly_preflight(
+        self,
+        request: ApprovedMediaExecutionRequest,
+        media_request: MediaGenerationPackageRequest,
+    ) -> None:
+        """Validate that planned scene assets can assemble cleanly before generation begins."""
+
+        placeholder_media = self._build_placeholder_generated_media(request, media_request)
+        self.short_assembly_service.build_render_request(
+            ShortAssemblyRequest(
+                storyboard=request.content_result.storyboard,
+                generated_media=placeholder_media,
+                width=request.width,
+                height=request.height,
+                fps=request.fps,
+                output_format=request.output_format,
+            )
+        )
+
+    def _build_placeholder_generated_media(
+        self,
+        request: ApprovedMediaExecutionRequest,
+        media_request: MediaGenerationPackageRequest,
+    ) -> GeneratedMediaPackage:
+        """Build one minimal synthetic media package for preflight-only assembly validation."""
+
+        total_duration_seconds = request.content_result.storyboard.total_estimated_duration_seconds
+        thumbnail = None
+        if media_request.thumbnail_request is not None:
+            thumbnail = GeneratedImage(
+                artifact=GeneratedAsset(asset_type=AssetType.IMAGE, uri="preflight://thumbnail.png"),
+                provider_name="preflight",
+                model="preflight",
+                mime_type="image/png",
+                width=1024,
+                height=1024,
+            )
+
+        narration = None
+        if media_request.narration_request is not None:
+            narration = GeneratedAudio(
+                artifact=GeneratedAsset(asset_type=AssetType.AUDIO, uri="preflight://narration.wav"),
+                provider_name="preflight",
+                model="preflight",
+                mime_type="audio/wav",
+                estimated_duration_seconds=total_duration_seconds,
+            )
+
+        scene_images = tuple(
+            GeneratedImage(
+                artifact=GeneratedAsset(
+                    asset_type=AssetType.IMAGE,
+                    uri=f"preflight://scene_{index:03d}.png",
+                ),
+                provider_name="preflight",
+                model="preflight",
+                mime_type="image/png",
+                width=1024,
+                height=1024,
+            )
+            for index in range(1, len(media_request.scene_image_requests) + 1)
+        )
+        scene_videos = tuple(
+            GeneratedVideo(
+                artifact=GeneratedAsset(
+                    asset_type=AssetType.VIDEO,
+                    uri=f"preflight://clip_{index:03d}.mp4",
+                ),
+                provider_name="preflight",
+                model="preflight",
+                mime_type="video/mp4",
+                duration_seconds=request.content_result.storyboard.scenes[index - 1].duration_seconds,
+                width=request.width,
+                height=request.height,
+                fps=request.fps,
+            )
+            for index in range(1, len(media_request.scene_video_requests) + 1)
+        )
+        return GeneratedMediaPackage(
+            thumbnail=thumbnail,
+            narration=narration,
+            scene_images=scene_images,
+            scene_videos=scene_videos,
+        )
+
+    def _validate_result_integrity(
+        self,
+        result: MediaExecutionResult,
+        *,
+        request: ApprovedMediaExecutionRequest,
+    ) -> None:
+        """Validate the final typed production result before reporting success."""
+
+        if result.run_id != request.run_id:
+            raise CreatorOSValidationError(
+                "result run_id did not match the approved request",
+                code="media_execution_result_run_id_mismatch",
+            )
+        if result.materialized_media.workspace.run_id != request.run_id:
+            raise CreatorOSValidationError(
+                "materialized workspace run_id did not match the approved request",
+                code="media_execution_workspace_run_id_mismatch",
+            )
+        if result.assembly.scene_count != len(request.content_result.storyboard.scenes):
+            raise CreatorOSValidationError(
+                "assembly scene count did not match the approved storyboard",
+                code="media_execution_result_scene_count_mismatch",
+            )
+
+        rendered_video = result.assembly.rendered_video
+        output_format = rendered_video.metadata.get("output_format", request.output_format)
+        if _normalize_output_format(str(output_format)) != _normalize_output_format(request.output_format):
+            raise CreatorOSValidationError(
+                "rendered output format did not match the approved request",
+                code="media_execution_result_output_format_mismatch",
+            )
+        if rendered_video.width != request.width or rendered_video.height != request.height:
+            raise CreatorOSValidationError(
+                "rendered dimensions did not match the approved request",
+                code="media_execution_result_dimension_mismatch",
+            )
+        if rendered_video.fps != request.fps:
+            raise CreatorOSValidationError(
+                "rendered fps did not match the approved request",
+                code="media_execution_result_fps_mismatch",
+            )
+        if rendered_video.duration_seconds <= 0:
+            raise CreatorOSValidationError(
+                "rendered duration must remain positive",
+                code="media_execution_result_duration_invalid",
+            )
+
+        rendered_uri = rendered_video.artifact.uri
+        if "://" not in rendered_uri:
+            rendered_path = Path(rendered_uri).resolve()
+            if not rendered_path.exists() or not rendered_path.is_file():
+                raise CreatorOSValidationError(
+                    "rendered local artifact does not exist",
+                    code="media_execution_result_artifact_missing",
+                )
 
     def _build_aligned_scene_visuals(
         self,

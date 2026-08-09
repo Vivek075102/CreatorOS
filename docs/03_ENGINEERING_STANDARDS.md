@@ -154,6 +154,8 @@ Configuration behavior must remain explicit and auditable. Hidden fallback behav
 
 When a live provider smoke test is needed, it must be exposed through an explicit guarded path rather than through implicit startup behavior, normal workflow execution, or routine CLI commands. Local readiness checks must remain offline, and live smoke execution must require deliberate confirmation before any paid network request is attempted.
 
+Controlled production commands that can trigger paid media generation must also provide a non-executing preflight or plan mode before first live use. That mode must validate configuration and execution readiness without generating media, writing production artifacts, rendering video, or making network calls.
+
 ## 11. Logging and Observability
 
 CreatorOS requires structured logging.
@@ -191,6 +193,8 @@ Additional mandatory rules:
 - API keys must never be printed back to the terminal, including in smoke-test or diagnostics commands.
 - Safe operational usage metrics such as `input_tokens`, `output_tokens`, `total_tokens`, `cached_tokens`, and `reasoning_tokens` may be logged when available because they are usage counters rather than credentials.
 - Secret-style token fields such as `access_token`, `refresh_token`, `auth_token`, and `bearer_token` must still be redacted.
+- Production preflight and execution-plan logs may include safe operational fields such as run ID, provider names, scene count, exact intended call counts, output format, and whether live media would be used.
+- Production preflight and execution-plan logs must not include prompt text, narration text, caption text, script bodies, or pricing guesses.
 
 ## 12. Error Handling
 
@@ -210,6 +214,8 @@ Mandatory rules:
 - User-facing errors must be understandable without exposing secrets.
 
 Error handling should make failures easier to diagnose, not harder to observe.
+
+For controlled production workflows, failure reporting must expose a safe stage or category such as preflight, media generation, materialization, assembly, or render. Those diagnostics must remain content-safe and secret-safe while preserving exception chaining for deeper debugging.
 
 ## 13. Retry and Idempotency Standards
 

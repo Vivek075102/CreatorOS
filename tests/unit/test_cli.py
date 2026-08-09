@@ -512,6 +512,16 @@ def test_run_help_displays_short_command(cli_module) -> None:
     assert stderr == ""
 
 
+def test_run_short_help_documents_plan_option(cli_module) -> None:
+    """Short-production help should document offline plan mode."""
+
+    exit_code, stdout, stderr = run_cli(cli_module, ["run", "short", "--help"])
+
+    assert exit_code == 0
+    assert "--plan" in stdout
+    assert stderr == ""
+
+
 def test_run_short_requires_explicit_approval(cli_module, monkeypatch: pytest.MonkeyPatch) -> None:
     """Short production must require explicit approval before execution begins."""
 
@@ -532,6 +542,33 @@ def test_run_short_mock_execution_reports_summary(cli_module, monkeypatch: pytes
     captured: dict[str, object] = {}
 
     class FakePipeline:
+        def build_execution_plan(self, request):
+            captured["planned_request"] = request
+            return cast(
+                object,
+                type(
+                    "FakePlan",
+                    (),
+                    {
+                        "run_id": request.run_id,
+                        "approved": True,
+                        "image_provider": "mock",
+                        "tts_provider": "mock",
+                        "video_provider": "mock",
+                        "render_provider": request.render_provider_name or "mock",
+                        "scene_count": 3,
+                        "image_generation_count": 4,
+                        "tts_generation_count": 1,
+                        "video_generation_count": 0,
+                        "live_media_call_count": 0,
+                        "will_use_live_media": False,
+                        "workspace_path": f"C:/GamingAIFactory/artifacts/{request.run_id}",
+                        "output_format": request.output_format,
+                        "execution_started": False,
+                    },
+                )(),
+            )
+
         async def execute(self, request):
             captured["request"] = request
             return cast(
@@ -604,6 +641,152 @@ def test_run_short_mock_execution_reports_summary(cli_module, monkeypatch: pytes
     assert request.confirm_live_media_calls is False
 
 
+def test_run_short_plan_reports_counts_without_execution(cli_module, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Plan mode should print counts and never start production execution."""
+
+    from creatoros import orchestrator
+
+    captured: dict[str, object] = {}
+
+    class FakePipeline:
+        def build_execution_plan(self, request):
+            captured["request"] = request
+            return cast(
+                object,
+                type(
+                    "FakePlan",
+                    (),
+                    {
+                        "run_id": request.run_id,
+                        "approved": True,
+                        "image_provider": request.provider_selection.image_provider_name,
+                        "tts_provider": request.provider_selection.tts_provider_name,
+                        "video_provider": request.provider_selection.video_provider_name,
+                        "render_provider": request.render_provider_name,
+                        "scene_count": 3,
+                        "image_generation_count": 4,
+                        "tts_generation_count": 1,
+                        "video_generation_count": 0,
+                        "live_media_call_count": 5,
+                        "will_use_live_media": True,
+                        "workspace_path": f"C:/GamingAIFactory/artifacts/{request.run_id}",
+                        "output_format": request.output_format,
+                        "execution_started": False,
+                    },
+                )(),
+            )
+
+        async def execute(self, request):
+            raise AssertionError("plan mode must not execute")
+
+    monkeypatch.setattr(
+        cli_module,
+        "get_settings",
+        lambda: StubSettings(
+            default_image_provider="openai-image",
+            default_image_model="gpt-image-1",
+            default_tts_provider="openai-tts",
+            default_tts_model="gpt-4o-mini-tts",
+        ),
+    )
+    monkeypatch.setattr(cli_module, "_build_short_provider_registry", lambda args: object())
+    monkeypatch.setattr(orchestrator, "create_media_execution_pipeline", lambda **kwargs: FakePipeline())
+
+    exit_code, stdout, stderr = run_cli(
+        cli_module,
+        [
+            "run",
+            "short",
+            "--game",
+            "Roblox",
+            "--topic",
+            "funny myths",
+            "--approve",
+            "--plan",
+            "--image-provider",
+            "openai-image",
+            "--tts-provider",
+            "openai-tts",
+            "--render-provider",
+            "ffmpeg",
+        ],
+    )
+
+    request = captured["request"]
+    assert exit_code == 0
+    assert "mode: plan" in stdout
+    assert "image_generation_calls: 4" in stdout
+    assert "tts_generation_calls: 1" in stdout
+    assert "video_generation_calls: 0" in stdout
+    assert "live_media_calls: 5" in stdout
+    assert "will_use_live_media: true" in stdout
+    assert "execution_started: false" in stdout
+    assert "workspace: C:\\GamingAIFactory\\artifacts\\short_roblox_funny_myths" in stdout or "workspace: C:/GamingAIFactory/artifacts/short_roblox_funny_myths" in stdout
+    assert stderr == ""
+    assert request.confirm_live_media_calls is False
+
+
+def test_run_short_plan_with_live_providers_does_not_require_confirmation(
+    cli_module,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Plan mode should allow live-provider visibility without the execution confirmation flag."""
+
+    from creatoros import orchestrator
+
+    class FakePipeline:
+        def build_execution_plan(self, request):
+            return cast(
+                object,
+                type(
+                    "FakePlan",
+                    (),
+                    {
+                        "run_id": request.run_id,
+                        "approved": True,
+                        "image_provider": "openai-image",
+                        "tts_provider": "openai-tts",
+                        "video_provider": "mock",
+                        "render_provider": "ffmpeg",
+                        "scene_count": 3,
+                        "image_generation_count": 4,
+                        "tts_generation_count": 1,
+                        "video_generation_count": 0,
+                        "live_media_call_count": 5,
+                        "will_use_live_media": True,
+                        "workspace_path": f"C:/GamingAIFactory/artifacts/{request.run_id}",
+                        "output_format": request.output_format,
+                        "execution_started": False,
+                    },
+                )(),
+            )
+
+        async def execute(self, request):
+            raise AssertionError("plan mode must not execute")
+
+    monkeypatch.setattr(
+        cli_module,
+        "get_settings",
+        lambda: StubSettings(
+            default_image_provider="openai-image",
+            default_image_model="gpt-image-1",
+            default_tts_provider="openai-tts",
+            default_tts_model="gpt-4o-mini-tts",
+        ),
+    )
+    monkeypatch.setattr(cli_module, "_build_short_provider_registry", lambda args: object())
+    monkeypatch.setattr(orchestrator, "create_media_execution_pipeline", lambda **kwargs: FakePipeline())
+
+    exit_code, stdout, stderr = run_cli(
+        cli_module,
+        ["run", "short", "--approve", "--plan", "--image-provider", "openai-image", "--tts-provider", "openai-tts"],
+    )
+
+    assert exit_code == 0
+    assert "mode: plan" in stdout
+    assert stderr == ""
+
+
 def test_run_short_live_media_requires_confirmation(cli_module, monkeypatch: pytest.MonkeyPatch) -> None:
     """Live media providers should be blocked without explicit confirmation."""
 
@@ -622,11 +805,18 @@ def test_run_short_live_media_requires_confirmation(cli_module, monkeypatch: pyt
 def test_run_short_live_media_requires_api_key(cli_module, monkeypatch: pytest.MonkeyPatch) -> None:
     """Explicit live media still requires configured credentials."""
 
-    monkeypatch.setattr(
-        cli_module,
-        "get_settings",
-        lambda: StubSettings(openai_api_key=None),
-    )
+    from creatoros import orchestrator
+
+    class FakePipeline:
+        def build_execution_plan(self, request):
+            raise AssertionError("execute path expected")
+
+        async def execute(self, request):
+            raise ConfigurationError("OPENAI_API_KEY is required for live image generation")
+
+    monkeypatch.setattr(cli_module, "get_settings", lambda: StubSettings(openai_api_key=None))
+    monkeypatch.setattr(cli_module, "_build_short_provider_registry", lambda args: object())
+    monkeypatch.setattr(orchestrator, "create_media_execution_pipeline", lambda **kwargs: FakePipeline())
 
     exit_code, stdout, stderr = run_cli(
         cli_module,
@@ -635,7 +825,7 @@ def test_run_short_live_media_requires_api_key(cli_module, monkeypatch: pytest.M
 
     assert exit_code == 3
     assert stdout == ""
-    assert "OPENAI_API_KEY is not configured" in stderr
+    assert "OPENAI_API_KEY is required" in stderr
 
 
 def test_run_short_ffmpeg_render_does_not_require_live_media_confirmation(
@@ -647,6 +837,32 @@ def test_run_short_ffmpeg_render_does_not_require_live_media_confirmation(
     from creatoros import orchestrator
 
     class FakePipeline:
+        def build_execution_plan(self, request):
+            return cast(
+                object,
+                type(
+                    "FakePlan",
+                    (),
+                    {
+                        "run_id": request.run_id,
+                        "approved": True,
+                        "image_provider": "mock",
+                        "tts_provider": "mock",
+                        "video_provider": "mock",
+                        "render_provider": request.render_provider_name or "mock",
+                        "scene_count": 3,
+                        "image_generation_count": 4,
+                        "tts_generation_count": 1,
+                        "video_generation_count": 0,
+                        "live_media_call_count": 0,
+                        "will_use_live_media": False,
+                        "workspace_path": f"C:/GamingAIFactory/artifacts/{request.run_id}",
+                        "output_format": request.output_format,
+                        "execution_started": False,
+                    },
+                )(),
+            )
+
         async def execute(self, request):
             return cast(
                 object,

@@ -15,6 +15,7 @@ from creatoros.orchestrator.models import (
     GamingWorkflowResult,
     HumanApproval,
     MediaExecutionResult,
+    ProductionExecutionPlan,
 )
 
 if TYPE_CHECKING:
@@ -71,6 +72,7 @@ __all__ = [
     "HumanApproval",
     "MediaExecutionPipeline",
     "MediaExecutionResult",
+    "ProductionExecutionPlan",
     "build_gaming_content_pipeline",
     "create_media_execution_pipeline",
     "run_demo_gaming_workflow",

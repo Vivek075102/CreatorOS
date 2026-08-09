@@ -642,6 +642,11 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Required explicit approval acknowledgement before production execution starts.",
     )
     run_short.add_argument(
+        "--plan",
+        action="store_true",
+        help="Run full offline preflight and print the execution plan without generating media.",
+    )
+    run_short.add_argument(
         "--image-provider",
         default="mock",
         choices=["mock", "openai-image"],
@@ -1515,8 +1520,12 @@ def _handle_run_short(
         )
         return EXIT_CONFIGURATION_ERROR
 
-    live_media_requested = args.image_provider != "mock" or args.tts_provider != "mock" or args.video_provider != "mock"
-    if live_media_requested and not args.confirm_live_calls:
+    live_media_requested = (
+        args.image_provider != "mock"
+        or args.tts_provider != "mock"
+        or args.video_provider != "mock"
+    )
+    if live_media_requested and not args.confirm_live_calls and not args.plan:
         _write_error(
             stderr,
             "Error: non-mock media providers require --confirm-live-calls before execution.",
@@ -1524,22 +1533,41 @@ def _handle_run_short(
         return EXIT_CONFIGURATION_ERROR
 
     settings = get_settings()
-    if live_media_requested and not _is_configured(settings.openai_api_key):
-        _write_error(
-            stderr,
-            "Error: OPENAI_API_KEY is not configured. Set it manually before running live media generation.",
-        )
-        return EXIT_CONFIGURATION_ERROR
-
     request = _build_demo_approved_media_execution_request(args)
     pipeline = create_media_execution_pipeline(
         provider_registry=_build_short_provider_registry(args),
         settings=settings,
     )
+
+    if args.plan:
+        plan = pipeline.build_execution_plan(request)
+        plan_rows: list[tuple[str, object]] = [
+            ("workflow", "controlled short production"),
+            ("mode", "plan"),
+            ("run_id", plan.run_id),
+            ("approved", plan.approved),
+            ("image_provider", plan.image_provider),
+            ("tts_provider", plan.tts_provider),
+            ("video_provider", plan.video_provider),
+            ("render_provider", plan.render_provider),
+            ("scene_count", plan.scene_count),
+            ("image_generation_calls", plan.image_generation_count),
+            ("tts_generation_calls", plan.tts_generation_count),
+            ("video_generation_calls", plan.video_generation_count),
+            ("live_media_calls", plan.live_media_call_count),
+            ("will_use_live_media", plan.will_use_live_media),
+            ("workspace", plan.workspace_path),
+            ("output_format", plan.output_format),
+            ("execution_started", plan.execution_started),
+        ]
+        _write_rows(stdout, plan_rows)
+        return EXIT_SUCCESS
+
     result = asyncio.run(pipeline.execute(request))
 
     rows: list[tuple[str, object]] = [
         ("workflow", "controlled short production"),
+        ("mode", "execute"),
         ("run_id", result.run_id),
         ("approved_by", result.approval.approved_by),
         ("title", result.content_result.script.title),

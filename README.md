@@ -304,16 +304,22 @@ CreatorOS now also includes an explicit post-approval media-execution pipeline:
 CreatorOS now includes a small controlled CLI surface for end-to-end short production:
 
 ```bash
+python -m creatoros run short --approve --plan
+python -m creatoros run short --game Roblox --topic "funny myths" --approve --plan
 python -m creatoros run short --approve
 python -m creatoros run short --game Roblox --topic "funny myths" --approve
 python -m creatoros run short --game Roblox --topic "funny myths" --approve --render-provider ffmpeg
 python -m creatoros run short --game Roblox --topic "funny myths" --approve --image-provider openai-image --tts-provider openai-tts --confirm-live-calls
 ```
 
-- `run short` builds a deterministic approved package and executes the post-approval production pipeline.
+- `run short --plan` builds the deterministic approved package, runs full local preflight, and prints a typed execution summary without generating media, materializing files, rendering video, or making network calls.
+- `run short` builds a deterministic approved package and executes the post-approval production pipeline only after the same preflight passes.
 - Offline execution remains easy because mock media providers and the mock render provider are still the defaults.
-- Live image or TTS generation is opt-in only and requires `--confirm-live-calls`.
+- Plan output includes exact intended media-call counts, whether live media would be used, and the run workspace path before any paid execution begins.
+- Live image or TTS generation is opt-in only and requires `--confirm-live-calls` on that execution command. Plan mode never counts as execution confirmation.
 - FFmpeg is treated as a local render backend, not a paid live media provider.
+- Preflight protects the run workspace by rejecting unsafe run IDs, unsupported output formats, missing live configuration, and an already-existing protected final output path.
+- If a run fails after successful materialization, CreatorOS preserves those materialized artifacts for diagnostics, cleans renderer temporary working directories, and never reports false success. Automatic retry and resume are not part of this milestone.
 - The command does not publish, schedule, upload, or run analytics.
 
 ## Controlled OpenAI Smoke Test

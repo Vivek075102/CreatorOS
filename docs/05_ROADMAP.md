@@ -165,6 +165,7 @@ Build the Research Engine and Opportunity Engine capabilities required to gather
 - Application-layer final Short assembly service that converts typed storyboard output plus a generated-media package into a deterministic render request and delegates final composition through the existing render boundary
 - Application-layer approved media-execution pipeline that takes a completed publication-ready planning result plus explicit human approval, maps approved plans into provider-neutral generation requests, and coordinates media generation with final Short assembly
 - Real end-to-end short-production orchestration that connects approved planning outputs through media generation, artifact materialization, assembly, and either offline mock rendering or local FFmpeg rendering
+- Production hardening for controlled short execution, including explicit offline preflight, deterministic execution planning, exact media-call visibility, protected final-output checks, safe failure categories, and plan-mode CLI support without network calls
 - Local artifact materialization foundation with deterministic run-scoped workspaces, explicit MIME allowlisting, atomic writes, and typed materialized-artifact contracts for later render consumption
 - First explicit real local render adapter behind `RenderProvider`, using FFmpeg to consume materialized local scene assets and produce a local MP4 while keeping mock as the default
 - Timed caption and text-overlay foundation for the FFmpeg render path, including typed caption contracts, deterministic wrapping, safe subtitle escaping, vertical-video positioning, and local font configuration
@@ -217,6 +218,7 @@ Build the Research Engine and Opportunity Engine capabilities required to gather
 - Provider-independent local artifact materialization now exists as a separate application service that can convert supported generated media payloads into deterministic local workspace files without adding cloud storage, publishing, or render-side effects
 - Provider-independent rendering now includes a first real local FFmpeg adapter that can turn materialized scene assets plus optional narration into a playable local MP4 without network calls
 - Post-approval short production now exists as one controlled orchestration path that preserves human approval, carries one stable run ID across the full artifact workspace, supports deterministic offline execution by default, and requires explicit confirmation before any live non-mock media provider call
+- Controlled short production now includes an explicit offline preflight boundary and deterministic execution plan that expose exact intended media-call counts before the first paid run
 - A first real image adapter can be registered and exercised behind `ImageProvider` without changing the default mock runtime or triggering live API calls during automated tests
 - A first real TTS adapter can be registered and exercised behind `TTSProvider` without changing the default mock runtime or triggering live API calls during automated tests
 - Media-agent completion in this milestone means planning integration only. It does not mean image generation, video generation, narration synthesis, editing, rendering, storage upload, or publishing are complete
@@ -228,6 +230,7 @@ Build the Research Engine and Opportunity Engine capabilities required to gather
 - FFmpeg-renderer completion in this milestone means local MP4 composition plus foundational timed caption overlays and basic narration fitting only. It does not mean word-level subtitles, animated captions, background music, sound design, GPU encoding, cloud rendering, publishing, or production-grade editing effects are complete
 - Final-assembly completion in this milestone means typed storyboard-to-render-request conversion and render-service delegation plus controlled production-pipeline handoff. It does not mean publishing, scheduling, analytics, or broader editing effects are complete
 - Approved-media-execution completion in this milestone means explicit post-approval orchestration through generation, materialization, assembly, and rendering only. It does not mean automatic execution after planning, durable storage, publishing, scheduling, or analytics are complete
+- Production-hardening completion in this milestone means local preflight, exact call visibility, workspace protection, and controlled diagnostics only. It does not mean retries, resume, failover, publishing, scheduling, analytics, cloud storage, or cost billing are complete
 - Render-foundation completion in this milestone means contract, registry, service, and mock-provider readiness only. It does not mean FFmpeg execution, MoviePy, MP4 creation, audio mixing, caption burn-in, transition rendering, or pipeline media execution are complete
 - Content opportunities can be ranked using explicit rules
 - Research workflows produce auditable structured outputs that can feed downstream content generation
@@ -258,6 +261,7 @@ Build the Research Engine and Opportunity Engine capabilities required to gather
 - Broader live-provider diagnostics only after the guarded smoke-test path proves operationally safe
 - Usage persistence, monetary cost estimation, and analytics storage only when later milestones justify them
 - Retry, repair, fallback, streaming, and workflow-state integration only when later milestones justify them
+- Resume, checkpoint restart, provider failover, and cost estimation only when later milestones intentionally design those capabilities rather than inferring them from the current controlled production path
 
 ## Milestone 3 — Content Intelligence
 

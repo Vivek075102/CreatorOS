@@ -12,7 +12,9 @@ from creatoros.core import (
     ApprovalRequiredError,
     ArtifactAlreadyExistsError,
     ArtifactPathError,
+    ConfigurationError,
     CreatorOSValidationError,
+    ProviderNotFoundError,
     WorkflowError,
 )
 from creatoros.domain import AssetType, GeneratedAsset
@@ -24,12 +26,14 @@ from creatoros.orchestrator import (
     HumanApproval,
     MediaExecutionPipeline,
     MediaExecutionResult,
+    ProductionExecutionPlan,
     create_media_execution_pipeline,
 )
 from creatoros.orchestrator.media_pipeline import (
     STAGE_ARTIFACT_MATERIALIZATION,
     STAGE_BUILD_ASSEMBLY_INPUTS,
     STAGE_MEDIA_GENERATION,
+    STAGE_PREFLIGHT,
     STAGE_SHORT_ASSEMBLY,
 )
 from creatoros.parsing import (
@@ -48,9 +52,13 @@ from creatoros.parsing import (
 from creatoros.providers import (
     GeneratedAudio,
     GeneratedImage,
+    GeneratedVideo,
     RenderedVideo,
-    create_provider_registry,
 )
+from creatoros.providers.ffmpeg.render import FFmpegRenderProvider
+from creatoros.providers.mock import create_mock_provider_registry
+from creatoros.providers.openai.image import OpenAIImageProvider
+from creatoros.providers.openai.tts import OpenAITTSProvider
 from creatoros.services import (
     ArtifactMaterializationService,
     GeneratedMediaPackage,
@@ -93,6 +101,8 @@ def build_settings(
     default_video_provider: str = "mock",
     default_render_provider: str = "mock",
     openai_api_key: str | None = None,
+    default_image_model: str | None = None,
+    default_tts_model: str | None = None,
 ) -> Settings:
     """Create isolated settings for media-production tests."""
 
@@ -105,9 +115,17 @@ def build_settings(
         default_llm_provider="mock",
         default_llm_model="mock-model",
         default_image_provider=default_image_provider,
-        default_image_model="gpt-image-1" if default_image_provider != "mock" else None,
+        default_image_model=(
+            default_image_model
+            if default_image_model is not None or default_image_provider == "mock"
+            else "gpt-image-1"
+        ),
         default_tts_provider=default_tts_provider,
-        default_tts_model="gpt-4o-mini-tts" if default_tts_provider != "mock" else None,
+        default_tts_model=(
+            default_tts_model
+            if default_tts_model is not None or default_tts_provider == "mock"
+            else "gpt-4o-mini-tts"
+        ),
         default_video_provider=default_video_provider,
         default_render_provider=default_render_provider,
         openai_api_key=openai_api_key,
@@ -417,14 +435,74 @@ class RecordingMediaGenerationService(MediaGenerationService):
     """Generation spy that records orchestration handoffs."""
 
     def __init__(self, settings: Settings) -> None:
-        super().__init__(create_provider_registry(), settings)
-        self.calls = 0
+        provider_registry = create_mock_provider_registry()
+        provider_registry.register(
+            OpenAIImageProvider(
+                api_key=settings.openai_api_key,
+                default_model=settings.default_image_model,
+                timeout_seconds=settings.provider_timeout_seconds,
+                max_retries=settings.provider_max_retries,
+            ),
+            replace=True,
+        )
+        provider_registry.register(
+            OpenAITTSProvider(
+                api_key=settings.openai_api_key,
+                default_model=settings.default_tts_model,
+                timeout_seconds=settings.provider_timeout_seconds,
+                max_retries=settings.provider_max_retries,
+            ),
+            replace=True,
+        )
+        super().__init__(provider_registry, settings)
+        self.package_calls = 0
+        self.image_calls = 0
+        self.audio_calls = 0
+        self.video_calls = 0
         self.last_request: MediaGenerationPackageRequest | None = None
 
+    async def generate_image(self, request, *, provider_name: str | None = None, context=None):  # type: ignore[override]
+        self.image_calls += 1
+        del request, provider_name, context
+        index = self.image_calls
+        logical_name = "thumbnail" if index == 1 else f"scene{index - 1}"
+        return GeneratedImage(
+            artifact=GeneratedAsset(asset_type=AssetType.IMAGE, uri=f"mock://generated/image/{logical_name}.png"),
+            provider_name="mock",
+            model="mock-image-model",
+            mime_type="image/png",
+            width=1024,
+            height=1024,
+            payload_bytes=MINIMAL_PNG_BYTES,
+        )
+
+    async def generate_audio(self, request, *, provider_name: str | None = None, context=None):  # type: ignore[override]
+        self.audio_calls += 1
+        del request, provider_name, context
+        return GeneratedAudio(
+            artifact=GeneratedAsset(asset_type=AssetType.AUDIO, uri="mock://generated/audio/narration.wav"),
+            provider_name="mock",
+            model="mock-tts-model",
+            mime_type="audio/wav",
+            estimated_duration_seconds=30.0,
+            payload_bytes=MINIMAL_WAV_BYTES,
+        )
+
+    async def generate_video(self, request, *, provider_name: str | None = None, context=None):  # type: ignore[override]
+        self.video_calls += 1
+        del request, provider_name, context
+        return GeneratedVideo(
+            artifact=GeneratedAsset(asset_type=AssetType.VIDEO, uri=f"mock://generated/video/clip{self.video_calls}.mp4"),
+            provider_name="mock",
+            model="mock-video-model",
+            mime_type="video/mp4",
+            duration_seconds=5.0,
+        )
+
     async def generate_package(self, request: MediaGenerationPackageRequest, *, context=None):  # type: ignore[override]
-        self.calls += 1
+        self.package_calls += 1
         self.last_request = request.model_copy(deep=True)
-        return build_generated_media_package()
+        return await super().generate_package(request, context=context)
 
 
 class FailingMediaGenerationService(RecordingMediaGenerationService):
@@ -467,7 +545,16 @@ class RecordingShortAssemblyService(ShortAssemblyService):
     """Assembly spy that records local handoffs and returns a deterministic local result."""
 
     def __init__(self, settings: Settings) -> None:
-        super().__init__(create_media_render_service(settings=settings))
+        provider_registry = create_mock_provider_registry()
+        provider_registry.register(
+            FFmpegRenderProvider(
+                artifact_root=settings.artifact_root,
+                ffmpeg_path="ffmpeg",
+                timeout_seconds=settings.provider_timeout_seconds,
+            ),
+            replace=True,
+        )
+        super().__init__(create_media_render_service(provider_registry=provider_registry, settings=settings))
         self.calls = 0
         self.last_request: ShortAssemblyRequest | None = None
         self.last_render_provider_name: str | None = None
@@ -481,6 +568,8 @@ class RecordingShortAssemblyService(ShortAssemblyService):
         assert first_scene_asset is not None
         first_scene_path = Path(first_scene_asset.uri)
         final_video_path = first_scene_path.parents[1] / "video" / "final_short.mp4"
+        final_video_path.parent.mkdir(parents=True, exist_ok=True)
+        final_video_path.write_bytes(b"mock-rendered-video")
         return ShortAssemblyResult(
             render_request=render_request,
             rendered_video=RenderedVideo(
@@ -592,7 +681,7 @@ def test_unapproved_content_is_rejected_before_any_downstream_stage(tmp_path: Pa
         run_async(pipeline.execute(build_request(approved=False)))
 
     assert exc_info.value.code == "media_execution_approval_required"
-    assert generation_service.calls == 0
+    assert generation_service.package_calls == 0
     assert materializer.calls == 0
     assert assembly_service.calls == 0
 
@@ -610,7 +699,7 @@ def test_publication_readiness_failure_blocks_all_later_stages(tmp_path: Path) -
         )
 
     assert exc_info.value.code == "media_execution_not_publication_ready"
-    assert generation_service.calls == 0
+    assert generation_service.package_calls == 0
     assert materializer.calls == 0
     assert assembly_service.calls == 0
 
@@ -627,9 +716,177 @@ def test_non_mock_media_provider_requires_explicit_live_confirmation(tmp_path: P
         run_async(pipeline.execute(request))
 
     assert exc_info.value.code == "media_execution_live_confirmation_required"
-    assert generation_service.calls == 0
+    assert generation_service.package_calls == 0
     assert materializer.calls == 0
     assert assembly_service.calls == 0
+
+
+def test_mock_preflight_builds_deterministic_plan_without_execution(tmp_path: Path) -> None:
+    """Offline preflight should build a stable plan and avoid every execution stage."""
+
+    pipeline, generation_service, materializer, assembly_service = build_spy_pipeline(tmp_path)
+
+    first_plan = pipeline.build_execution_plan(build_request(run_id="planned_run"))
+    second_plan = pipeline.build_execution_plan(build_request(run_id="planned_run"))
+
+    assert isinstance(first_plan, ProductionExecutionPlan)
+    assert first_plan == second_plan
+    assert first_plan.run_id == "planned_run"
+    assert first_plan.scene_count == 3
+    assert first_plan.image_generation_count == 4
+    assert first_plan.tts_generation_count == 1
+    assert first_plan.video_generation_count == 0
+    assert first_plan.live_media_call_count == 0
+    assert first_plan.will_use_live_media is False
+    assert first_plan.execution_started is False
+    assert generation_service.package_calls == 0
+    assert materializer.calls == 0
+    assert assembly_service.calls == 0
+
+
+def test_live_provider_plan_reports_live_call_counts_without_confirmation(tmp_path: Path) -> None:
+    """Plan mode should expose live-call counts without starting execution or needing confirmation."""
+
+    settings = build_settings(
+        tmp_path,
+        default_image_provider="openai-image",
+        default_tts_provider="openai-tts",
+        openai_api_key="sk-test-secret",
+    )
+    pipeline, generation_service, materializer, assembly_service = build_spy_pipeline(
+        tmp_path,
+        settings=settings,
+    )
+
+    plan = pipeline.build_execution_plan(build_request())
+
+    assert plan.image_provider == "openai-image"
+    assert plan.tts_provider == "openai-tts"
+    assert plan.image_generation_count == 4
+    assert plan.tts_generation_count == 1
+    assert plan.video_generation_count == 0
+    assert plan.live_media_call_count == 5
+    assert plan.will_use_live_media is True
+    assert generation_service.package_calls == 0
+    assert materializer.calls == 0
+    assert assembly_service.calls == 0
+
+
+def test_plan_rejects_invalid_dimensions_before_generation(tmp_path: Path) -> None:
+    """Preflight should catch invalid dimensions even for manually constructed requests."""
+
+    pipeline, generation_service, materializer, assembly_service = build_spy_pipeline(tmp_path)
+    request = build_request().model_copy(update={"width": 0})
+
+    with pytest.raises(CreatorOSValidationError) as exc_info:
+        pipeline.build_execution_plan(request)
+
+    assert exc_info.value.code == "media_execution_invalid_dimensions"
+    assert generation_service.package_calls == 0
+    assert materializer.calls == 0
+    assert assembly_service.calls == 0
+
+
+def test_plan_rejects_invalid_fps_before_generation(tmp_path: Path) -> None:
+    """Preflight should catch non-positive or non-finite fps values."""
+
+    pipeline, generation_service, materializer, assembly_service = build_spy_pipeline(tmp_path)
+    request = build_request().model_copy(update={"fps": 0.0})
+
+    with pytest.raises(CreatorOSValidationError) as exc_info:
+        pipeline.build_execution_plan(request)
+
+    assert exc_info.value.code == "media_execution_invalid_fps"
+    assert generation_service.package_calls == 0
+    assert materializer.calls == 0
+    assert assembly_service.calls == 0
+
+
+def test_plan_rejects_unsupported_output_format_before_generation(tmp_path: Path) -> None:
+    """Preflight should reject unsupported final output formats safely."""
+
+    pipeline, generation_service, materializer, assembly_service = build_spy_pipeline(tmp_path)
+    request = build_request().model_copy(update={"output_format": "mov"})
+
+    with pytest.raises(CreatorOSValidationError) as exc_info:
+        pipeline.build_execution_plan(request)
+
+    assert exc_info.value.code == "media_execution_output_format_unsupported"
+    assert generation_service.package_calls == 0
+    assert materializer.calls == 0
+    assert assembly_service.calls == 0
+
+
+def test_unknown_provider_fails_preflight_before_generation(tmp_path: Path) -> None:
+    """Unknown provider names should fail during preflight rather than during generation."""
+
+    pipeline, generation_service, materializer, assembly_service = build_spy_pipeline(tmp_path)
+    request = build_request(
+        provider_selection=MediaProviderSelection(image_provider_name="missing-image"),
+    )
+
+    with pytest.raises(ProviderNotFoundError):
+        pipeline.build_execution_plan(request)
+
+    assert generation_service.package_calls == 0
+    assert materializer.calls == 0
+    assert assembly_service.calls == 0
+
+
+def test_missing_live_configuration_fails_preflight_before_provider_invocation(tmp_path: Path) -> None:
+    """Live-provider preflight should fail before generation when required config is missing."""
+
+    settings = build_settings(
+        tmp_path,
+        default_image_provider="openai-image",
+        openai_api_key="sk-test-secret",
+    ).model_copy(update={"default_image_model": None})
+    pipeline, generation_service, materializer, assembly_service = build_spy_pipeline(
+        tmp_path,
+        settings=settings,
+    )
+
+    with pytest.raises(ConfigurationError) as exc_info:
+        pipeline.build_execution_plan(build_request())
+
+    assert exc_info.value.code == "media_execution_missing_live_configuration"
+    assert generation_service.package_calls == 0
+    assert materializer.calls == 0
+    assert assembly_service.calls == 0
+
+
+def test_existing_final_output_is_protected_during_preflight(tmp_path: Path) -> None:
+    """A protected final video path should fail before any media generation begins."""
+
+    settings = build_settings(tmp_path)
+    protected_output = settings.artifact_root / "run_001" / "video" / "final_short.mp4"
+    protected_output.parent.mkdir(parents=True, exist_ok=True)
+    protected_output.write_bytes(b"existing-final")
+    pipeline, generation_service, materializer, assembly_service = build_spy_pipeline(
+        tmp_path,
+        settings=settings,
+    )
+
+    with pytest.raises(ArtifactAlreadyExistsError) as exc_info:
+        pipeline.build_execution_plan(build_request())
+
+    assert exc_info.value.code == "media_execution_final_output_exists"
+    assert generation_service.package_calls == 0
+    assert materializer.calls == 0
+    assert assembly_service.calls == 0
+
+
+def test_plan_does_not_include_secrets_or_prompt_text(tmp_path: Path) -> None:
+    """Execution plans should remain operational summaries rather than content payloads."""
+
+    settings = build_settings(tmp_path, openai_api_key="sk-test-secret")
+    pipeline, *_ = build_spy_pipeline(tmp_path, settings=settings)
+
+    plan_dump = pipeline.build_execution_plan(build_request()).model_dump_json()
+
+    assert "sk-test-secret" not in plan_dump
+    assert "You probably still believe this Roblox myth." not in plan_dump
+    assert "Title:" not in plan_dump
 
 
 def test_api_key_presence_alone_does_not_authorize_live_execution(tmp_path: Path) -> None:
@@ -649,7 +906,7 @@ def test_api_key_presence_alone_does_not_authorize_live_execution(tmp_path: Path
         run_async(pipeline.execute(build_request()))
 
     assert exc_info.value.code == "media_execution_live_confirmation_required"
-    assert generation_service.calls == 0
+    assert generation_service.package_calls == 0
     assert materializer.calls == 0
     assert assembly_service.calls == 0
 
@@ -657,7 +914,16 @@ def test_api_key_presence_alone_does_not_authorize_live_execution(tmp_path: Path
 def test_live_media_provider_is_allowed_when_confirmation_is_explicit(tmp_path: Path) -> None:
     """Explicit confirmation should allow non-mock media provider policy to pass."""
 
-    pipeline, generation_service, materializer, assembly_service = build_spy_pipeline(tmp_path)
+    settings = build_settings(
+        tmp_path,
+        openai_api_key="sk-test-secret",
+        default_image_provider="openai-image",
+        default_tts_provider="openai-tts",
+    )
+    pipeline, generation_service, materializer, assembly_service = build_spy_pipeline(
+        tmp_path,
+        settings=settings,
+    )
     request = build_request(
         provider_selection=MediaProviderSelection(
             image_provider_name="openai-image",
@@ -669,7 +935,7 @@ def test_live_media_provider_is_allowed_when_confirmation_is_explicit(tmp_path: 
     result = run_async(pipeline.execute(request))
 
     assert isinstance(result, MediaExecutionResult)
-    assert generation_service.calls == 1
+    assert generation_service.package_calls == 1
     assert materializer.calls == 1
     assert assembly_service.calls == 1
 
@@ -683,7 +949,7 @@ def test_ffmpeg_render_selection_does_not_require_live_media_confirmation(tmp_pa
     result = run_async(pipeline.execute(request))
 
     assert result.render_provider_name == "ffmpeg"
-    assert generation_service.calls == 1
+    assert generation_service.package_calls == 1
     assert materializer.calls == 1
     assert assembly_service.calls == 1
 
@@ -736,6 +1002,24 @@ def test_execute_preserves_run_id_and_handoffs_local_materialized_assets(tmp_pat
     assert "payload_bytes" not in result.model_dump()
 
 
+def test_planned_call_counts_match_executed_mock_call_counts(tmp_path: Path) -> None:
+    """Preflight call counts should match the actual deterministic mock execution counts."""
+
+    pipeline, generation_service, materializer, assembly_service = build_spy_pipeline(tmp_path)
+    request = build_request(run_id="count_match_run")
+
+    plan = pipeline.build_execution_plan(request)
+    result = run_async(pipeline.execute(request))
+
+    assert result.run_id == "count_match_run"
+    assert plan.image_generation_count == generation_service.image_calls
+    assert plan.tts_generation_count == generation_service.audio_calls
+    assert plan.video_generation_count == generation_service.video_calls
+    assert generation_service.package_calls == 1
+    assert materializer.calls == 1
+    assert assembly_service.calls == 1
+
+
 def test_media_generation_failure_stops_materialization_and_assembly(tmp_path: Path) -> None:
     """Generation failures should prevent every later stage from running."""
 
@@ -749,7 +1033,7 @@ def test_media_generation_failure_stops_materialization_and_assembly(tmp_path: P
     with pytest.raises(WorkflowError, match="media generation failed"):
         run_async(pipeline.execute(build_request()))
 
-    assert generation_service.calls == 1
+    assert generation_service.package_calls == 1
     assert materializer.calls == 0
     assert assembly_service.calls == 0
 
@@ -767,7 +1051,7 @@ def test_materialization_failure_stops_assembly(tmp_path: Path) -> None:
     with pytest.raises(WorkflowError, match="materialization failed"):
         run_async(pipeline.execute(build_request()))
 
-    assert generation_service.calls == 1
+    assert generation_service.package_calls == 1
     assert materializer.calls == 1
     assert assembly_service.calls == 0
 
@@ -785,9 +1069,44 @@ def test_assembly_failure_propagates_without_false_success(tmp_path: Path) -> No
     with pytest.raises(WorkflowError, match="assembly failed"):
         run_async(pipeline.execute(build_request()))
 
-    assert generation_service.calls == 1
+    assert generation_service.package_calls == 1
     assert materializer.calls == 1
     assert assembly_service.calls == 1
+
+
+def test_assembly_failure_preserves_materialized_artifacts_for_diagnostics(tmp_path: Path) -> None:
+    """Later-stage failures should keep successfully materialized artifacts in the run workspace."""
+
+    settings = build_settings(tmp_path)
+    pipeline = create_media_execution_pipeline(
+        settings=settings,
+        short_assembly_service=FailingShortAssemblyService(settings),
+    )
+
+    with pytest.raises(WorkflowError):
+        run_async(pipeline.execute(build_request(run_id="diagnostic_run")))
+
+    workspace = settings.artifact_root / "diagnostic_run"
+    assert (workspace / "images" / "thumbnail.png").is_file()
+    assert (workspace / "audio" / "narration.wav").is_file()
+    assert (workspace / "images" / "scene_001.png").is_file()
+
+
+def test_failure_category_is_added_to_stage_errors(tmp_path: Path) -> None:
+    """Stage failures should expose a safe failure category without leaking content."""
+
+    settings = build_settings(tmp_path)
+    pipeline, *_ = build_spy_pipeline(
+        tmp_path,
+        settings=settings,
+        short_assembly_service=FailingShortAssemblyService(settings),
+    )
+
+    with pytest.raises(WorkflowError) as exc_info:
+        run_async(pipeline.execute(build_request()))
+
+    assert exc_info.value.details["stage"] == STAGE_SHORT_ASSEMBLY
+    assert exc_info.value.details["failure_category"] == "render_failed"
 
 
 def test_real_mock_end_to_end_execution_completes_fully_offline(tmp_path: Path) -> None:
@@ -848,7 +1167,11 @@ def test_success_logs_safe_stage_metadata_only(tmp_path: Path) -> None:
         STAGE_SHORT_ASSEMBLY,
     ]
     combined = "".join(str(event) for event in logger.events)
+    assert any(event["event"] == "production_preflight_started" for event in logger.events)
+    assert any(event["event"] == "production_preflight_completed" for event in logger.events)
+    assert any(event["event"] == "production_plan_created" for event in logger.events)
     assert STAGE_BUILD_ASSEMBLY_INPUTS not in stage_events
+    assert STAGE_PREFLIGHT not in stage_events
     assert "sk-test-secret" not in combined
     assert "You probably still believe this Roblox myth." not in combined
     assert "Roblox Myth?" not in combined

@@ -206,6 +206,44 @@ class ApprovedMediaExecutionRequest(CreatorOSModel):
         return ArtifactWorkspace.validate_run_id(value)
 
 
+class ProductionExecutionPlan(CreatorOSModel):
+    """Typed deterministic preflight summary for one approved short-production run."""
+
+    run_id: str
+    approved: bool
+    image_provider: str
+    tts_provider: str
+    video_provider: str
+    render_provider: str
+    scene_count: int = Field(gt=0)
+    image_generation_count: int = Field(ge=0)
+    tts_generation_count: int = Field(ge=0)
+    video_generation_count: int = Field(ge=0)
+    live_media_call_count: int = Field(ge=0)
+    will_use_live_media: bool
+    final_width: int = Field(gt=0)
+    final_height: int = Field(gt=0)
+    fps: float = Field(gt=0)
+    output_format: str
+    workspace_path: str
+    execution_started: bool = False
+
+    @field_validator(
+        "run_id",
+        "image_provider",
+        "tts_provider",
+        "video_provider",
+        "render_provider",
+        "output_format",
+        "workspace_path",
+    )
+    @classmethod
+    def validate_required_text(cls, value: str, info) -> str:
+        """Trim and reject blank execution-plan text fields."""
+
+        return _validate_non_blank(value, field_name=info.field_name)
+
+
 class MediaExecutionResult(CreatorOSModel):
     """Typed post-approval aggregate result for media execution."""
 
@@ -268,4 +306,5 @@ __all__ = [
     "GamingWorkflowResult",
     "HumanApproval",
     "MediaExecutionResult",
+    "ProductionExecutionPlan",
 ]
