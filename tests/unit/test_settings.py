@@ -127,6 +127,13 @@ def test_negative_provider_timeout_is_rejected() -> None:
         build_settings(provider_timeout_seconds=-1.0)
 
 
+def test_negative_openai_image_timeout_is_rejected() -> None:
+    """OpenAI image timeouts must be positive."""
+
+    with pytest.raises(ValidationError):
+        build_settings(openai_image_timeout_seconds=-1.0)
+
+
 def test_negative_provider_retry_count_is_rejected() -> None:
     """Provider retry counts must not be negative."""
 
@@ -171,6 +178,7 @@ def test_environment_variables_override_defaults() -> None:
             "DEFAULT_VIDEO_PROVIDER": "custom-video",
             "DEFAULT_RENDER_PROVIDER": "custom-render",
             "PROVIDER_TIMEOUT_SECONDS": "45",
+            "OPENAI_IMAGE_TIMEOUT_SECONDS": "300",
             "PROVIDER_MAX_RETRIES": "5",
             "FFMPEG_PATH": "tools/ffmpeg/bin/ffmpeg.exe",
             "CAPTION_FONT_NAME": "Segoe UI",
@@ -196,6 +204,7 @@ def test_environment_variables_override_defaults() -> None:
     assert settings.default_video_provider == "custom-video"
     assert settings.default_render_provider == "custom-render"
     assert settings.provider_timeout_seconds == 45.0
+    assert settings.openai_image_timeout_seconds == 300.0
     assert settings.provider_max_retries == 5
     assert settings.ffmpeg_path == PROJECT_ROOT / Path("tools/ffmpeg/bin/ffmpeg.exe")
     assert settings.caption_font_name == "Segoe UI"
@@ -220,3 +229,12 @@ def test_get_settings_returns_cached_instance() -> None:
 
     assert first is second
     mock_settings.assert_called_once_with()
+
+
+def test_default_image_timeout_is_separate_from_generic_provider_timeout() -> None:
+    """Image generation should keep its own slower default timeout."""
+
+    settings = build_settings()
+
+    assert settings.provider_timeout_seconds == 30.0
+    assert settings.openai_image_timeout_seconds == 300.0

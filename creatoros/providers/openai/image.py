@@ -319,7 +319,7 @@ class OpenAIImageProvider:
         )
         self._default_model = _normalize_optional_string(default_model)
         self._timeout_seconds = (
-            get_settings().provider_timeout_seconds
+            get_settings().openai_image_timeout_seconds
             if timeout_seconds is None
             else timeout_seconds
         )

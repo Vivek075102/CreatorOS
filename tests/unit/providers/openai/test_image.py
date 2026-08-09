@@ -28,6 +28,7 @@ from creatoros.providers import (
     ImageGenerationRequest,
     ImageProvider,
     ProviderCapability,
+    ProviderRequestContext,
     create_provider_registry,
     resolve_default_image_provider,
 )
@@ -242,8 +243,30 @@ def test_generate_translates_request_and_normalizes_response(
     assert all("prompt" not in payload for _, payload in fake_logger.infos)
 
 
+def test_generate_uses_image_specific_default_timeout_when_not_overridden(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The image adapter should default to the dedicated image timeout setting."""
+
+    class StubSettings:
+        openai_image_timeout_seconds = 300.0
+
+    fake_images = FakeImagesClient(response=build_image_response())
+    monkeypatch.setattr("creatoros.providers.openai.image.get_settings", lambda: StubSettings())
+    provider = OpenAIImageProvider(
+        client=FakeOpenAIImageClient(fake_images),
+        api_key="sk-test",
+        default_model="gpt-image-1",
+        max_retries=0,
+    )
+
+    run_async(provider.generate(ImageGenerationRequest(prompt="portrait")))
+
+    assert fake_images.calls[0]["timeout"] == 300.0
+
+
 def test_generate_uses_context_timeout_when_supplied() -> None:
-    """Context timeout should override the provider default timeout."""
+    """Context timeout should override the image-specific provider timeout."""
 
     fake_images = FakeImagesClient(response=build_image_response())
     provider = build_provider(client=FakeOpenAIImageClient(fake_images))
@@ -251,10 +274,10 @@ def test_generate_uses_context_timeout_when_supplied() -> None:
     run_async(
         provider.generate(
             ImageGenerationRequest(prompt="portrait"),
-            context=None,
+            context=ProviderRequestContext(timeout_seconds=90.0),
         )
     )
-    assert fake_images.calls[0]["timeout"] == 30.0
+    assert fake_images.calls[0]["timeout"] == 90.0
 
 
 def test_generate_never_sends_unsupported_response_format_argument() -> None:
@@ -450,6 +473,42 @@ def test_timeout_errors_are_translated() -> None:
         run_async(provider.generate(ImageGenerationRequest(prompt="city")))
 
     assert exc_info.value.retryable is True
+    assert exc_info.value.code == "provider_timeout"
+    assert "city" not in str(exc_info.value.details)
+    assert len(fake_images.calls) == 1
+
+
+def test_openai_client_construction_uses_image_timeout_without_global_retry_changes(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Real client construction should use the dedicated image timeout and explicit retry count."""
+
+    captured_kwargs: dict[str, object] = {}
+
+    class StubSettings:
+        openai_image_timeout_seconds = 300.0
+
+    class StubAsyncOpenAI:
+        def __init__(self, **kwargs: object) -> None:
+            captured_kwargs.update(kwargs)
+            self.images = FakeImagesClient(response=build_image_response())
+
+    monkeypatch.setattr("creatoros.providers.openai.image.get_settings", lambda: StubSettings())
+    monkeypatch.setattr("creatoros.providers.openai.image.AsyncOpenAI", StubAsyncOpenAI)
+
+    provider = OpenAIImageProvider(
+        client=None,
+        api_key="sk-test",
+        default_model="gpt-image-1",
+        max_retries=0,
+    )
+
+    client = provider._get_client()
+
+    assert isinstance(client.images, FakeImagesClient)
+    assert captured_kwargs["api_key"] == "sk-test"
+    assert captured_kwargs["timeout"] == 300.0
+    assert captured_kwargs["max_retries"] == 0
 
 
 def test_connection_errors_are_translated() -> None:

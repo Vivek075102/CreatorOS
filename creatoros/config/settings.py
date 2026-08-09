@@ -39,6 +39,10 @@ class Settings(BaseSettings):
     youtube_client_id: str | None = Field(default=None, alias="YOUTUBE_CLIENT_ID")
     youtube_client_secret: str | None = Field(default=None, alias="YOUTUBE_CLIENT_SECRET")
     provider_timeout_seconds: float = Field(default=30.0, alias="PROVIDER_TIMEOUT_SECONDS")
+    openai_image_timeout_seconds: float = Field(
+        default=300.0,
+        alias="OPENAI_IMAGE_TIMEOUT_SECONDS",
+    )
     provider_max_retries: int = Field(default=3, alias="PROVIDER_MAX_RETRIES")
     ffmpeg_path: Path | None = Field(default=None, alias="FFMPEG_PATH")
     caption_font_name: str = Field(default="Arial", alias="CAPTION_FONT_NAME")
@@ -119,13 +123,13 @@ class Settings(BaseSettings):
             )
         return normalized_value
 
-    @field_validator("provider_timeout_seconds")
+    @field_validator("provider_timeout_seconds", "openai_image_timeout_seconds")
     @classmethod
-    def validate_provider_timeout_seconds(cls, value: float) -> float:
-        """Ensure provider timeouts are positive."""
+    def validate_positive_timeout_seconds(cls, value: float) -> float:
+        """Ensure configured timeout values are positive."""
 
         if value <= 0:
-            raise ValueError("provider_timeout_seconds must be greater than zero")
+            raise ValueError("timeout seconds must be greater than zero")
         return value
 
     @field_validator("provider_max_retries")
