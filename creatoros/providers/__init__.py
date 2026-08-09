@@ -84,6 +84,7 @@ from creatoros.providers.registry import (
     resolve_default_video_provider,
 )
 from creatoros.providers.render import (
+    DEFAULT_CROSSFADE_DURATION_SECONDS,
     AudioCompositionPolicy,
     CaptionOverlay,
     CaptionPosition,
@@ -93,11 +94,16 @@ from creatoros.providers.render import (
     RenderedVideo,
     RenderScene,
     RenderTransition,
+    SceneVisualTreatment,
     ShortRenderRequest,
+    VisualMotion,
+    VisualMotionIntensity,
+    build_default_visual_treatment,
 )
 
 __all__ = [
     "DEFAULT_CLOUDINARY_ASSET_HOSTING_PROVIDER_NAME",
+    "DEFAULT_CROSSFADE_DURATION_SECONDS",
     "DEFAULT_FFMPEG_RENDER_PROVIDER_NAME",
     "DEFAULT_KLING_API_BASE_URL",
     "DEFAULT_KLING_IMAGE_TO_VIDEO_ENDPOINT_PATH",
@@ -150,6 +156,7 @@ __all__ = [
     "RenderScene",
     "RenderTransition",
     "RenderedVideo",
+    "SceneVisualTreatment",
     "SearchProvider",
     "ShortRenderRequest",
     "StorageProvider",
@@ -158,7 +165,10 @@ __all__ = [
     "TrendProvider",
     "VideoGenerationRequest",
     "VideoProvider",
+    "VisualMotion",
+    "VisualMotionIntensity",
     "VoiceProvider",
+    "build_default_visual_treatment",
     "create_provider_registry",
     "get_provider_registry",
     "register_cloudinary_asset_hosting_provider",

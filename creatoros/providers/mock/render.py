@@ -50,6 +50,7 @@ def _build_digest(request: ShortRenderRequest) -> str:
                     "caption_max_lines": scene.caption_max_lines,
                     "narration_start_seconds": scene.narration_start_seconds,
                     "narration_end_seconds": scene.narration_end_seconds,
+                    "visual_treatment": scene.visual_treatment.model_dump(mode="json"),
                 }
                 for scene in request.production_timeline.scenes
             ],
@@ -123,6 +124,11 @@ class MockRenderProvider(MockProviderBase):
                 "output_format": request.output_format,
                 "has_narration": request.narration is not None,
                 "timeline_scene_count": len(request.scenes) if timeline is None else len(timeline.scenes),
+                "visual_treatments": (
+                    []
+                    if timeline is None
+                    else [scene.visual_treatment.model_dump(mode="json") for scene in timeline.scenes]
+                ),
             },
         )
         return ProviderResult[RenderedVideo](

@@ -17,6 +17,7 @@ from creatoros.providers import (
     RenderedVideo,
     RenderScene,
     ShortRenderRequest,
+    build_default_visual_treatment,
 )
 from creatoros.services.media_generation import GeneratedMediaPackage
 from creatoros.services.media_render import MediaRenderService, create_media_render_service
@@ -127,6 +128,12 @@ def _build_production_timeline(
             if overlap_end > overlap_start:
                 narration_start_seconds = overlap_start
                 narration_end_seconds = overlap_end
+        next_source_asset_type = None
+        if index + 1 < len(storyboard.scenes):
+            if generated_media.scene_videos:
+                next_source_asset_type = generated_media.scene_videos[index + 1].artifact.asset_type
+            else:
+                next_source_asset_type = generated_media.scene_images[index + 1].artifact.asset_type
         timeline_scenes.append(
             ProductionTimelineScene(
                 scene_number=storyboard_scene.scene_number,
@@ -137,6 +144,11 @@ def _build_production_timeline(
                 caption_text=storyboard_scene.on_screen_text,
                 narration_start_seconds=narration_start_seconds,
                 narration_end_seconds=narration_end_seconds,
+                visual_treatment=build_default_visual_treatment(
+                    scene_number=storyboard_scene.scene_number,
+                    source_asset_type=source_asset_ref.asset_type,
+                    next_source_asset_type=next_source_asset_type,
+                ),
             )
         )
         current_start = current_end

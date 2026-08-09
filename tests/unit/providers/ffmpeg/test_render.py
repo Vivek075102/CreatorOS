@@ -27,7 +27,10 @@ from creatoros.providers import (
     ProviderCapability,
     ProviderRequestContext,
     RenderProvider,
+    RenderTransition,
+    SceneVisualTreatment,
     ShortRenderRequest,
+    VisualMotion,
     create_provider_registry,
     register_ffmpeg_render_provider,
     resolve_default_render_provider,
@@ -144,6 +147,30 @@ def build_request(
     return ShortRenderRequest(
         scenes=scenes,
         narration=narration,
+        width=1080,
+        height=1920,
+        fps=30.0,
+    )
+
+
+def build_two_image_request(*, image_path: Path, second_image_path: Path) -> ShortRenderRequest:
+    """Create a two-scene still-image render request for transition tests."""
+
+    return ShortRenderRequest(
+        scenes=[
+            RenderScene(
+                scene_number=1,
+                duration_seconds=2.0,
+                visual_asset_ref=GeneratedAsset(asset_type=AssetType.IMAGE, uri=str(image_path)),
+                caption_text="CreatorOS caption",
+            ),
+            RenderScene(
+                scene_number=2,
+                duration_seconds=3.0,
+                visual_asset_ref=GeneratedAsset(asset_type=AssetType.IMAGE, uri=str(second_image_path)),
+                caption_text="Second caption",
+            ),
+        ],
         width=1080,
         height=1920,
         fps=30.0,
@@ -394,7 +421,10 @@ def test_image_scene_command_uses_loop_duration_filter_and_separate_argv(tmp_pat
     assert "-t" in first_call and "2" in first_call
     assert "-r" in first_call and "30" in first_call
     assert "-vf" in first_call
-    assert "scale=w=1080:h=1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1" in first_call
+    filter_value = first_call[first_call.index("-vf") + 1]
+    assert "scale=w=1145:h=2035:force_original_aspect_ratio=increase" in filter_value
+    assert "zoompan=" in filter_value
+    assert "s=1080x1920" in filter_value
     assert str(image_path) in first_call
 
 
@@ -693,6 +723,147 @@ def test_ffmpeg_render_uses_explicit_production_timeline_when_supplied(tmp_path:
     assert "-t" in second_scene_call and "3.75" in second_scene_call
     assert "0:00:00.00,0:00:01.25" in subtitle_contents
     assert "0:00:01.25,0:00:05.00" in subtitle_contents
+
+
+def test_still_image_push_in_generates_zoompan_filter(tmp_path: Path) -> None:
+    """Still-image scenes should render with deterministic Ken Burns-style zoom movement."""
+
+    artifact_root, image_path, _video_path, _narration_path = create_workspace_files(tmp_path)
+    ffmpeg_binary = tmp_path / "ffmpeg.exe"
+    ffmpeg_binary.write_text("binary", encoding="utf-8")
+    runner = RecordingFFmpegRunner()
+    provider = build_provider(artifact_root=artifact_root, ffmpeg_path=ffmpeg_binary, command_runner=runner)
+    request = build_request(image_path=image_path)
+
+    run_async(provider.render(request))
+
+    scene_call = runner.calls[0]
+    filter_value = scene_call[scene_call.index("-vf") + 1]
+    assert "zoompan=" in filter_value
+    assert "z='min(zoom+0.0015,1.060)'" in filter_value
+    assert "fps=30" in filter_value
+    assert "s=1080x1920" in filter_value
+
+
+def test_pull_out_and_pan_filters_are_supported_for_still_images(tmp_path: Path) -> None:
+    """Explicit still-image motion treatments should generate deterministic filter variants."""
+
+    artifact_root, image_path, _video_path, _narration_path = create_workspace_files(tmp_path)
+    second_image_path = artifact_root / "run_001" / "images" / "scene_002.png"
+    second_image_path.write_bytes(b"png-bytes-2")
+    ffmpeg_binary = tmp_path / "ffmpeg.exe"
+    ffmpeg_binary.write_text("binary", encoding="utf-8")
+    runner = RecordingFFmpegRunner()
+    provider = build_provider(artifact_root=artifact_root, ffmpeg_path=ffmpeg_binary, command_runner=runner)
+    request = build_two_image_request(image_path=image_path, second_image_path=second_image_path)
+    request.production_timeline = ProductionTimeline(
+        scenes=[
+            ProductionTimelineScene(
+                scene_number=1,
+                start_seconds=0.0,
+                end_seconds=2.0,
+                duration_seconds=2.0,
+                source_asset_ref=GeneratedAsset(asset_type=AssetType.IMAGE, uri=str(image_path)),
+                caption_text="CreatorOS caption",
+                visual_treatment=SceneVisualTreatment(motion=VisualMotion.PULL_OUT),
+            ),
+            ProductionTimelineScene(
+                scene_number=2,
+                start_seconds=2.0,
+                end_seconds=5.0,
+                duration_seconds=3.0,
+                source_asset_ref=GeneratedAsset(asset_type=AssetType.IMAGE, uri=str(second_image_path)),
+                caption_text="Second caption",
+                visual_treatment=SceneVisualTreatment(motion=VisualMotion.PAN_DOWN),
+            ),
+        ],
+        target_duration_seconds=5.0,
+    )
+
+    run_async(provider.render(request))
+
+    first_filter = runner.calls[0][runner.calls[0].index("-vf") + 1]
+    second_filter = runner.calls[1][runner.calls[1].index("-vf") + 1]
+    assert "if(eq(on,1),1.060,max(1.0,zoom-0.0015))" in first_filter
+    assert "y='(ih-ih/zoom)*on/" in second_filter
+
+
+def test_generated_video_scenes_preserve_native_motion_without_zoompan(tmp_path: Path) -> None:
+    """Generated-video segments should be scaled and cropped without synthetic zoom/pan."""
+
+    artifact_root, image_path, video_path, _narration_path = create_workspace_files(tmp_path)
+    ffmpeg_binary = tmp_path / "ffmpeg.exe"
+    ffmpeg_binary.write_text("binary", encoding="utf-8")
+    runner = RecordingFFmpegRunner()
+    provider = build_provider(artifact_root=artifact_root, ffmpeg_path=ffmpeg_binary, command_runner=runner)
+    request = build_request(image_path=image_path, video_path=video_path)
+
+    run_async(provider.render(request))
+
+    video_call = runner.calls[1]
+    filter_value = video_call[video_call.index("-vf") + 1]
+    assert "zoompan" not in filter_value
+    assert "scale=w=1080:h=1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1" in filter_value
+
+
+def test_crossfade_path_preserves_total_duration_and_captions_after_visual_treatment(tmp_path: Path) -> None:
+    """Crossfades should be composed before captions while preserving final timeline duration."""
+
+    artifact_root, image_path, _video_path, narration_path = create_workspace_files(tmp_path)
+    second_image_path = artifact_root / "run_001" / "images" / "scene_002.png"
+    second_image_path.write_bytes(b"png-bytes-2")
+    ffmpeg_binary = tmp_path / "ffmpeg.exe"
+    ffmpeg_binary.write_text("binary", encoding="utf-8")
+    runner = RecordingFFmpegRunner()
+    provider = build_provider(artifact_root=artifact_root, ffmpeg_path=ffmpeg_binary, command_runner=runner)
+    request = build_two_image_request(image_path=image_path, second_image_path=second_image_path)
+    request.narration = GeneratedAudio(
+        artifact=GeneratedAsset(asset_type=AssetType.AUDIO, uri=str(narration_path)),
+        provider_name="mock",
+        model="mock-tts-model",
+        mime_type="audio/wav",
+        estimated_duration_seconds=5.0,
+    )
+    request.production_timeline = ProductionTimeline(
+        scenes=[
+            ProductionTimelineScene(
+                scene_number=1,
+                start_seconds=0.0,
+                end_seconds=2.0,
+                duration_seconds=2.0,
+                source_asset_ref=GeneratedAsset(asset_type=AssetType.IMAGE, uri=str(image_path)),
+                caption_text="CreatorOS caption",
+                visual_treatment=SceneVisualTreatment(
+                    motion=VisualMotion.PUSH_IN,
+                    transition=RenderTransition.CROSSFADE,
+                    transition_duration_seconds=0.2,
+                ),
+            ),
+            ProductionTimelineScene(
+                scene_number=2,
+                start_seconds=2.0,
+                end_seconds=5.0,
+                duration_seconds=3.0,
+                source_asset_ref=GeneratedAsset(asset_type=AssetType.IMAGE, uri=str(second_image_path)),
+                caption_text="Second caption",
+            ),
+        ],
+        target_duration_seconds=5.0,
+    )
+
+    run_async(provider.render(request))
+
+    first_scene_call = runner.calls[0]
+    final_call = runner.calls[-1]
+    assert first_scene_call[first_scene_call.index("-t") + 1] == "2.2"
+    assert "-f" not in final_call or "concat" not in final_call
+    assert "-filter_complex" in final_call
+    filter_complex = runner.filter_complex_values[-1]
+    assert "xfade=transition=fade:duration=0.2:offset=2" in filter_complex
+    assert "subtitles='" in filter_complex
+    assert "[2:a]aresample=48000" in filter_complex
+    assert final_call[final_call.index("-map") + 1] == "[video_out]"
+    assert final_call[-2] == "5"
 
 
 def test_invalid_caption_font_file_fails_safely_before_final_render(tmp_path: Path) -> None:

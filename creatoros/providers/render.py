@@ -48,7 +48,26 @@ class RenderTransition(StrEnum):
     """Tiny provider-neutral transition set for the initial render contract."""
 
     CUT = "cut"
-    FADE = "fade"
+    CROSSFADE = "crossfade"
+
+
+class VisualMotion(StrEnum):
+    """Provider-neutral visual motion treatments for final Short scenes."""
+
+    NONE = "none"
+    PUSH_IN = "push_in"
+    PULL_OUT = "pull_out"
+    PAN_LEFT = "pan_left"
+    PAN_RIGHT = "pan_right"
+    PAN_UP = "pan_up"
+    PAN_DOWN = "pan_down"
+
+
+class VisualMotionIntensity(StrEnum):
+    """Small provider-neutral motion-intensity set for deterministic editorial movement."""
+
+    SUBTLE = "subtle"
+    NORMAL = "normal"
 
 
 class NarrationTimingPolicy(StrEnum):
@@ -80,6 +99,50 @@ class CaptionOverlay(CreatorOSModel):
         return _validate_non_blank(value, field_name="text")
 
 
+class SceneVisualTreatment(CreatorOSModel):
+    """Provider-neutral visual treatment instructions for one production-timeline scene."""
+
+    motion: VisualMotion = VisualMotion.NONE
+    intensity: VisualMotionIntensity = VisualMotionIntensity.SUBTLE
+    transition: RenderTransition = RenderTransition.CUT
+    transition_duration_seconds: float = 0.0
+
+    @field_validator("transition", mode="before")
+    @classmethod
+    def normalize_transition(cls, value: object) -> object:
+        """Support legacy fade naming while normalizing to crossfade."""
+
+        if value == "fade":
+            return RenderTransition.CROSSFADE.value
+        return value
+
+    @field_validator("transition_duration_seconds")
+    @classmethod
+    def validate_transition_duration_seconds(cls, value: float) -> float:
+        """Require finite non-negative transition durations."""
+
+        if not math.isfinite(value):
+            raise ValueError("transition_duration_seconds must be finite")
+        if value < 0:
+            raise ValueError("transition_duration_seconds must be zero or greater")
+        return round(value, 6)
+
+    @model_validator(mode="after")
+    def validate_transition_semantics(self) -> SceneVisualTreatment:
+        """Require internally coherent transition settings."""
+
+        if self.transition is RenderTransition.CUT and not math.isclose(
+            self.transition_duration_seconds,
+            0.0,
+            rel_tol=0.0,
+            abs_tol=1e-6,
+        ):
+            raise ValueError("cut transitions must use a zero duration")
+        if self.transition is RenderTransition.CROSSFADE and self.transition_duration_seconds <= 0:
+            raise ValueError("crossfade transitions must use a positive duration")
+        return self
+
+
 class ProductionTimelineScene(CreatorOSModel):
     """One explicit paced scene interval on the final provider-neutral production timeline."""
 
@@ -95,6 +158,7 @@ class ProductionTimelineScene(CreatorOSModel):
     caption_max_lines: int = Field(default=2, gt=0)
     narration_start_seconds: float | None = None
     narration_end_seconds: float | None = None
+    visual_treatment: SceneVisualTreatment = Field(default_factory=SceneVisualTreatment)
 
     @field_validator(
         "start_seconds",
@@ -196,10 +260,18 @@ class ProductionTimeline(CreatorOSModel):
             raise ValueError("timeline scene numbers must be sequential starting at 1")
 
         expected_start = 0.0
-        for scene in self.scenes:
+        for index, scene in enumerate(self.scenes):
             if not math.isclose(scene.start_seconds, expected_start, rel_tol=0.0, abs_tol=1e-6):
                 raise ValueError("timeline scenes must be contiguous and monotonically ordered")
             expected_start = scene.end_seconds
+            if scene.visual_treatment.transition is RenderTransition.CROSSFADE:
+                if index == len(self.scenes) - 1:
+                    raise ValueError("the final timeline scene cannot transition with crossfade")
+                next_scene = self.scenes[index + 1]
+                if scene.visual_treatment.transition_duration_seconds >= scene.duration_seconds:
+                    raise ValueError("crossfade duration must be smaller than the source scene duration")
+                if scene.visual_treatment.transition_duration_seconds >= next_scene.duration_seconds:
+                    raise ValueError("crossfade duration must be smaller than the destination scene duration")
 
         if not math.isclose(
             self.total_duration_seconds,
@@ -265,6 +337,15 @@ class RenderScene(CreatorOSModel):
         """Normalize optional planning text."""
 
         return _normalize_optional_string(value, field_name=info.field_name)
+
+    @field_validator("transition", mode="before")
+    @classmethod
+    def normalize_transition(cls, value: object) -> object:
+        """Support legacy fade naming while normalizing to crossfade."""
+
+        if value == "fade":
+            return RenderTransition.CROSSFADE.value
+        return value
 
     @model_validator(mode="before")
     @classmethod
@@ -408,7 +489,7 @@ def _build_legacy_production_timeline(
     narration_duration = None if narration is None else narration.estimated_duration_seconds
     timeline_scenes: list[ProductionTimelineScene] = []
     current_start = 0.0
-    for scene in scenes:
+    for index, scene in enumerate(scenes):
         current_end = round(current_start + scene.duration_seconds, 6)
         if scene.video_asset_ref is not None:
             source_asset_ref = scene.video_asset_ref.model_copy(deep=True)
@@ -428,6 +509,25 @@ def _build_legacy_production_timeline(
             if overlap_end > overlap_start:
                 narration_start_seconds = overlap_start
                 narration_end_seconds = overlap_end
+        next_source_asset_type = None
+        if index + 1 < len(scenes):
+            next_scene = scenes[index + 1]
+            if next_scene.video_asset_ref is not None:
+                next_source_asset_type = next_scene.video_asset_ref.asset_type
+            elif next_scene.visual_asset_ref is not None:
+                next_source_asset_type = next_scene.visual_asset_ref.asset_type
+        visual_treatment = build_default_visual_treatment(
+            scene_number=scene.scene_number,
+            source_asset_type=source_asset_ref.asset_type,
+            next_source_asset_type=next_source_asset_type,
+        )
+        if scene.transition is RenderTransition.CROSSFADE and index < len(scenes) - 1:
+            visual_treatment = SceneVisualTreatment(
+                motion=visual_treatment.motion,
+                intensity=visual_treatment.intensity,
+                transition=RenderTransition.CROSSFADE,
+                transition_duration_seconds=DEFAULT_CROSSFADE_DURATION_SECONDS,
+            )
         timeline_scenes.append(
             ProductionTimelineScene(
                 scene_number=scene.scene_number,
@@ -444,12 +544,49 @@ def _build_legacy_production_timeline(
                 caption_max_lines=2 if scene.caption is None else scene.caption.max_lines,
                 narration_start_seconds=narration_start_seconds,
                 narration_end_seconds=narration_end_seconds,
+                visual_treatment=visual_treatment,
             )
         )
         current_start = current_end
     return ProductionTimeline(
         scenes=timeline_scenes,
         target_duration_seconds=round(sum(scene.duration_seconds for scene in scenes), 6),
+    )
+
+
+DEFAULT_CROSSFADE_DURATION_SECONDS = 0.2
+_DEFAULT_STILL_IMAGE_MOTION_PATTERN = (
+    VisualMotion.PUSH_IN,
+    VisualMotion.PAN_RIGHT,
+    VisualMotion.PUSH_IN,
+    VisualMotion.PAN_LEFT,
+)
+
+
+def build_default_visual_treatment(
+    *,
+    scene_number: int,
+    source_asset_type: AssetType,
+    next_source_asset_type: AssetType | None,
+) -> SceneVisualTreatment:
+    """Build one deterministic provider-neutral visual treatment for a timeline scene."""
+
+    if source_asset_type is AssetType.VIDEO:
+        motion = VisualMotion.NONE
+    else:
+        motion = _DEFAULT_STILL_IMAGE_MOTION_PATTERN[(scene_number - 1) % len(_DEFAULT_STILL_IMAGE_MOTION_PATTERN)]
+
+    transition = RenderTransition.CUT
+    transition_duration_seconds = 0.0
+    if source_asset_type is AssetType.IMAGE and next_source_asset_type is AssetType.IMAGE:
+        transition = RenderTransition.CROSSFADE
+        transition_duration_seconds = DEFAULT_CROSSFADE_DURATION_SECONDS
+
+    return SceneVisualTreatment(
+        motion=motion,
+        intensity=VisualMotionIntensity.SUBTLE,
+        transition=transition,
+        transition_duration_seconds=transition_duration_seconds,
     )
 
 
@@ -497,6 +634,7 @@ class RenderedVideo(CreatorOSModel):
 
 
 __all__ = [
+    "DEFAULT_CROSSFADE_DURATION_SECONDS",
     "AudioCompositionPolicy",
     "CaptionOverlay",
     "CaptionPosition",
@@ -506,5 +644,9 @@ __all__ = [
     "RenderScene",
     "RenderTransition",
     "RenderedVideo",
+    "SceneVisualTreatment",
     "ShortRenderRequest",
+    "VisualMotion",
+    "VisualMotionIntensity",
+    "build_default_visual_treatment",
 ]

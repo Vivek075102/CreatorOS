@@ -25,6 +25,7 @@ from creatoros.providers.render import (
     RenderedVideo,
     RenderTransition,
     ShortRenderRequest,
+    VisualMotion,
 )
 from creatoros.services import (
     GeneratedMediaPackage,
@@ -281,6 +282,8 @@ def test_single_storyboard_scene_maps_to_one_scene_image() -> None:
     assert render_request.scenes[0].caption_text == "Caption 1"
     assert render_request.scenes[0].motion_instruction is None
     assert render_request.scenes[0].transition is RenderTransition.CUT
+    assert render_request.production_timeline.scenes[0].visual_treatment.motion is VisualMotion.PUSH_IN
+    assert render_request.production_timeline.scenes[0].visual_treatment.transition is RenderTransition.CUT
 
 
 def test_multiple_scenes_map_in_deterministic_order_without_drops_or_duplicates() -> None:
@@ -308,6 +311,10 @@ def test_multiple_scenes_map_in_deterministic_order_without_drops_or_duplicates(
         "mock://generated/video/1.mp4",
         "mock://generated/video/2.mp4",
     ]
+    assert all(
+        scene.visual_treatment.motion is VisualMotion.NONE
+        for scene in render_request.production_timeline.scenes
+    )
 
 
 def test_incompatible_image_count_is_rejected_before_rendering() -> None:
@@ -403,6 +410,46 @@ def test_build_render_request_is_deterministic_and_does_not_mutate_source_reques
     assert isinstance(first.production_timeline, ProductionTimeline)
     assert first.total_duration_seconds == 7.0
     assert request.model_dump(mode="json") == original_dump
+
+
+def test_still_image_treatments_follow_deterministic_pattern() -> None:
+    """Still-image timelines should receive deterministic subtle motion and conservative transitions."""
+
+    render_service, _provider = build_render_service()
+    service = ShortAssemblyService(render_service)
+
+    render_request = service.build_render_request(build_request(scene_count=4, include_videos=False))
+
+    assert render_request.production_timeline is not None
+    assert [scene.visual_treatment.motion for scene in render_request.production_timeline.scenes] == [
+        VisualMotion.PUSH_IN,
+        VisualMotion.PAN_RIGHT,
+        VisualMotion.PUSH_IN,
+        VisualMotion.PAN_LEFT,
+    ]
+    assert [scene.visual_treatment.transition for scene in render_request.production_timeline.scenes] == [
+        RenderTransition.CROSSFADE,
+        RenderTransition.CROSSFADE,
+        RenderTransition.CROSSFADE,
+        RenderTransition.CUT,
+    ]
+
+
+def test_mixed_image_and_video_treatments_preserve_video_motion() -> None:
+    """Mixed timelines should animate stills subtly while leaving generated video motion alone."""
+
+    render_service, _provider = build_render_service()
+    service = ShortAssemblyService(render_service)
+
+    render_request = service.build_render_request(build_request(scene_count=2, include_videos=True))
+
+    assert render_request.production_timeline is not None
+    assert render_request.production_timeline.scenes[0].visual_treatment.motion is VisualMotion.NONE
+    assert render_request.production_timeline.scenes[1].visual_treatment.motion is VisualMotion.NONE
+    assert all(
+        scene.visual_treatment.transition is RenderTransition.CUT
+        for scene in render_request.production_timeline.scenes
+    )
 
 
 def test_production_timeline_preserves_scene_order() -> None:

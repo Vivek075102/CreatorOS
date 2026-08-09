@@ -69,6 +69,7 @@ def build_narration_filter_chain(
     target_duration_seconds: float,
     sample_rate_hz: int = DEFAULT_OUTPUT_AUDIO_SAMPLE_RATE_HZ,
     channel_layout: str = DEFAULT_OUTPUT_AUDIO_CHANNEL_LAYOUT,
+    input_stream_label: str = "[1:a]",
 ) -> str:
     """Build one deterministic FFmpeg audio filter chain for narration fitting."""
 
@@ -78,10 +79,13 @@ def build_narration_filter_chain(
         raise ValueError("sample_rate_hz must be greater than zero")
     if not channel_layout.strip():
         raise ValueError("channel_layout must not be blank")
+    if not input_stream_label.strip():
+        raise ValueError("input_stream_label must not be blank")
 
     formatted_duration = f"{target_duration_seconds:.6f}".rstrip("0").rstrip(".")
     return (
-        "[1:a]"
+        input_stream_label
+        + 
         f"aresample={sample_rate_hz},"
         f"aformat=sample_fmts=fltp:channel_layouts={channel_layout},"
         "apad,"

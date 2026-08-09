@@ -77,6 +77,20 @@ def test_mock_render_preserves_duration_dimensions_and_fps() -> None:
     assert result.data.width == request.width
     assert result.data.height == request.height
     assert result.data.fps == request.fps
+    assert result.data.metadata["visual_treatments"] == [
+        {
+            "motion": "push_in",
+            "intensity": "subtle",
+            "transition": "cut",
+            "transition_duration_seconds": 0.0,
+        },
+        {
+            "motion": "none",
+            "intensity": "subtle",
+            "transition": "cut",
+            "transition_duration_seconds": 0.0,
+        },
+    ]
 
 
 def test_mock_render_provider_satisfies_runtime_protocol() -> None:

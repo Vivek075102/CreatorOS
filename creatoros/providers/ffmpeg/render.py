@@ -38,7 +38,10 @@ from creatoros.providers.ffmpeg.captions import (
 from creatoros.providers.render import (
     ProductionTimelineScene,
     RenderedVideo,
+    RenderTransition,
     ShortRenderRequest,
+    VisualMotion,
+    VisualMotionIntensity,
 )
 
 DEFAULT_FFMPEG_RENDER_PROVIDER_NAME = "ffmpeg"
@@ -171,6 +174,7 @@ class FFmpegRenderProvider:
             await self._compose_final_video(
                 request=request,
                 ffmpeg_binary=ffmpeg_binary,
+                scene_segments=scene_segments,
                 concat_list_path=concat_list_path,
                 narration_path=narration_path,
                 caption_subtitle_path=caption_subtitle_path,
@@ -434,10 +438,8 @@ class FFmpegRenderProvider:
     ) -> tuple[str, ...]:
         """Build one FFmpeg argv command for a normalized scene segment."""
 
-        scale_filter = (
-            f"scale=w={width}:h={height}:force_original_aspect_ratio=decrease,"
-            f"pad={width}:{height}:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1"
-        )
+        scene_duration_seconds = self._resolve_segment_duration_seconds(scene)
+        scale_filter = self._build_video_scale_filter(width=width, height=height)
         base_command = [str(ffmpeg_binary), "-y"]
         if scene.source_asset_ref.asset_type is AssetType.VIDEO:
             base_command.extend(
@@ -445,7 +447,7 @@ class FFmpegRenderProvider:
                     "-i",
                     str(source_path),
                     "-t",
-                    self._format_seconds(scene.duration_seconds),
+                    self._format_seconds(scene_duration_seconds),
                     "-r",
                     self._format_fps(fps),
                     "-vf",
@@ -469,11 +471,17 @@ class FFmpegRenderProvider:
                 "-i",
                 str(source_path),
                 "-t",
-                self._format_seconds(scene.duration_seconds),
+                self._format_seconds(scene_duration_seconds),
                 "-r",
                 self._format_fps(fps),
                 "-vf",
-                scale_filter,
+                self._build_still_image_filter(
+                    scene,
+                    width=width,
+                    height=height,
+                    fps=fps,
+                    scene_duration_seconds=scene_duration_seconds,
+                ),
                 "-an",
                 "-c:v",
                 "libx264",
@@ -507,15 +515,56 @@ class FFmpegRenderProvider:
         *,
         request: ShortRenderRequest,
         ffmpeg_binary: Path,
+        scene_segments: Sequence[Path],
         concat_list_path: Path,
         narration_path: Path | None,
         caption_subtitle_path: Path | None,
         output_path: Path,
         timeout_seconds: float | None,
-    ) -> None:
+        ) -> None:
         """Compose normalized scene segments and optional narration into the final MP4."""
 
         audio_plan = build_audio_render_plan(request)
+        assert request.production_timeline is not None
+        if self._timeline_uses_crossfade(request.production_timeline.scenes):
+            command = self._build_crossfade_compose_command(
+                request=request,
+                ffmpeg_binary=ffmpeg_binary,
+                scene_segments=scene_segments,
+                narration_path=narration_path,
+                caption_subtitle_path=caption_subtitle_path,
+                output_path=output_path,
+                audio_plan=audio_plan,
+            )
+        else:
+            command = self._build_concat_compose_command(
+                request=request,
+                ffmpeg_binary=ffmpeg_binary,
+                concat_list_path=concat_list_path,
+                narration_path=narration_path,
+                caption_subtitle_path=caption_subtitle_path,
+                output_path=output_path,
+                audio_plan=audio_plan,
+            )
+        await self._execute_ffmpeg_command(
+            tuple(command),
+            timeout_seconds=timeout_seconds,
+            failure_code="render_output_failed",
+        )
+
+    def _build_concat_compose_command(
+        self,
+        *,
+        request: ShortRenderRequest,
+        ffmpeg_binary: Path,
+        concat_list_path: Path,
+        narration_path: Path | None,
+        caption_subtitle_path: Path | None,
+        output_path: Path,
+        audio_plan,
+    ) -> list[str]:
+        """Build the existing concat-based final-compose command."""
+
         command = [
             str(ffmpeg_binary),
             "-f",
@@ -583,11 +632,101 @@ class FFmpegRenderProvider:
                     str(output_path),
                 ]
             )
-        await self._execute_ffmpeg_command(
-            tuple(command),
-            timeout_seconds=timeout_seconds,
-            failure_code="render_output_failed",
+        return command
+
+    def _build_crossfade_compose_command(
+        self,
+        *,
+        request: ShortRenderRequest,
+        ffmpeg_binary: Path,
+        scene_segments: Sequence[Path],
+        narration_path: Path | None,
+        caption_subtitle_path: Path | None,
+        output_path: Path,
+        audio_plan,
+    ) -> list[str]:
+        """Build one final-compose command that applies deterministic crossfades before captions."""
+
+        assert request.production_timeline is not None
+        command = [str(ffmpeg_binary)]
+        for segment_path in scene_segments:
+            command.extend(["-i", str(segment_path)])
+        narration_input_index = None
+        if audio_plan.include_audio_stream and narration_path is not None:
+            narration_input_index = len(scene_segments)
+            command.extend(["-i", str(narration_path)])
+
+        filter_chains: list[str] = []
+        previous_label = "[0:v]"
+        output_label = previous_label
+        for index, scene in enumerate(request.production_timeline.scenes[:-1], start=1):
+            next_label = f"[vxfade_{index}]"
+            if scene.visual_treatment.transition is RenderTransition.CROSSFADE:
+                filter_chains.append(
+                    f"{previous_label}[{index}:v]"
+                    f"xfade=transition=fade:duration={self._format_seconds(scene.visual_treatment.transition_duration_seconds)}:"
+                    f"offset={self._format_seconds(scene.end_seconds)}{next_label}"
+                )
+            else:
+                filter_chains.append(
+                    f"{previous_label}[{index}:v]"
+                    f"concat=n=2:v=1:a=0{next_label}"
+                )
+            previous_label = next_label
+            output_label = next_label
+
+        mapped_video_label = output_label
+        if caption_subtitle_path is not None:
+            caption_label = "[video_out]"
+            filter_chains.append(
+                output_label
+                + build_subtitles_filter_arg(
+                    subtitle_path=caption_subtitle_path,
+                    fonts_dir=self._resolve_caption_fonts_dir(),
+                )
+                + caption_label
+            )
+            mapped_video_label = caption_label
+
+        if audio_plan.include_audio_stream and narration_path is not None:
+            assert narration_input_index is not None
+            assert audio_plan.filter_chain is not None
+            filter_chains.append(
+                audio_plan.filter_chain.replace("[1:a]", f"[{narration_input_index}:a]")
+            )
+
+        if filter_chains:
+            command.extend(["-filter_complex", ";".join(filter_chains)])
+
+        command.extend(["-map", mapped_video_label])
+        command.extend(["-c:v", "libx264", "-pix_fmt", "yuv420p"])
+        if audio_plan.include_audio_stream and narration_path is not None:
+            command.extend(
+                [
+                    "-map",
+                    "[narration_out]",
+                    "-c:a",
+                    audio_plan.codec,
+                    "-ar",
+                    str(audio_plan.sample_rate_hz),
+                    "-ac",
+                    "2",
+                    "-b:a",
+                    audio_plan.bitrate,
+                ]
+            )
+        else:
+            command.append("-an")
+        command.extend(
+            [
+                "-movflags",
+                "+faststart",
+                "-t",
+                self._format_seconds(request.total_duration_seconds),
+                str(output_path),
+            ]
         )
+        return command
 
     def _write_caption_subtitle_file(
         self,
@@ -618,6 +757,85 @@ class FFmpegRenderProvider:
         )
         subtitle_path.write_text(subtitle_document, encoding="utf-8")
         return subtitle_path
+
+    @staticmethod
+    def _timeline_uses_crossfade(scenes: Sequence[ProductionTimelineScene]) -> bool:
+        """Return whether any timeline scene transitions with crossfade."""
+
+        return any(scene.visual_treatment.transition is RenderTransition.CROSSFADE for scene in scenes[:-1])
+
+    @staticmethod
+    def _resolve_segment_duration_seconds(scene: ProductionTimelineScene) -> float:
+        """Return the rendered segment duration, including outgoing overlap when needed."""
+
+        if scene.visual_treatment.transition is RenderTransition.CROSSFADE:
+            return round(scene.duration_seconds + scene.visual_treatment.transition_duration_seconds, 6)
+        return scene.duration_seconds
+
+    @staticmethod
+    def _build_video_scale_filter(*, width: int, height: int) -> str:
+        """Build one deterministic fill-and-crop video scaling filter."""
+
+        return (
+            f"scale=w={width}:h={height}:force_original_aspect_ratio=increase,"
+            f"crop={width}:{height},setsar=1"
+        )
+
+    def _build_still_image_filter(
+        self,
+        scene: ProductionTimelineScene,
+        *,
+        width: int,
+        height: int,
+        fps: float,
+        scene_duration_seconds: float,
+    ) -> str:
+        """Build one deterministic Ken Burns-style filter chain for still-image scenes."""
+
+        fps_value = self._format_fps(fps)
+        frame_count = max(1, round(scene_duration_seconds * fps))
+        zoom_max = 1.06 if scene.visual_treatment.intensity is VisualMotionIntensity.SUBTLE else 1.12
+        cover_width = max(width, round(width * zoom_max))
+        cover_height = max(height, round(height * zoom_max))
+        base = (
+            f"scale=w={cover_width}:h={cover_height}:force_original_aspect_ratio=increase,"
+            f"zoompan=s={width}x{height}:fps={fps_value}:d={frame_count}:"
+        )
+        motion = scene.visual_treatment.motion
+        if motion is VisualMotion.PUSH_IN:
+            return (
+                base
+                + f"z='min(zoom+0.0015,{zoom_max:.3f})':"
+                + "x='iw/2-(iw/zoom/2)':"
+                + "y='ih/2-(ih/zoom/2)',setsar=1"
+            )
+        if motion is VisualMotion.PULL_OUT:
+            return (
+                base
+                + f"z='if(eq(on,1),{zoom_max:.3f},max(1.0,zoom-0.0015))':"
+                + "x='iw/2-(iw/zoom/2)':"
+                + "y='ih/2-(ih/zoom/2)',setsar=1"
+            )
+
+        denominator = max(1, frame_count - 1)
+        pan_extent = "(iw-iw/zoom)"
+        vertical_extent = "(ih-ih/zoom)"
+        x_expr = "iw/2-(iw/zoom/2)"
+        y_expr = "ih/2-(ih/zoom/2)"
+        if motion is VisualMotion.PAN_RIGHT:
+            x_expr = f"{pan_extent}*on/{denominator}"
+        elif motion is VisualMotion.PAN_LEFT:
+            x_expr = f"{pan_extent}*(1-on/{denominator})"
+        elif motion is VisualMotion.PAN_DOWN:
+            y_expr = f"{vertical_extent}*on/{denominator}"
+        elif motion is VisualMotion.PAN_UP:
+            y_expr = f"{vertical_extent}*(1-on/{denominator})"
+        return (
+            base
+            + "z='1.03':"
+            + f"x='{x_expr}':"
+            + f"y='{y_expr}',setsar=1"
+        )
 
     def _validate_caption_configuration(self) -> None:
         """Validate the local caption font configuration before subtitle rendering."""
@@ -744,6 +962,7 @@ class FFmpegRenderProvider:
                         "caption_max_lines": scene.caption_max_lines,
                         "narration_start_seconds": scene.narration_start_seconds,
                         "narration_end_seconds": scene.narration_end_seconds,
+                        "visual_treatment": scene.visual_treatment.model_dump(mode="json"),
                     }
                     for scene in request.production_timeline.scenes
                 ],

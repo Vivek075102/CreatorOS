@@ -7,6 +7,7 @@ from pydantic import ValidationError
 
 from creatoros.domain import AssetType, GeneratedAsset
 from creatoros.providers import (
+    DEFAULT_CROSSFADE_DURATION_SECONDS,
     AudioCompositionPolicy,
     CaptionOverlay,
     CaptionPosition,
@@ -17,7 +18,11 @@ from creatoros.providers import (
     RenderedVideo,
     RenderScene,
     RenderTransition,
+    SceneVisualTreatment,
     ShortRenderRequest,
+    VisualMotion,
+    VisualMotionIntensity,
+    build_default_visual_treatment,
 )
 
 
@@ -101,6 +106,7 @@ def test_valid_render_scene_is_accepted() -> None:
     assert scene.caption == CaptionOverlay(text="Caption text")
     assert scene.caption_text == "Caption text"
     assert scene.motion_instruction == "Slow push in"
+    assert scene.transition is RenderTransition.CUT
 
 
 def test_scene_number_must_be_positive() -> None:
@@ -145,6 +151,112 @@ def test_invalid_caption_position_is_rejected() -> None:
             duration_seconds=3.0,
             visual_asset_ref=build_image_asset(),
             caption={"text": "Caption text", "position": "left"},
+        )
+
+
+def test_visual_treatment_defaults_are_valid() -> None:
+    """The provider-neutral visual-treatment model should expose safe defaults."""
+
+    treatment = SceneVisualTreatment()
+
+    assert treatment.motion is VisualMotion.NONE
+    assert treatment.intensity is VisualMotionIntensity.SUBTLE
+    assert treatment.transition is RenderTransition.CUT
+    assert treatment.transition_duration_seconds == 0.0
+
+
+def test_unsupported_motion_is_rejected() -> None:
+    """Only the provider-neutral motion enum should be accepted."""
+
+    with pytest.raises(ValidationError):
+        SceneVisualTreatment(motion="spiral")
+
+
+def test_unsupported_transition_is_rejected() -> None:
+    """Only the provider-neutral transition enum should be accepted."""
+
+    with pytest.raises(ValidationError):
+        SceneVisualTreatment(transition="wipe")
+
+
+def test_legacy_fade_transition_normalizes_to_crossfade() -> None:
+    """Legacy fade transition names should normalize to crossfade safely."""
+
+    scene = RenderScene(
+        scene_number=1,
+        duration_seconds=3.0,
+        visual_asset_ref=build_image_asset(),
+        transition="fade",
+    )
+
+    assert scene.transition is RenderTransition.CROSSFADE
+
+
+def test_default_visual_treatment_is_deterministic_for_still_images() -> None:
+    """Still-image scenes should receive a deterministic motion-and-transition pattern."""
+
+    first = build_default_visual_treatment(
+        scene_number=1,
+        source_asset_type=AssetType.IMAGE,
+        next_source_asset_type=AssetType.IMAGE,
+    )
+    second = build_default_visual_treatment(
+        scene_number=2,
+        source_asset_type=AssetType.IMAGE,
+        next_source_asset_type=AssetType.IMAGE,
+    )
+    repeat = build_default_visual_treatment(
+        scene_number=1,
+        source_asset_type=AssetType.IMAGE,
+        next_source_asset_type=AssetType.IMAGE,
+    )
+
+    assert first.motion is VisualMotion.PUSH_IN
+    assert second.motion is VisualMotion.PAN_RIGHT
+    assert first.transition is RenderTransition.CROSSFADE
+    assert first.transition_duration_seconds == DEFAULT_CROSSFADE_DURATION_SECONDS
+    assert first == repeat
+
+
+def test_default_visual_treatment_preserves_native_video_motion() -> None:
+    """Generated-video scenes should default to no synthetic camera motion."""
+
+    treatment = build_default_visual_treatment(
+        scene_number=3,
+        source_asset_type=AssetType.VIDEO,
+        next_source_asset_type=AssetType.VIDEO,
+    )
+
+    assert treatment.motion is VisualMotion.NONE
+    assert treatment.transition is RenderTransition.CUT
+
+
+def test_crossfade_requires_non_final_following_scene_and_safe_duration() -> None:
+    """Timeline validation should bound crossfade duration safely."""
+
+    with pytest.raises(ValidationError):
+        ProductionTimeline(
+            scenes=[
+                ProductionTimelineScene(
+                    scene_number=1,
+                    start_seconds=0.0,
+                    end_seconds=1.0,
+                    duration_seconds=1.0,
+                    source_asset_ref=build_image_asset("mock://generated/image/1.png"),
+                    visual_treatment=SceneVisualTreatment(
+                        transition=RenderTransition.CROSSFADE,
+                        transition_duration_seconds=1.0,
+                    ),
+                ),
+                ProductionTimelineScene(
+                    scene_number=2,
+                    start_seconds=1.0,
+                    end_seconds=2.0,
+                    duration_seconds=1.0,
+                    source_asset_ref=build_image_asset("mock://generated/image/2.png"),
+                ),
+            ],
+            target_duration_seconds=2.0,
         )
 
 
