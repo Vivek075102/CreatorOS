@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+from pathlib import Path
 
 import pytest
 from pydantic import ValidationError
@@ -76,6 +77,80 @@ def test_video_request_normalizes_prompt() -> None:
     request = VideoGenerationRequest(prompt="  opener shot  ", duration_seconds=3.5)
 
     assert request.prompt == "opener shot"
+
+
+def test_video_request_accepts_provider_neutral_reference_image() -> None:
+    """Video requests should accept a generated image asset as a reference image."""
+
+    reference_image = GeneratedAsset(
+        asset_type=AssetType.IMAGE,
+        uri="mock://generated/image/reference.png",
+        metadata={"role": "reference"},
+    )
+
+    request = VideoGenerationRequest(
+        prompt="Animate this keyframe",
+        duration_seconds=3.5,
+        reference_image=reference_image,
+    )
+
+    assert request.reference_image is not None
+    assert request.reference_image.asset_type is AssetType.IMAGE
+    assert request.reference_image.uri == "mock://generated/image/reference.png"
+
+
+def test_video_request_copies_reference_image_safely_without_mutating_source() -> None:
+    """Reference image assets should be deep-copied defensively."""
+
+    reference_image = GeneratedAsset(
+        asset_type=AssetType.IMAGE,
+        uri="mock://generated/image/reference.png",
+        metadata={"tag": "original"},
+    )
+    request = VideoGenerationRequest(
+        prompt="Animate this still",
+        duration_seconds=4.0,
+        reference_image=reference_image,
+    )
+
+    reference_image.uri = "mock://generated/image/mutated.png"
+    reference_image.metadata["tag"] = "mutated"
+
+    assert request.reference_image is not None
+    assert request.reference_image.uri == "mock://generated/image/reference.png"
+    assert request.reference_image.metadata["tag"] == "original"
+
+
+def test_video_request_rejects_non_image_reference_assets() -> None:
+    """Image-to-video references should stay constrained to image assets."""
+
+    with pytest.raises(ValidationError):
+        VideoGenerationRequest(
+            prompt="Animate this clip",
+            duration_seconds=4.0,
+            reference_image=GeneratedAsset(
+                asset_type=AssetType.VIDEO,
+                uri="mock://generated/video/not-an-image.mp4",
+            ),
+        )
+
+
+def test_video_request_serialization_excludes_any_binary_payload_fields() -> None:
+    """Reference-image contracts should remain lightweight and metadata-safe."""
+
+    request = VideoGenerationRequest(
+        prompt="Animate this still",
+        duration_seconds=4.0,
+        reference_image=GeneratedAsset(
+            asset_type=AssetType.IMAGE,
+            uri="mock://generated/image/reference.png",
+            metadata={"hint": "safe"},
+        ),
+    )
+    dumped = request.model_dump()
+
+    assert dumped["reference_image"]["uri"] == "mock://generated/image/reference.png"
+    assert "payload_bytes" not in str(dumped)
 
 
 def test_blank_video_prompt_is_rejected() -> None:
@@ -188,3 +263,13 @@ def test_blank_provider_identity_is_rejected_for_media_results() -> None:
             width=1024,
             height=1024,
         )
+
+
+def test_video_request_contract_remains_provider_neutral() -> None:
+    """The video request contract should not grow Kling-specific or raw-path fields."""
+
+    source = Path("creatoros/providers/media.py").read_text(encoding="utf-8")
+
+    assert "reference_image" in source
+    assert "image_path" not in source
+    assert "kling_" not in source

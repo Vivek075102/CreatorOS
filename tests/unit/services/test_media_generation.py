@@ -15,6 +15,7 @@ from openai.types.images_response import ImagesResponse, Usage
 
 from creatoros.config import Settings
 from creatoros.core import CreatorOSValidationError, ProviderNotFoundError
+from creatoros.domain import AssetType, GeneratedAsset
 from creatoros.providers import (
     GeneratedAudio,
     GeneratedImage,
@@ -94,6 +95,18 @@ def build_video_request(prompt: str = "Scene clip", duration_seconds: float = 4.
     """Create a reusable video request."""
 
     return VideoGenerationRequest(prompt=prompt, duration_seconds=duration_seconds)
+
+
+def build_reference_image_asset(
+    uri: str = "mock://generated/image/reference.png",
+) -> GeneratedAsset:
+    """Create one provider-neutral reference image asset for image-to-video tests."""
+
+    return GeneratedAsset(
+        asset_type=AssetType.IMAGE,
+        uri=uri,
+        metadata={"role": "reference"},
+    )
 
 
 class RecordingImageProvider(MockImageProvider):
@@ -447,6 +460,27 @@ def test_explicit_video_provider_override_works() -> None:
     assert result.provider_name == "alternate"
     assert default_provider.calls == 0
     assert alternate_provider.calls == 1
+
+
+def test_video_request_with_reference_image_is_forwarded_unchanged() -> None:
+    """Video requests should preserve provider-neutral image references across the service boundary."""
+
+    registry = create_provider_registry()
+    provider = RecordingVideoProvider(name="mock")
+    registry.register(provider)
+    service = MediaGenerationService(registry, build_settings(default_video_provider="mock"))
+    request = VideoGenerationRequest(
+        prompt="Animate this still",
+        duration_seconds=4.0,
+        reference_image=build_reference_image_asset(),
+    )
+
+    run_async(service.generate_video(request))
+
+    assert provider.last_request == request
+    assert provider.last_request is not None
+    assert provider.last_request.reference_image is not None
+    assert provider.last_request.reference_image.uri == "mock://generated/image/reference.png"
 
 
 def test_video_provider_remains_separate_from_render_provider() -> None:

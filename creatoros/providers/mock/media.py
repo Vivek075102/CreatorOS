@@ -177,6 +177,8 @@ class MockVideoProvider(MockProviderBase):
                 request.fps,
                 request.negative_prompt,
                 request.seed,
+                None if request.reference_image is None else request.reference_image.id,
+                None if request.reference_image is None else request.reference_image.uri,
             )
         )
         artifact = GeneratedAsset(
@@ -184,6 +186,10 @@ class MockVideoProvider(MockProviderBase):
             uri=f"mock://generated/video/{digest}.mp4",
             metadata={"mock_artifact_id": digest},
         )
+        metadata: dict[str, object] = {"mock": True}
+        if request.reference_image is not None:
+            metadata["reference_image_supplied"] = True
+            metadata["reference_image_asset_id"] = request.reference_image.id
         result = GeneratedVideo(
             artifact=artifact,
             provider_name=self.info.name,
@@ -194,7 +200,7 @@ class MockVideoProvider(MockProviderBase):
             height=request.height,
             fps=request.fps,
             request_id=f"mock_video_request_{digest}",
-            metadata={"mock": True},
+            metadata=metadata,
         )
         return ProviderResult[GeneratedVideo](
             data=result,

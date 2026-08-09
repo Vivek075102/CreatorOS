@@ -177,6 +177,7 @@ CreatorOS now also includes a first integrated provider-independent AI content p
 CreatorOS now also includes a provider-independent media provider foundation for future generation work:
 
 - Separate typed provider-neutral request and result contracts now exist for image generation, speech/TTS generation, and video generation.
+- `VideoGenerationRequest` now supports both text-to-video and provider-neutral image-to-video requests through an optional `reference_image` asset reference.
 - The current capability-specific contracts are `ImageProvider`, `TTSProvider`, and `VideoProvider`, with the existing `VoiceProvider` kept as a backward-compatible compatibility contract for the deterministic demo path.
 - The shared `ProviderRegistry` is reused for media providers. No second provider framework was introduced.
 - Default provider settings now include `default_image_provider`, `default_tts_provider`, and `default_video_provider`, each defaulting to `mock`.
@@ -185,8 +186,10 @@ CreatorOS now also includes a provider-independent media provider foundation for
 - The first real TTS adapter is now `OpenAITTSProvider`, registered explicitly under the stable speech provider name `openai-tts`.
 - `OPENAI_API_KEY` is reused for the OpenAI TTS adapter, and `DEFAULT_TTS_MODEL` must be configured explicitly before any live TTS request can succeed.
 - Deterministic `MockImageProvider`, `MockTTSProvider`, and `MockVideoProvider` now return typed mock generation results without network calls, binary media generation, FFmpeg, file output, or vendor SDKs.
+- The image-to-video request path uses the existing `GeneratedAsset` abstraction rather than a raw path string, so future dedicated video providers remain replaceable.
 - Mock remains the default image provider. Real OpenAI image generation is opt-in only and is not invoked automatically by `GamingMediaAgent`, the integrated content pipeline, or automated tests.
 - Mock remains the default TTS provider. Real OpenAI speech generation is opt-in only and is not invoked automatically by `GamingMediaAgent`, the integrated content pipeline, or automated tests.
+- Dedicated real video providers such as Kling remain planned but are not implemented in this milestone.
 - OpenAI SDK client objects, temporary provider URLs, and binary image payloads remain inside the adapter boundary. No image files, storage uploads, or permanent asset materialization are created in this milestone.
 - OpenAI SDK client objects and binary speech payloads remain inside the adapter boundary. No narration files, storage uploads, or durable audio materialization are created in this milestone.
 - Capability-specific mock registry helpers now exist for image, TTS, and video provider setup in addition to the existing full mock registry bootstrap.
@@ -220,6 +223,7 @@ CreatorOS now also includes an application-layer `MediaGenerationService` for pr
 - The same service can use real provider adapters such as `OpenAIImageProvider` and `OpenAITTSProvider` through the shared `ProviderRegistry` when explicitly registered.
 - The service does not invoke `GamingMediaAgent`, `LLMExecutionService`, `MediaRenderService`, `RenderProvider`, publishing providers, storage providers, or workflow-state mutation.
 - The generated media contracts may now carry an ephemeral `payload_bytes` field for local runtime materialization, but `MediaGenerationService` still does not write files itself.
+- The same ephemeral `GeneratedImage.payload_bytes` mechanism is the intended future handoff for real image-to-video adapters that need source image bytes without reordering the current pipeline.
 - The next media stage will assemble a `GeneratedMediaPackage` into a `ShortRenderRequest` for rendering rather than mixing generation and rendering together.
 
 ## Artifact Materialization Foundation
@@ -294,6 +298,8 @@ CreatorOS now also includes an explicit post-approval media-execution pipeline:
 - Thumbnail planning becomes a thumbnail-generation request and remains outside the video timeline for later publishing work.
 - Narration planning becomes a typed TTS request, and storyboard scenes become deterministic scene-image requests using existing approved planning data only.
 - Optional scene-video requests are created only when aligned typed scene-visual and scene-motion plans are actually available.
+- Scene image generation and scene video generation still happen in one bounded package pass before materialization, so true scene-image-to-video dependency wiring is not connected yet.
+- Phase 2.7B is intended to add a dedicated real video adapter, and Phase 2.7C is intended to connect generated scene reference images to generated motion clips through a safe staged execution design.
 - Default providers remain mock-first, so normal execution stays offline and deterministic unless real providers are explicitly registered and selected.
 - Live non-mock media generation requires explicit confirmation before execution. API-key presence alone is not authorization.
 - One validated run ID owns the complete workspace from generated media through materialized files and the final local MP4 path when FFmpeg rendering is used.

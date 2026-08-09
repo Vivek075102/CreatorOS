@@ -25,6 +25,23 @@ from creatoros.providers.mock import (
 )
 
 
+def build_reference_image(uri: str) -> GeneratedImage:
+    """Create one provider-neutral reference image result for image-to-video tests."""
+
+    return GeneratedImage(
+        artifact={
+            "asset_type": AssetType.IMAGE,
+            "uri": uri,
+            "metadata": {"source": "test"},
+        },
+        provider_name="mock",
+        model="mock-image-model",
+        mime_type="image/png",
+        width=1024,
+        height=1024,
+    )
+
+
 def test_image_provider_returns_image_generated_asset() -> None:
     """Image generation should return a deterministic typed image result."""
 
@@ -110,6 +127,88 @@ def test_same_input_produces_predictable_media_artifact_identities() -> None:
     assert first_image.data.artifact.uri == second_image.data.artifact.uri
     assert first_audio.data.artifact.uri == second_audio.data.artifact.uri
     assert first_video.data.artifact.uri == second_video.data.artifact.uri
+
+
+def test_mock_image_to_video_is_deterministic_for_the_same_reference_image() -> None:
+    """Identical image-to-video inputs should produce identical mock video identities."""
+
+    provider = MockVideoProvider()
+    reference_image = build_reference_image("mock://generated/image/reference-a.png").artifact
+    first = asyncio.run(
+        provider.generate(
+            VideoGenerationRequest(
+                prompt="Add gentle camera motion",
+                duration_seconds=4.0,
+                reference_image=reference_image,
+            )
+        )
+    )
+    second = asyncio.run(
+        provider.generate(
+            VideoGenerationRequest(
+                prompt="Add gentle camera motion",
+                duration_seconds=4.0,
+                reference_image=reference_image,
+            )
+        )
+    )
+
+    assert first.data.artifact.uri == second.data.artifact.uri
+    assert first.data.metadata["reference_image_supplied"] is True
+    assert first.data.duration_seconds == 4.0
+
+
+def test_different_reference_images_produce_different_mock_video_ids() -> None:
+    """Different reference-image identities should change deterministic mock video output IDs."""
+
+    provider = MockVideoProvider()
+    first_reference_image = build_reference_image("mock://generated/image/reference-a.png").artifact
+    second_reference_image = build_reference_image("mock://generated/image/reference-b.png").artifact
+    first = asyncio.run(
+        provider.generate(
+            VideoGenerationRequest(
+                prompt="Same motion prompt",
+                duration_seconds=4.0,
+                reference_image=first_reference_image,
+            )
+        )
+    )
+    second = asyncio.run(
+        provider.generate(
+            VideoGenerationRequest(
+                prompt="Same motion prompt",
+                duration_seconds=4.0,
+                reference_image=second_reference_image,
+            )
+        )
+    )
+
+    assert first.data.artifact.uri != second.data.artifact.uri
+
+
+def test_mock_video_preserves_requested_fields_for_image_to_video() -> None:
+    """Mock video generation should preserve duration, dimensions, and fps for I2V requests."""
+
+    provider = MockVideoProvider()
+    reference_image = build_reference_image("mock://generated/image/reference-a.png").artifact
+
+    result = asyncio.run(
+        provider.generate(
+            VideoGenerationRequest(
+                prompt="Add fast motion",
+                duration_seconds=5.5,
+                width=1080,
+                height=1920,
+                fps=30.0,
+                reference_image=reference_image,
+            )
+        )
+    )
+
+    assert result.data.duration_seconds == 5.5
+    assert result.data.width == 1080
+    assert result.data.height == 1920
+    assert result.data.fps == 30.0
 
 
 def test_mock_media_providers_satisfy_runtime_protocols() -> None:

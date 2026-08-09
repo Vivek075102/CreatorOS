@@ -255,6 +255,8 @@ Build the Research Engine and Opportunity Engine capabilities required to gather
 - Integrated media-generation plus assembly orchestration inside the larger CreatorOS workflow only when Milestone 2.5G intentionally starts that work
 - Real artifact materialization, richer rendering, and downstream publishing integration only when later milestones intentionally start that work
 - Artifact workspace retention policies, durable storage integration, richer video payload handling, and real renderer file consumption only when later milestones intentionally start that work
+- Dedicated real video-provider integration such as Kling only when the next explicit media milestone starts that provider work behind the existing `VideoProvider` contract
+- A staged image-to-video execution design that wires generated scene reference images into generated motion clips only when the next explicit media milestone starts that dependency work
 - Caption burn-in, text overlays, richer transitions, background music, and render-quality refinements only when later milestones intentionally start that work
 - Guarded live image smoke verification, binary materialization, and durable storage references only when later media milestones intentionally add those operational paths
 - Guarded live TTS smoke verification, binary audio materialization, and durable storage references only when later media milestones intentionally add those operational paths

@@ -97,7 +97,13 @@ class TTSGenerationRequest(CreatorOSModel):
 
 
 class VideoGenerationRequest(CreatorOSModel):
-    """Provider-neutral request for future video-generation providers."""
+    """Provider-neutral request for text-to-video or image-to-video providers.
+
+    ``reference_image`` is an optional provider-neutral image asset reference.
+    Its ``uri`` may point to either a local materialized file or a provider-owned
+    transient reference. Adapters are responsible for translating that reference
+    into the upload or fetch mechanism required by their concrete provider.
+    """
 
     prompt: str
     duration_seconds: float
@@ -106,6 +112,7 @@ class VideoGenerationRequest(CreatorOSModel):
     fps: float | None = None
     negative_prompt: str | None = None
     seed: int | None = None
+    reference_image: GeneratedAsset | None = None
 
     @field_validator("prompt")
     @classmethod
@@ -136,6 +143,25 @@ class VideoGenerationRequest(CreatorOSModel):
         """Normalize optional negative prompts."""
 
         return _normalize_optional_string(value, field_name="negative_prompt")
+
+    @field_validator("reference_image", mode="before")
+    @classmethod
+    def copy_reference_image(cls, value: object) -> GeneratedAsset | None:
+        """Deep-copy an optional provider-neutral reference image asset safely."""
+
+        if value is None:
+            return None
+        if not isinstance(value, GeneratedAsset):
+            raise TypeError("reference_image must be a GeneratedAsset")
+        return value.model_copy(deep=True)
+
+    @model_validator(mode="after")
+    def validate_reference_image(self) -> VideoGenerationRequest:
+        """Require image-to-video references to remain image assets only."""
+
+        if self.reference_image is not None and self.reference_image.asset_type is not AssetType.IMAGE:
+            raise ValueError("reference_image.asset_type must be image")
+        return self
 
 
 class GeneratedImage(CreatorOSModel):
