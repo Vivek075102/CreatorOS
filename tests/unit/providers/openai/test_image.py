@@ -230,16 +230,15 @@ def test_generate_translates_request_and_normalizes_response(
     assert result.usage.total_units == 46
     assert "https://example.invalid" not in str(result.model_dump())
     assert "b64_json" not in str(result.model_dump())
-    assert fake_images.calls == [
-        {
-            "model": "gpt-image-1",
-            "prompt": "Pixel art dragon",
-            "size": "1024x1536",
-            "output_format": "png",
-            "response_format": "b64_json",
-            "timeout": 30.0,
-        }
-    ]
+    assert len(fake_images.calls) == 1
+    request_kwargs = fake_images.calls[0]
+    assert request_kwargs["model"] == "gpt-image-1"
+    assert request_kwargs["prompt"] == "Pixel art dragon"
+    assert request_kwargs["size"] == "1024x1536"
+    assert request_kwargs["timeout"] == 30.0
+    assert "response_format" not in request_kwargs
+    assert "output_format" not in request_kwargs
+    assert set(request_kwargs) == {"model", "prompt", "size", "timeout"}
     assert all("prompt" not in payload for _, payload in fake_logger.infos)
 
 
@@ -256,6 +255,19 @@ def test_generate_uses_context_timeout_when_supplied() -> None:
         )
     )
     assert fake_images.calls[0]["timeout"] == 30.0
+
+
+def test_generate_never_sends_unsupported_response_format_argument() -> None:
+    """The adapter should not send the known-bad response_format argument for GPT Image calls."""
+
+    fake_images = FakeImagesClient(response=build_binary_image_response())
+    provider = build_provider(client=FakeOpenAIImageClient(fake_images))
+
+    run_async(provider.generate(ImageGenerationRequest(prompt="compatibility check")))
+
+    request_kwargs = fake_images.calls[0]
+    assert "response_format" not in request_kwargs
+    assert "output_format" not in request_kwargs
 
 
 def test_generate_image_compatibility_returns_generated_asset() -> None:

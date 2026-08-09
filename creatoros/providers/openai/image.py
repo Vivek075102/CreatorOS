@@ -39,8 +39,7 @@ from creatoros.providers.media import GeneratedImage, ImageGenerationRequest
 DEFAULT_OPENAI_IMAGE_PROVIDER_NAME = "openai-image"
 DEFAULT_OPENAI_IMAGE_MODEL: str | None = None
 _OPENAI_IMAGE_PROVIDER_TYPE = "image"
-_REQUESTED_OUTPUT_FORMAT = "png"
-_REQUESTED_RESPONSE_FORMAT = "b64_json"
+_DEFAULT_OUTPUT_FORMAT = "png"
 _SUPPORTED_IMAGE_SIZES: dict[tuple[int, int], str] = {
     (256, 256): "256x256",
     (512, 512): "512x512",
@@ -185,7 +184,7 @@ def _normalize_output_format(response: object) -> str:
         normalized_output_format = output_format.strip().lower()
         if normalized_output_format in _MIME_TYPES_BY_FORMAT:
             return normalized_output_format
-    return _REQUESTED_OUTPUT_FORMAT
+    return _DEFAULT_OUTPUT_FORMAT
 
 
 def _build_artifact_uri(
@@ -392,8 +391,6 @@ class OpenAIImageProvider:
             "model": model,
             "prompt": request.prompt,
             "size": size,
-            "output_format": _REQUESTED_OUTPUT_FORMAT,
-            "response_format": _REQUESTED_RESPONSE_FORMAT,
             "timeout": timeout_seconds,
         }
 
