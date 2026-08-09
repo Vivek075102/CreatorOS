@@ -36,6 +36,10 @@ _MINIMAL_WAV_BYTES = (
     b"\x10\x00\x00\x00\x01\x00\x01\x00@\x1f\x00\x00@\x1f\x00\x00"
     b"\x01\x00\x08\x00data\x04\x00\x00\x00\x80\x80\x80\x80"
 )
+_MINIMAL_MP4_BYTES = (
+    b"\x00\x00\x00\x18ftypmp42"
+    b"\x00\x00\x00\x00mp42isom"
+)
 
 
 def _validate_non_blank(value: str, *, field_name: str) -> str:
@@ -201,6 +205,7 @@ class MockVideoProvider(MockProviderBase):
             fps=request.fps,
             request_id=f"mock_video_request_{digest}",
             metadata=metadata,
+            payload_bytes=_MINIMAL_MP4_BYTES,
         )
         return ProviderResult[GeneratedVideo](
             data=result,

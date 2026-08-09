@@ -16,7 +16,7 @@ from creatoros.core import (
     CreatorOSValidationError,
     WorkflowError,
 )
-from creatoros.domain import AssetType, GeneratedAsset
+from creatoros.domain import AssetType, GeneratedAsset, HostedAsset
 from creatoros.observability import get_logger
 from creatoros.orchestrator.models import (
     ApprovedMediaExecutionRequest,
@@ -37,6 +37,7 @@ from creatoros.providers import (
 from creatoros.providers.openai.tts import SUPPORTED_OPENAI_TTS_VOICES
 from creatoros.services import (
     ArtifactMaterializationService,
+    AssetHostingService,
     GeneratedMediaPackage,
     MaterializedMediaPackage,
     MediaGenerationPackageRequest,
@@ -54,6 +55,7 @@ STAGE_VERIFY_HUMAN_APPROVAL = "verify_human_approval"
 STAGE_BUILD_MEDIA_REQUESTS = "build_media_requests"
 STAGE_VERIFY_LIVE_CALL_POLICY = "verify_live_call_policy"
 STAGE_MEDIA_GENERATION = "media_generation"
+STAGE_ASSET_HOSTING = "asset_hosting"
 STAGE_ARTIFACT_MATERIALIZATION = "artifact_materialization"
 STAGE_BUILD_ASSEMBLY_INPUTS = "build_assembly_inputs"
 STAGE_SHORT_ASSEMBLY = "short_assembly"
@@ -195,6 +197,8 @@ def _failure_category_for_stage(stage: str) -> str:
         return "preflight_failed"
     if stage == STAGE_MEDIA_GENERATION:
         return "media_generation_failed"
+    if stage == STAGE_ASSET_HOSTING:
+        return "asset_hosting_failed"
     if stage == STAGE_ARTIFACT_MATERIALIZATION:
         return "materialization_failed"
     if stage == STAGE_BUILD_ASSEMBLY_INPUTS:
@@ -309,6 +313,21 @@ def _materialize_generated_media_for_assembly(
     )
 
 
+def _build_hosted_reference_asset(hosted_asset: HostedAsset) -> GeneratedAsset:
+    """Convert one hosted asset into the provider-neutral reference-image contract."""
+
+    return GeneratedAsset(
+        asset_type=AssetType.IMAGE,
+        uri=hosted_asset.public_url,
+        metadata={
+            "hosted": True,
+            "hosting_provider_name": hosted_asset.provider_name,
+            "provider_asset_id": hosted_asset.provider_asset_id,
+            "source_asset_id": hosted_asset.source_asset.id,
+        },
+    )
+
+
 class MediaExecutionPipeline:
     """Execute approved media generation and final Short assembly after planning stops."""
 
@@ -316,6 +335,7 @@ class MediaExecutionPipeline:
         self,
         *,
         media_generation_service: MediaGenerationService,
+        asset_hosting_service: AssetHostingService,
         artifact_materialization_service: ArtifactMaterializationService,
         short_assembly_service: ShortAssemblyService,
     ) -> None:
@@ -323,6 +343,11 @@ class MediaExecutionPipeline:
             media_generation_service,
             MediaGenerationService,
             dependency_name="media_generation_service",
+        )
+        self.asset_hosting_service = self._validate_dependency(
+            asset_hosting_service,
+            AssetHostingService,
+            dependency_name="asset_hosting_service",
         )
         self.artifact_materialization_service = self._validate_dependency(
             artifact_materialization_service,
@@ -350,7 +375,6 @@ class MediaExecutionPipeline:
         )
 
         scene_visuals = self._build_aligned_scene_visuals(request.content_result)
-        scene_motions = self._build_aligned_scene_motions(request.content_result)
 
         scene_image_requests = tuple(
             ImageGenerationRequest(
@@ -363,21 +387,6 @@ class MediaExecutionPipeline:
             for index, scene_plan in enumerate(request.content_result.storyboard.scenes)
         )
 
-        scene_video_requests: tuple[VideoGenerationRequest, ...] = ()
-        if scene_visuals and scene_motions:
-            scene_video_requests = tuple(
-                VideoGenerationRequest(
-                    prompt=_build_scene_video_prompt(
-                        request.content_result,
-                        scene_plan,
-                        scene_visuals[index],
-                        scene_motions[index],
-                    ),
-                    duration_seconds=scene_plan.duration_seconds,
-                )
-                for index, scene_plan in enumerate(request.content_result.storyboard.scenes)
-            )
-
         try:
             return MediaGenerationPackageRequest(
                 thumbnail_request=ImageGenerationRequest(
@@ -388,7 +397,6 @@ class MediaExecutionPipeline:
                     voice=narration_voice,
                 ),
                 scene_image_requests=scene_image_requests,
-                scene_video_requests=scene_video_requests,
                 provider_selection=request.provider_selection,
             )
         except ValidationError as error:
@@ -426,6 +434,21 @@ class MediaExecutionPipeline:
             generated_media = await self.media_generation_service.generate_package(
                 media_generation_request
             )
+            if plan.video_generation_count > 0:
+                active_stage = STAGE_ASSET_HOSTING
+                hosted_scene_images = await self._host_scene_images_for_video_generation(
+                    generated_media=generated_media,
+                    request=request,
+                )
+                active_stage = STAGE_MEDIA_GENERATION
+                generated_scene_videos = await self._generate_scene_videos_from_hosted_images(
+                    content_result=request.content_result,
+                    hosted_scene_images=hosted_scene_images,
+                    provider_selection=request.provider_selection,
+                )
+                generated_media = generated_media.model_copy(
+                    update={"scene_videos": generated_scene_videos}
+                )
             self.logger.info(
                 "media_execution_stage_completed",
                 pipeline_name=PIPELINE_NAME,
@@ -524,6 +547,78 @@ class MediaExecutionPipeline:
         )
         return result
 
+    async def _host_scene_images_for_video_generation(
+        self,
+        *,
+        generated_media: GeneratedMediaPackage,
+        request: ApprovedMediaExecutionRequest,
+    ) -> tuple[HostedAsset, ...]:
+        """Host local scene images so video providers can consume remote-safe references."""
+
+        selection = (
+            MediaProviderSelection()
+            if request.provider_selection is None
+            else request.provider_selection
+        )
+        hosted_assets: list[HostedAsset] = []
+        try:
+            for scene_image in generated_media.scene_images:
+                hosted_assets.append(
+                    await self.asset_hosting_service.host_asset(
+                        scene_image.artifact,
+                        provider_name=selection.hosting_provider_name,
+                    )
+                )
+            self.logger.info(
+                "media_execution_stage_completed",
+                pipeline_name=PIPELINE_NAME,
+                stage=STAGE_ASSET_HOSTING,
+                run_id=request.run_id,
+                hosted_asset_count=len(hosted_assets),
+                success=True,
+            )
+            return tuple(hosted_assets)
+        except Exception:
+            await self._cleanup_hosted_scene_images(
+                hosted_scene_images=tuple(hosted_assets),
+                provider_selection=request.provider_selection,
+            )
+            raise
+
+    async def _generate_scene_videos_from_hosted_images(
+        self,
+        *,
+        content_result: GamingContentPipelineResult,
+        hosted_scene_images: tuple[HostedAsset, ...],
+        provider_selection: MediaProviderSelection | None,
+    ) -> tuple[GeneratedVideo, ...]:
+        """Generate scene videos only after remote-safe hosted image references exist."""
+
+        video_requests = self._build_scene_video_requests(
+            content_result=content_result,
+            hosted_scene_images=hosted_scene_images,
+        )
+        selection = (
+            MediaProviderSelection()
+            if provider_selection is None
+            else provider_selection
+        )
+        generated_videos: list[GeneratedVideo] = []
+        try:
+            for video_request in video_requests:
+                generated_videos.append(
+                    await self.media_generation_service.generate_video(
+                        video_request,
+                        provider_name=selection.video_provider_name,
+                    )
+                )
+            return tuple(generated_videos)
+        finally:
+            await self._cleanup_hosted_scene_images(
+                hosted_scene_images=hosted_scene_images,
+                provider_selection=provider_selection,
+            )
+
     def _run_preflight(
         self,
         request: ApprovedMediaExecutionRequest,
@@ -547,6 +642,7 @@ class MediaExecutionPipeline:
             effective_image_provider,
             effective_tts_provider,
             effective_video_provider,
+            effective_hosting_provider,
             effective_render_provider,
         ) = self._resolve_effective_provider_names(request)
         plan = self._build_execution_plan(
@@ -555,6 +651,7 @@ class MediaExecutionPipeline:
             image_provider=effective_image_provider,
             tts_provider=effective_tts_provider,
             video_provider=effective_video_provider,
+            hosting_provider=effective_hosting_provider,
             render_provider=effective_render_provider,
         )
 
@@ -562,9 +659,11 @@ class MediaExecutionPipeline:
             self._verify_live_call_policy(request, media_generation_request)
         self._validate_registered_providers(
             media_request=media_generation_request,
+            scene_video_generation_count=plan.video_generation_count,
             image_provider=effective_image_provider,
             tts_provider=effective_tts_provider,
             video_provider=effective_video_provider,
+            hosting_provider=effective_hosting_provider,
             render_provider=effective_render_provider,
         )
         self._validate_live_provider_configuration(plan, media_request=media_generation_request)
@@ -644,6 +743,12 @@ class MediaExecutionPipeline:
             if selection.video_provider_name is None
             else selection.video_provider_name
         )
+        effective_hosting_provider = (
+            defaults.default_asset_hosting_provider
+            if selection.hosting_provider_name is None
+            else selection.hosting_provider_name
+        )
+        scene_video_generation_count = self._count_scene_video_requests(request.content_result)
 
         live_media_providers: list[str] = []
         if (
@@ -653,7 +758,9 @@ class MediaExecutionPipeline:
             live_media_providers.append(effective_image_provider)
         if media_request.narration_request is not None and not _is_mock_provider_name(effective_tts_provider):
             live_media_providers.append(effective_tts_provider)
-        if media_request.scene_video_requests and not _is_mock_provider_name(effective_video_provider):
+        if scene_video_generation_count > 0 and not _is_mock_provider_name(effective_hosting_provider):
+            live_media_providers.append(effective_hosting_provider)
+        if scene_video_generation_count > 0 and not _is_mock_provider_name(effective_video_provider):
             live_media_providers.append(effective_video_provider)
 
         if live_media_providers and not request.confirm_live_media_calls:
@@ -666,7 +773,7 @@ class MediaExecutionPipeline:
     def _resolve_effective_provider_names(
         self,
         request: ApprovedMediaExecutionRequest,
-    ) -> tuple[str, str, str, str]:
+    ) -> tuple[str, str, str, str, str]:
         """Resolve the effective provider names used for plan and preflight validation."""
 
         selection = (
@@ -690,12 +797,17 @@ class MediaExecutionPipeline:
             if selection.video_provider_name is None
             else selection.video_provider_name
         )
+        hosting_provider = (
+            settings.default_asset_hosting_provider
+            if selection.hosting_provider_name is None
+            else selection.hosting_provider_name
+        )
         render_provider = (
             self.short_assembly_service.media_render_service.settings.default_render_provider
             if request.render_provider_name is None
             else request.render_provider_name
         )
-        return image_provider, tts_provider, video_provider, render_provider
+        return image_provider, tts_provider, video_provider, hosting_provider, render_provider
 
     def _build_execution_plan(
         self,
@@ -705,21 +817,26 @@ class MediaExecutionPipeline:
         image_provider: str,
         tts_provider: str,
         video_provider: str,
+        hosting_provider: str,
         render_provider: str,
     ) -> ProductionExecutionPlan:
         """Summarize one approved production request without exposing prompts or content bodies."""
 
+        scene_video_generation_count = self._count_scene_video_requests(request.content_result)
         image_generation_count = (
             (1 if media_request.thumbnail_request is not None else 0)
             + len(media_request.scene_image_requests)
         )
         tts_generation_count = 1 if media_request.narration_request is not None else 0
-        video_generation_count = len(media_request.scene_video_requests)
+        video_generation_count = scene_video_generation_count
+        asset_hosting_calls = scene_video_generation_count
         live_media_call_count = 0
         if _is_live_provider_name(image_provider):
             live_media_call_count += image_generation_count
         if _is_live_provider_name(tts_provider):
             live_media_call_count += tts_generation_count
+        if asset_hosting_calls > 0 and _is_live_provider_name(hosting_provider):
+            live_media_call_count += asset_hosting_calls
         if _is_live_provider_name(video_provider):
             live_media_call_count += video_generation_count
 
@@ -730,11 +847,13 @@ class MediaExecutionPipeline:
             image_provider=image_provider,
             tts_provider=tts_provider,
             video_provider=video_provider,
+            hosting_provider=hosting_provider,
             render_provider=render_provider,
             scene_count=len(request.content_result.storyboard.scenes),
             image_generation_count=image_generation_count,
             tts_generation_count=tts_generation_count,
             video_generation_count=video_generation_count,
+            asset_hosting_calls=asset_hosting_calls,
             live_media_call_count=live_media_call_count,
             will_use_live_media=live_media_call_count > 0,
             final_width=request.width,
@@ -781,9 +900,11 @@ class MediaExecutionPipeline:
         self,
         *,
         media_request: MediaGenerationPackageRequest,
+        scene_video_generation_count: int,
         image_provider: str,
         tts_provider: str,
         video_provider: str,
+        hosting_provider: str,
         render_provider: str,
     ) -> None:
         """Validate that every effective provider can be resolved before execution begins."""
@@ -792,7 +913,8 @@ class MediaExecutionPipeline:
             self.media_generation_service._resolve_image_provider(image_provider)
         if media_request.narration_request is not None:
             self.media_generation_service._resolve_tts_provider(tts_provider)
-        if media_request.scene_video_requests:
+        if scene_video_generation_count > 0:
+            self.asset_hosting_service._resolve_provider(hosting_provider)
             self.media_generation_service._resolve_video_provider(video_provider)
         self.short_assembly_service.media_render_service._resolve_provider(render_provider)
 
@@ -850,6 +972,120 @@ class MediaExecutionPipeline:
                         "supported_voices": sorted(SUPPORTED_OPENAI_TTS_VOICES),
                     },
                 )
+        if plan.asset_hosting_calls > 0 and plan.hosting_provider == "cloudinary":
+            required_cloudinary_fields = (
+                ("cloudinary_cloud_name", settings.cloudinary_cloud_name),
+                ("cloudinary_api_key", settings.cloudinary_api_key),
+                ("cloudinary_api_secret", settings.cloudinary_api_secret),
+            )
+            for field_name, value in required_cloudinary_fields:
+                if value is None or not value.strip():
+                    raise ConfigurationError(
+                        "Cloudinary configuration is required for hosted scene-image references",
+                        code="media_execution_missing_live_configuration",
+                        details={"provider_name": plan.hosting_provider, "field": field_name},
+                    )
+        if plan.video_generation_count > 0 and plan.video_provider == "kling":
+            if settings.kling_api_key is None or not settings.kling_api_key.strip():
+                raise ConfigurationError(
+                    "KLING_API_KEY is required for live scene video generation",
+                    code="media_execution_missing_live_configuration",
+                    details={"provider_name": plan.video_provider, "field": "kling_api_key"},
+                )
+            if settings.default_video_model is None or not settings.default_video_model.strip():
+                raise ConfigurationError(
+                    "DEFAULT_VIDEO_MODEL is required for live scene video generation",
+                    code="media_execution_missing_live_configuration",
+                    details={"provider_name": plan.video_provider, "field": "default_video_model"},
+                )
+
+    def _count_scene_video_requests(
+        self,
+        result: GamingContentPipelineResult,
+    ) -> int:
+        """Return the number of scene videos planned for one approved content package."""
+
+        scene_visuals = self._build_aligned_scene_visuals(result)
+        scene_motions = self._build_aligned_scene_motions(result)
+        if not scene_visuals or not scene_motions:
+            return 0
+        return len(result.storyboard.scenes)
+
+    def _build_scene_video_requests(
+        self,
+        *,
+        content_result: GamingContentPipelineResult,
+        hosted_scene_images: tuple[HostedAsset, ...],
+    ) -> tuple[VideoGenerationRequest, ...]:
+        """Build scene-video requests only after hosted image references are available."""
+
+        scene_visuals = self._build_aligned_scene_visuals(content_result)
+        scene_motions = self._build_aligned_scene_motions(content_result)
+        if not scene_visuals or not scene_motions:
+            return ()
+        if len(hosted_scene_images) != len(content_result.storyboard.scenes):
+            raise CreatorOSValidationError(
+                "hosted scene image count must match storyboard scene count",
+                code="media_execution_hosted_reference_count_mismatch",
+                details={
+                    "storyboard_scene_count": len(content_result.storyboard.scenes),
+                    "hosted_scene_image_count": len(hosted_scene_images),
+                },
+            )
+        return tuple(
+            VideoGenerationRequest(
+                prompt=_build_scene_video_prompt(
+                    content_result,
+                    scene_plan,
+                    scene_visuals[index],
+                    scene_motions[index],
+                ),
+                duration_seconds=scene_plan.duration_seconds,
+                reference_image=_build_hosted_reference_asset(hosted_scene_images[index]),
+            )
+            for index, scene_plan in enumerate(content_result.storyboard.scenes)
+        )
+
+    async def _cleanup_hosted_scene_images(
+        self,
+        *,
+        hosted_scene_images: tuple[HostedAsset, ...],
+        provider_selection: MediaProviderSelection | None,
+    ) -> None:
+        """Delete temporary hosted references without failing a successful production run."""
+
+        if not hosted_scene_images:
+            return
+        selection = (
+            MediaProviderSelection()
+            if provider_selection is None
+            else provider_selection
+        )
+        deleted_count = 0
+        for hosted_asset in hosted_scene_images:
+            try:
+                deleted = await self.asset_hosting_service.delete_hosted_asset(
+                    hosted_asset,
+                    provider_name=selection.hosting_provider_name,
+                )
+            except Exception as error:
+                self.logger.exception(
+                    "media_execution_hosted_asset_cleanup_failed",
+                    pipeline_name=PIPELINE_NAME,
+                    provider_name=hosted_asset.provider_name,
+                    provider_asset_id=hosted_asset.provider_asset_id,
+                    error_type=type(error).__name__,
+                )
+                continue
+            if deleted:
+                deleted_count += 1
+        self.logger.info(
+            "media_execution_hosted_asset_cleanup_completed",
+            pipeline_name=PIPELINE_NAME,
+            hosted_asset_count=len(hosted_scene_images),
+            deleted_count=deleted_count,
+            success=True,
+        )
 
     def _resolve_narration_voice(
         self,
@@ -1136,6 +1372,7 @@ def create_media_execution_pipeline(
     *,
     provider_registry=None,
     media_generation_service: MediaGenerationService | None = None,
+    asset_hosting_service: AssetHostingService | None = None,
     artifact_materialization_service: ArtifactMaterializationService | None = None,
     short_assembly_service: ShortAssemblyService | None = None,
     settings=None,
@@ -1144,6 +1381,7 @@ def create_media_execution_pipeline(
 
     from creatoros.services import (
         create_artifact_materialization_service,
+        create_asset_hosting_service,
         create_media_generation_service,
         create_media_render_service,
         create_short_assembly_service,
@@ -1162,6 +1400,14 @@ def create_media_execution_pipeline(
         if artifact_materialization_service is None
         else artifact_materialization_service
     )
+    resolved_asset_hosting_service = (
+        create_asset_hosting_service(
+            provider_registry=provider_registry,
+            settings=settings,
+        )
+        if asset_hosting_service is None
+        else asset_hosting_service
+    )
     resolved_short_assembly_service = (
         create_short_assembly_service(
             media_render_service=create_media_render_service(
@@ -1177,6 +1423,7 @@ def create_media_execution_pipeline(
     )
     return MediaExecutionPipeline(
         media_generation_service=resolved_media_generation_service,
+        asset_hosting_service=resolved_asset_hosting_service,
         artifact_materialization_service=resolved_artifact_materialization_service,
         short_assembly_service=resolved_short_assembly_service,
     )

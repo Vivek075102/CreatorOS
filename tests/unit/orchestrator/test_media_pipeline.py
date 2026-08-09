@@ -17,7 +17,7 @@ from creatoros.core import (
     ProviderNotFoundError,
     WorkflowError,
 )
-from creatoros.domain import AssetType, GeneratedAsset
+from creatoros.domain import AssetType, GeneratedAsset, HostedAsset
 from creatoros.orchestrator import (
     ApprovedMediaExecutionRequest,
     GamingContentMediaPlanSet,
@@ -41,6 +41,8 @@ from creatoros.parsing import (
     GamingNarrationDirectionOutput,
     GamingOpportunityEvaluationOutput,
     GamingPublicationReadinessReviewOutput,
+    GamingSceneMotionOutput,
+    GamingSceneVisualOutput,
     GamingScriptQualityReviewOutput,
     GamingStoryboardQualityReviewOutput,
     GamingThumbnailConceptOutput,
@@ -54,13 +56,17 @@ from creatoros.providers import (
     GeneratedImage,
     GeneratedVideo,
     RenderedVideo,
+    VideoGenerationRequest,
 )
+from creatoros.providers.cloudinary import CloudinaryAssetHostingProvider
 from creatoros.providers.ffmpeg.render import FFmpegRenderProvider
+from creatoros.providers.kling import KlingVideoProvider
 from creatoros.providers.mock import create_mock_provider_registry
 from creatoros.providers.openai.image import OpenAIImageProvider
 from creatoros.providers.openai.tts import OpenAITTSProvider
 from creatoros.services import (
     ArtifactMaterializationService,
+    AssetHostingService,
     GeneratedMediaPackage,
     MaterializedArtifact,
     MaterializedMediaPackage,
@@ -99,8 +105,14 @@ def build_settings(
     default_image_provider: str = "mock",
     default_tts_provider: str = "mock",
     default_video_provider: str = "mock",
+    default_video_model: str | None = None,
     default_render_provider: str = "mock",
+    default_asset_hosting_provider: str = "mock",
     openai_api_key: str | None = None,
+    cloudinary_cloud_name: str | None = "demo-cloud",
+    cloudinary_api_key: str | None = "cloudinary-key",
+    cloudinary_api_secret: str | None = "cloudinary-secret",
+    kling_api_key: str | None = "kling-test-key",
     default_image_model: str | None = None,
     default_tts_model: str | None = None,
     default_tts_voice: str = "alloy",
@@ -129,8 +141,22 @@ def build_settings(
         ),
         default_tts_voice=default_tts_voice,
         default_video_provider=default_video_provider,
+        default_video_model=(
+            default_video_model
+            if default_video_model is not None or default_video_provider == "mock"
+            else "kling-v1"
+        ),
         default_render_provider=default_render_provider,
+        default_asset_hosting_provider=default_asset_hosting_provider,
         openai_api_key=openai_api_key,
+        cloudinary_cloud_name=cloudinary_cloud_name,
+        cloudinary_api_key=cloudinary_api_key,
+        cloudinary_api_secret=cloudinary_api_secret,
+        cloudinary_asset_folder="creatoros",
+        kling_api_key=kling_api_key,
+        kling_api_base_url="https://api.kling.example",
+        kling_video_timeout_seconds=900.0,
+        kling_video_poll_interval_seconds=0.01,
         anthropic_api_key=None,
         youtube_client_id=None,
         youtube_client_secret=None,
@@ -298,6 +324,7 @@ def build_request(
     run_id: str = "run_001",
     readiness_decision: str = "ready_for_human_review",
     approved: bool = True,
+    content_result: GamingContentPipelineResult | None = None,
     provider_selection: MediaProviderSelection | None = None,
     render_provider_name: str | None = None,
     confirm_live_media_calls: bool = False,
@@ -305,12 +332,97 @@ def build_request(
     """Create one reusable production request."""
 
     return ApprovedMediaExecutionRequest(
-        content_result=build_content_result(readiness_decision=readiness_decision),
+        content_result=(
+            build_content_result(readiness_decision=readiness_decision)
+            if content_result is None
+            else content_result
+        ),
         approval=HumanApproval(approved=approved, approved_by="lead_editor"),
         run_id=run_id,
         provider_selection=provider_selection,
         render_provider_name=render_provider_name,
         confirm_live_media_calls=confirm_live_media_calls,
+    )
+
+
+def build_video_enabled_content_result() -> GamingContentPipelineResult:
+    """Create one approved content package with aligned scene visuals and motions."""
+
+    result = build_content_result()
+    return result.model_copy(
+        update={
+            "media_plans": result.media_plans.model_copy(
+                update={
+                    "scene_visuals": (
+                        GamingSceneVisualOutput(
+                            scene_number=1,
+                            subject="One Roblox character reacting to the myth claim.",
+                            environment="A fast Roblox opener.",
+                            action="Immediate reaction to the hook.",
+                            composition="Tight vertical framing.",
+                            mood="Energetic.",
+                            on_screen_text="Roblox Myth?",
+                            style_direction="Readable short-form frame.",
+                            negative_guidance="Avoid clutter.",
+                        ),
+                        GamingSceneVisualOutput(
+                            scene_number=2,
+                            subject="A clear explanatory Roblox comparison.",
+                            environment="A readable breakdown frame.",
+                            action="Present the correction simply.",
+                            composition="Balanced center composition.",
+                            mood="Confident.",
+                            on_screen_text="Quick Breakdown",
+                            style_direction="Readable educational frame.",
+                            negative_guidance="Avoid busy overlays.",
+                        ),
+                        GamingSceneVisualOutput(
+                            scene_number=3,
+                            subject="A clean Roblox ending frame.",
+                            environment="A branded closing backdrop.",
+                            action="Hold the CTA cleanly.",
+                            composition="Simple end-card framing.",
+                            mood="Inviting.",
+                            on_screen_text="What Next?",
+                            style_direction="Clean branded closer.",
+                            negative_guidance="Avoid extra unsupported detail.",
+                        ),
+                    ),
+                    "scene_motions": (
+                        GamingSceneMotionOutput(
+                            scene_number=1,
+                            primary_motion="Short push-in.",
+                            subject_movement="Small reaction movement.",
+                            camera_direction="Push in toward the subject.",
+                            transition_guidance="Open immediately with momentum.",
+                            pacing="Quick.",
+                            avoid="Avoid shaky motion.",
+                            duration_seconds=10.0,
+                        ),
+                        GamingSceneMotionOutput(
+                            scene_number=2,
+                            primary_motion="Slow lateral move.",
+                            subject_movement="Minimal movement for readability.",
+                            camera_direction="Steady lateral move.",
+                            transition_guidance="Bridge from hook to explanation.",
+                            pacing="Measured.",
+                            avoid="Avoid abrupt zooms.",
+                            duration_seconds=12.0,
+                        ),
+                        GamingSceneMotionOutput(
+                            scene_number=3,
+                            primary_motion="Gentle end-card drift.",
+                            subject_movement="Minimal closing movement.",
+                            camera_direction="Soft hold.",
+                            transition_guidance="Settle into the CTA.",
+                            pacing="Calm.",
+                            avoid="Avoid frantic motion.",
+                            duration_seconds=8.0,
+                        ),
+                    ),
+                }
+            )
+        }
     )
 
 
@@ -416,7 +528,17 @@ def build_materialized_media_package(
             )
             for index, image in enumerate(package.scene_images, start=1)
         ),
-        scene_videos=(),
+        scene_videos=tuple(
+            MaterializedArtifact(
+                artifact_id=video.artifact.id,
+                kind=ArtifactKind.VIDEO,
+                path=workspace_root / "video" / f"clip_{index:03d}.mp4",
+                mime_type=video.mime_type,
+                size_bytes=1024,
+                source_provider=video.provider_name,
+            )
+            for index, video in enumerate(package.scene_videos, start=1)
+        ),
     )
 
 
@@ -438,6 +560,16 @@ class RecordingMediaGenerationService(MediaGenerationService):
 
     def __init__(self, settings: Settings) -> None:
         provider_registry = create_mock_provider_registry()
+        provider_registry.register(
+            KlingVideoProvider(
+                transport=None,
+                api_key=settings.kling_api_key,
+                default_model=settings.default_video_model,
+                timeout_seconds=settings.kling_video_timeout_seconds,
+                poll_interval_seconds=settings.kling_video_poll_interval_seconds,
+            ),
+            replace=True,
+        )
         provider_registry.register(
             OpenAIImageProvider(
                 api_key=settings.openai_api_key,
@@ -462,6 +594,7 @@ class RecordingMediaGenerationService(MediaGenerationService):
         self.audio_calls = 0
         self.video_calls = 0
         self.last_request: MediaGenerationPackageRequest | None = None
+        self.video_requests: list[VideoGenerationRequest] = []
 
     async def generate_image(self, request, *, provider_name: str | None = None, context=None):  # type: ignore[override]
         self.image_calls += 1
@@ -492,7 +625,8 @@ class RecordingMediaGenerationService(MediaGenerationService):
 
     async def generate_video(self, request, *, provider_name: str | None = None, context=None):  # type: ignore[override]
         self.video_calls += 1
-        del request, provider_name, context
+        self.video_requests.append(request.model_copy(deep=True))
+        del provider_name, context
         return GeneratedVideo(
             artifact=GeneratedAsset(asset_type=AssetType.VIDEO, uri=f"mock://generated/video/clip{self.video_calls}.mp4"),
             provider_name="mock",
@@ -541,6 +675,49 @@ class FailingArtifactMaterializationService(RecordingArtifactMaterializationServ
     def materialize_package(self, package: GeneratedMediaPackage, *, run_id: str) -> MaterializedMediaPackage:  # type: ignore[override]
         super().materialize_package(package, run_id=run_id)
         raise WorkflowError("materialization failed", code="materialization_failed")
+
+
+class RecordingAssetHostingService(AssetHostingService):
+    """Hosting spy that records hosted reference image handoffs."""
+
+    def __init__(self, settings: Settings) -> None:
+        provider_registry = create_mock_provider_registry()
+        provider_registry.register(
+            CloudinaryAssetHostingProvider(
+                cloud_name=settings.cloudinary_cloud_name,
+                api_key=settings.cloudinary_api_key,
+                api_secret=settings.cloudinary_api_secret,
+                asset_folder=settings.cloudinary_asset_folder,
+                allowed_roots=(settings.artifact_root.parent,),
+            ),
+            replace=True,
+        )
+        super().__init__(provider_registry, settings)
+        self.host_calls = 0
+        self.delete_calls = 0
+        self.hosted_assets: list[HostedAsset] = []
+
+    async def host_asset(self, asset, *, provider_name: str | None = None, context=None):  # type: ignore[override]
+        self.host_calls += 1
+        hosted_asset = await super().host_asset(asset, provider_name=provider_name, context=context)
+        self.hosted_assets.append(hosted_asset.model_copy(deep=True))
+        return hosted_asset
+
+    async def delete_hosted_asset(self, hosted_asset, *, provider_name: str | None = None, context=None):  # type: ignore[override]
+        self.delete_calls += 1
+        return await super().delete_hosted_asset(
+            hosted_asset,
+            provider_name=provider_name,
+            context=context,
+        )
+
+
+class FailingDeleteAssetHostingService(RecordingAssetHostingService):
+    """Hosting spy that simulates cleanup failures without affecting hosting success."""
+
+    async def delete_hosted_asset(self, hosted_asset, *, provider_name: str | None = None, context=None):  # type: ignore[override]
+        self.delete_calls += 1
+        raise WorkflowError("hosted asset cleanup failed", code="hosted_asset_cleanup_failed")
 
 
 class RecordingShortAssemblyService(ShortAssemblyService):
@@ -603,6 +780,7 @@ def build_spy_pipeline(
     *,
     settings: Settings | None = None,
     media_generation_service: MediaGenerationService | None = None,
+    asset_hosting_service: AssetHostingService | None = None,
     artifact_materialization_service: ArtifactMaterializationService | None = None,
     short_assembly_service: ShortAssemblyService | None = None,
 ) -> tuple[
@@ -624,6 +802,11 @@ def build_spy_pipeline(
         if artifact_materialization_service is None
         else artifact_materialization_service
     )
+    resolved_hosting = (
+        RecordingAssetHostingService(resolved_settings)
+        if asset_hosting_service is None
+        else asset_hosting_service
+    )
     resolved_assembly = (
         RecordingShortAssemblyService(resolved_settings)
         if short_assembly_service is None
@@ -631,6 +814,7 @@ def build_spy_pipeline(
     )
     pipeline = MediaExecutionPipeline(
         media_generation_service=resolved_generation,
+        asset_hosting_service=resolved_hosting,
         artifact_materialization_service=resolved_materializer,
         short_assembly_service=resolved_assembly,
     )
@@ -643,6 +827,7 @@ def test_pipeline_accepts_required_dependencies(tmp_path: Path) -> None:
     pipeline, generation_service, materializer, assembly_service = build_spy_pipeline(tmp_path)
 
     assert pipeline.media_generation_service is generation_service
+    assert isinstance(pipeline.asset_hosting_service, RecordingAssetHostingService)
     assert pipeline.artifact_materialization_service is materializer
     assert pipeline.short_assembly_service is assembly_service
 
@@ -651,6 +836,7 @@ def test_pipeline_accepts_required_dependencies(tmp_path: Path) -> None:
     ("dependency_name", "kwargs"),
     [
         ("media_generation_service", {"media_generation_service": object()}),
+        ("asset_hosting_service", {"asset_hosting_service": object()}),
         ("artifact_materialization_service", {"artifact_materialization_service": object()}),
         ("short_assembly_service", {"short_assembly_service": object()}),
     ],
@@ -665,6 +851,7 @@ def test_pipeline_rejects_invalid_dependencies(
     settings = build_settings(tmp_path)
     dependencies: dict[str, object] = {
         "media_generation_service": RecordingMediaGenerationService(settings),
+        "asset_hosting_service": RecordingAssetHostingService(settings),
         "artifact_materialization_service": RecordingArtifactMaterializationService(settings),
         "short_assembly_service": RecordingShortAssemblyService(settings),
     }
@@ -677,21 +864,21 @@ def test_pipeline_rejects_invalid_dependencies(
 def test_unapproved_content_is_rejected_before_any_downstream_stage(tmp_path: Path) -> None:
     """Approval must be validated before generation, materialization, or assembly begin."""
 
-    pipeline, generation_service, materializer, assembly_service = build_spy_pipeline(tmp_path)
+    pipeline, generation_service, _materializer, assembly_service = build_spy_pipeline(tmp_path)
 
     with pytest.raises(ApprovalRequiredError) as exc_info:
         run_async(pipeline.execute(build_request(approved=False)))
 
     assert exc_info.value.code == "media_execution_approval_required"
     assert generation_service.package_calls == 0
-    assert materializer.calls == 0
+    assert _materializer.calls == 0
     assert assembly_service.calls == 0
 
 
 def test_publication_readiness_failure_blocks_all_later_stages(tmp_path: Path) -> None:
     """Content that is not ready for human review must never enter production."""
 
-    pipeline, generation_service, materializer, assembly_service = build_spy_pipeline(tmp_path)
+    pipeline, generation_service, _materializer, assembly_service = build_spy_pipeline(tmp_path)
 
     with pytest.raises(WorkflowError) as exc_info:
         run_async(
@@ -702,14 +889,14 @@ def test_publication_readiness_failure_blocks_all_later_stages(tmp_path: Path) -
 
     assert exc_info.value.code == "media_execution_not_publication_ready"
     assert generation_service.package_calls == 0
-    assert materializer.calls == 0
+    assert _materializer.calls == 0
     assert assembly_service.calls == 0
 
 
 def test_non_mock_media_provider_requires_explicit_live_confirmation(tmp_path: Path) -> None:
     """Live media provider selection must fail before any provider call without confirmation."""
 
-    pipeline, generation_service, materializer, assembly_service = build_spy_pipeline(tmp_path)
+    pipeline, generation_service, _materializer, assembly_service = build_spy_pipeline(tmp_path)
     request = build_request(
         provider_selection=MediaProviderSelection(image_provider_name="openai-image")
     )
@@ -719,7 +906,7 @@ def test_non_mock_media_provider_requires_explicit_live_confirmation(tmp_path: P
 
     assert exc_info.value.code == "media_execution_live_confirmation_required"
     assert generation_service.package_calls == 0
-    assert materializer.calls == 0
+    assert _materializer.calls == 0
     assert assembly_service.calls == 0
 
 
@@ -755,7 +942,7 @@ def test_live_provider_plan_reports_live_call_counts_without_confirmation(tmp_pa
         default_tts_provider="openai-tts",
         openai_api_key="sk-test-secret",
     )
-    pipeline, generation_service, materializer, assembly_service = build_spy_pipeline(
+    pipeline, generation_service, _materializer, _assembly_service = build_spy_pipeline(
         tmp_path,
         settings=settings,
     )
@@ -770,8 +957,60 @@ def test_live_provider_plan_reports_live_call_counts_without_confirmation(tmp_pa
     assert plan.live_media_call_count == 5
     assert plan.will_use_live_media is True
     assert generation_service.package_calls == 0
-    assert materializer.calls == 0
+    assert _materializer.calls == 0
+    assert _assembly_service.calls == 0
+
+
+def test_video_enabled_plan_reports_hosting_and_video_call_counts(tmp_path: Path) -> None:
+    """Video-enabled packages should count hosting and scene-video generation separately."""
+
+    pipeline, generation_service, _materializer, assembly_service = build_spy_pipeline(tmp_path)
+
+    plan = pipeline.build_execution_plan(
+        build_request(content_result=build_video_enabled_content_result())
+    )
+
+    assert plan.image_generation_count == 4
+    assert plan.tts_generation_count == 1
+    assert plan.asset_hosting_calls == 3
+    assert plan.video_generation_count == 3
+    assert plan.live_media_call_count == 0
+    assert generation_service.package_calls == 0
+    assert _materializer.calls == 0
     assert assembly_service.calls == 0
+
+
+def test_video_enabled_live_plan_counts_cloudinary_and_kling_calls(tmp_path: Path) -> None:
+    """Plan mode should expose Cloudinary and Kling live calls without starting execution."""
+
+    settings = build_settings(
+        tmp_path,
+        default_video_provider="kling",
+        default_asset_hosting_provider="cloudinary",
+    )
+    pipeline, generation_service, _materializer, _assembly_service = build_spy_pipeline(
+        tmp_path,
+        settings=settings,
+    )
+    request = build_request(
+        content_result=build_video_enabled_content_result(),
+        provider_selection=MediaProviderSelection(
+            hosting_provider_name="cloudinary",
+            video_provider_name="kling",
+        ),
+    )
+
+    plan = pipeline.build_execution_plan(request)
+
+    assert plan.hosting_provider == "cloudinary"
+    assert plan.video_provider == "kling"
+    assert plan.asset_hosting_calls == 3
+    assert plan.video_generation_count == 3
+    assert plan.live_media_call_count == 6
+    assert plan.will_use_live_media is True
+    assert generation_service.package_calls == 0
+    assert _materializer.calls == 0
+    assert _assembly_service.calls == 0
 
 
 def test_media_generation_request_includes_default_tts_voice(tmp_path: Path) -> None:
@@ -813,7 +1052,7 @@ def test_openai_tts_preflight_rejects_missing_voice_before_any_media_generation(
         openai_api_key="sk-test-secret",
         default_tts_voice="   ",
     )
-    pipeline, generation_service, materializer, assembly_service = build_spy_pipeline(
+    pipeline, generation_service, _materializer, _assembly_service = build_spy_pipeline(
         tmp_path,
         settings=settings,
     )
@@ -832,8 +1071,8 @@ def test_openai_tts_preflight_rejects_missing_voice_before_any_media_generation(
     assert generation_service.package_calls == 0
     assert generation_service.image_calls == 0
     assert generation_service.audio_calls == 0
-    assert materializer.calls == 0
-    assert assembly_service.calls == 0
+    assert _materializer.calls == 0
+    assert _assembly_service.calls == 0
     assert "sk-test-secret" not in str(exc_info.value)
 
 
@@ -849,7 +1088,7 @@ def test_openai_tts_preflight_rejects_unsupported_voice_before_any_media_generat
         openai_api_key="sk-test-secret",
         default_tts_voice="robot",
     )
-    pipeline, generation_service, materializer, assembly_service = build_spy_pipeline(
+    pipeline, generation_service, _materializer, _assembly_service = build_spy_pipeline(
         tmp_path,
         settings=settings,
     )
@@ -868,8 +1107,8 @@ def test_openai_tts_preflight_rejects_unsupported_voice_before_any_media_generat
     assert generation_service.package_calls == 0
     assert generation_service.image_calls == 0
     assert generation_service.audio_calls == 0
-    assert materializer.calls == 0
-    assert assembly_service.calls == 0
+    assert _materializer.calls == 0
+    assert _assembly_service.calls == 0
 
 
 def test_openai_tts_preflight_accepts_supported_voice_without_generation(tmp_path: Path) -> None:
@@ -881,7 +1120,7 @@ def test_openai_tts_preflight_accepts_supported_voice_without_generation(tmp_pat
         openai_api_key="sk-test-secret",
         default_tts_voice="nova",
     )
-    pipeline, generation_service, materializer, assembly_service = build_spy_pipeline(
+    pipeline, generation_service, _materializer, _assembly_service = build_spy_pipeline(
         tmp_path,
         settings=settings,
     )
@@ -890,6 +1129,37 @@ def test_openai_tts_preflight_accepts_supported_voice_without_generation(tmp_pat
 
     assert plan.tts_provider == "openai-tts"
     assert generation_service.package_calls == 0
+
+
+def test_video_enabled_live_preflight_rejects_missing_cloudinary_or_kling_config(tmp_path: Path) -> None:
+    """Live hosted-reference video execution should fail before any provider call when config is missing."""
+
+    settings = build_settings(
+        tmp_path,
+        default_video_provider="kling",
+        default_asset_hosting_provider="cloudinary",
+    )
+    pipeline, generation_service, materializer, assembly_service = build_spy_pipeline(
+        tmp_path,
+        settings=settings,
+    )
+    generation_service.settings.cloudinary_api_key = None
+    generation_service.settings.kling_api_key = None
+    request = build_request(
+        content_result=build_video_enabled_content_result(),
+        provider_selection=MediaProviderSelection(
+            hosting_provider_name="cloudinary",
+            video_provider_name="kling",
+        ),
+        confirm_live_media_calls=True,
+    )
+
+    with pytest.raises(ConfigurationError) as exc_info:
+        run_async(pipeline.execute(request))
+
+    assert exc_info.value.code == "media_execution_missing_live_configuration"
+    assert generation_service.package_calls == 0
+    assert generation_service.video_calls == 0
     assert materializer.calls == 0
     assert assembly_service.calls == 0
 
@@ -897,7 +1167,7 @@ def test_openai_tts_preflight_accepts_supported_voice_without_generation(tmp_pat
 def test_plan_rejects_invalid_dimensions_before_generation(tmp_path: Path) -> None:
     """Preflight should catch invalid dimensions even for manually constructed requests."""
 
-    pipeline, generation_service, materializer, assembly_service = build_spy_pipeline(tmp_path)
+    pipeline, generation_service, _materializer, assembly_service = build_spy_pipeline(tmp_path)
     request = build_request().model_copy(update={"width": 0})
 
     with pytest.raises(CreatorOSValidationError) as exc_info:
@@ -905,14 +1175,14 @@ def test_plan_rejects_invalid_dimensions_before_generation(tmp_path: Path) -> No
 
     assert exc_info.value.code == "media_execution_invalid_dimensions"
     assert generation_service.package_calls == 0
-    assert materializer.calls == 0
+    assert _materializer.calls == 0
     assert assembly_service.calls == 0
 
 
 def test_plan_rejects_invalid_fps_before_generation(tmp_path: Path) -> None:
     """Preflight should catch non-positive or non-finite fps values."""
 
-    pipeline, generation_service, materializer, assembly_service = build_spy_pipeline(tmp_path)
+    pipeline, generation_service, _materializer, assembly_service = build_spy_pipeline(tmp_path)
     request = build_request().model_copy(update={"fps": 0.0})
 
     with pytest.raises(CreatorOSValidationError) as exc_info:
@@ -920,14 +1190,14 @@ def test_plan_rejects_invalid_fps_before_generation(tmp_path: Path) -> None:
 
     assert exc_info.value.code == "media_execution_invalid_fps"
     assert generation_service.package_calls == 0
-    assert materializer.calls == 0
+    assert _materializer.calls == 0
     assert assembly_service.calls == 0
 
 
 def test_plan_rejects_unsupported_output_format_before_generation(tmp_path: Path) -> None:
     """Preflight should reject unsupported final output formats safely."""
 
-    pipeline, generation_service, materializer, assembly_service = build_spy_pipeline(tmp_path)
+    pipeline, generation_service, _materializer, assembly_service = build_spy_pipeline(tmp_path)
     request = build_request().model_copy(update={"output_format": "mov"})
 
     with pytest.raises(CreatorOSValidationError) as exc_info:
@@ -935,7 +1205,7 @@ def test_plan_rejects_unsupported_output_format_before_generation(tmp_path: Path
 
     assert exc_info.value.code == "media_execution_output_format_unsupported"
     assert generation_service.package_calls == 0
-    assert materializer.calls == 0
+    assert _materializer.calls == 0
     assert assembly_service.calls == 0
 
 
@@ -1122,6 +1392,61 @@ def test_execute_preserves_run_id_and_handoffs_local_materialized_assets(tmp_pat
         "video\\final_short.mp4"
     ) or result.assembly.rendered_video.artifact.uri.endswith("video/final_short.mp4")
     assert "payload_bytes" not in result.model_dump()
+
+
+def test_video_enabled_execution_hosts_scene_images_then_materializes_scene_videos(tmp_path: Path) -> None:
+    """Video-enabled execution should host scene images before generating materialized scene videos."""
+
+    pipeline, generation_service, _materializer, assembly_service = build_spy_pipeline(tmp_path)
+    request = build_request(
+        run_id="video_enabled_run",
+        content_result=build_video_enabled_content_result(),
+    )
+
+    result = run_async(pipeline.execute(request))
+    hosting_service = pipeline.asset_hosting_service
+
+    assert hosting_service.host_calls == 3
+    assert hosting_service.delete_calls == 3
+    assert generation_service.video_calls == 3
+    assert all(video_request.reference_image is not None for video_request in generation_service.video_requests)
+    assert all(
+        video_request.reference_image is not None
+        and video_request.reference_image.uri.startswith("https://")
+        for video_request in generation_service.video_requests
+    )
+    assert len(result.materialized_media.scene_videos) == 3
+    assert all(artifact.path.name.startswith("clip_") for artifact in result.materialized_media.scene_videos)
+    assert assembly_service.last_request is not None
+    assert all(scene.video_asset_ref is not None for scene in result.assembly.render_request.scenes)
+
+
+def test_cleanup_failures_do_not_fail_successful_video_enabled_execution(tmp_path: Path) -> None:
+    """Best-effort hosted-asset cleanup failures should not fail successful production."""
+
+    settings = build_settings(tmp_path)
+    hosting_service = FailingDeleteAssetHostingService(settings)
+    pipeline, generation_service, materializer, assembly_service = build_spy_pipeline(
+        tmp_path,
+        settings=settings,
+        asset_hosting_service=hosting_service,
+    )
+
+    result = run_async(
+        pipeline.execute(
+            build_request(
+                run_id="cleanup_tolerant_run",
+                content_result=build_video_enabled_content_result(),
+            )
+        )
+    )
+
+    assert result.run_id == "cleanup_tolerant_run"
+    assert hosting_service.host_calls == 3
+    assert hosting_service.delete_calls == 3
+    assert generation_service.video_calls == 3
+    assert materializer.calls == 1
+    assert assembly_service.calls == 1
 
 
 def test_planned_call_counts_match_executed_mock_call_counts(tmp_path: Path) -> None:

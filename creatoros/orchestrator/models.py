@@ -214,11 +214,13 @@ class ProductionExecutionPlan(CreatorOSModel):
     image_provider: str
     tts_provider: str
     video_provider: str
+    hosting_provider: str
     render_provider: str
     scene_count: int = Field(gt=0)
     image_generation_count: int = Field(ge=0)
     tts_generation_count: int = Field(ge=0)
     video_generation_count: int = Field(ge=0)
+    asset_hosting_calls: int = Field(ge=0)
     live_media_call_count: int = Field(ge=0)
     will_use_live_media: bool
     final_width: int = Field(gt=0)

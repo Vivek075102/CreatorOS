@@ -41,12 +41,17 @@ class StubSettings:
     default_tts_provider: str = "mock"
     default_tts_model: str | None = None
     default_video_provider: str = "mock"
+    default_video_model: str | None = None
     default_render_provider: str = "mock"
     default_asset_hosting_provider: str = "mock"
     openai_api_key: str | None = "openai-secret"
     cloudinary_cloud_name: str | None = "demo-cloud"
     cloudinary_api_key: str | None = "cloudinary-key"
     cloudinary_api_secret: str | None = "cloudinary-secret"
+    kling_api_key: str | None = "kling-test-key"
+    kling_api_base_url: str = "https://api.kling.example"
+    kling_video_timeout_seconds: float = 900.0
+    kling_video_poll_interval_seconds: float = 0.01
     anthropic_api_key: str | None = "anthropic-secret"
     youtube_client_id: str | None = "youtube-client"
     youtube_client_secret: str | None = "youtube-secret"
@@ -561,11 +566,13 @@ def test_run_short_mock_execution_reports_summary(cli_module, monkeypatch: pytes
                         "image_provider": "mock",
                         "tts_provider": "mock",
                         "video_provider": "mock",
+                        "hosting_provider": "mock",
                         "render_provider": request.render_provider_name or "mock",
                         "scene_count": 3,
                         "image_generation_count": 4,
                         "tts_generation_count": 1,
-                        "video_generation_count": 0,
+                        "video_generation_count": 3,
+                        "asset_hosting_calls": 3,
                         "live_media_call_count": 0,
                         "will_use_live_media": False,
                         "workspace_path": f"C:/GamingAIFactory/artifacts/{request.run_id}",
@@ -668,12 +675,14 @@ def test_run_short_plan_reports_counts_without_execution(cli_module, monkeypatch
                         "image_provider": request.provider_selection.image_provider_name,
                         "tts_provider": request.provider_selection.tts_provider_name,
                         "video_provider": request.provider_selection.video_provider_name,
+                        "hosting_provider": request.provider_selection.hosting_provider_name,
                         "render_provider": request.render_provider_name,
                         "scene_count": 3,
                         "image_generation_count": 4,
                         "tts_generation_count": 1,
-                        "video_generation_count": 0,
-                        "live_media_call_count": 5,
+                        "video_generation_count": 3,
+                        "asset_hosting_calls": 3,
+                        "live_media_call_count": 8,
                         "will_use_live_media": True,
                         "workspace_path": f"C:/GamingAIFactory/artifacts/{request.run_id}",
                         "output_format": request.output_format,
@@ -723,8 +732,9 @@ def test_run_short_plan_reports_counts_without_execution(cli_module, monkeypatch
     assert "mode: plan" in stdout
     assert "image_generation_calls: 4" in stdout
     assert "tts_generation_calls: 1" in stdout
-    assert "video_generation_calls: 0" in stdout
-    assert "live_media_calls: 5" in stdout
+    assert "video_generation_calls: 3" in stdout
+    assert "asset_hosting_calls: 3" in stdout
+    assert "live_media_calls: 8" in stdout
     assert "will_use_live_media: true" in stdout
     assert "execution_started: false" in stdout
     assert "workspace: C:\\GamingAIFactory\\artifacts\\short_roblox_funny_myths" in stdout or "workspace: C:/GamingAIFactory/artifacts/short_roblox_funny_myths" in stdout
@@ -753,11 +763,13 @@ def test_run_short_plan_with_live_providers_does_not_require_confirmation(
                         "image_provider": "openai-image",
                         "tts_provider": "openai-tts",
                         "video_provider": "mock",
+                        "hosting_provider": "mock",
                         "render_provider": "ffmpeg",
                         "scene_count": 3,
                         "image_generation_count": 4,
                         "tts_generation_count": 1,
-                        "video_generation_count": 0,
+                        "video_generation_count": 3,
+                        "asset_hosting_calls": 3,
                         "live_media_call_count": 5,
                         "will_use_live_media": True,
                         "workspace_path": f"C:/GamingAIFactory/artifacts/{request.run_id}",
@@ -790,6 +802,8 @@ def test_run_short_plan_with_live_providers_does_not_require_confirmation(
 
     assert exit_code == 0
     assert "mode: plan" in stdout
+    assert "video_generation_calls: 3" in stdout
+    assert "asset_hosting_calls: 3" in stdout
     assert stderr == ""
 
 
@@ -855,11 +869,13 @@ def test_run_short_ffmpeg_render_does_not_require_live_media_confirmation(
                         "image_provider": "mock",
                         "tts_provider": "mock",
                         "video_provider": "mock",
+                        "hosting_provider": "mock",
                         "render_provider": request.render_provider_name or "mock",
                         "scene_count": 3,
                         "image_generation_count": 4,
                         "tts_generation_count": 1,
-                        "video_generation_count": 0,
+                        "video_generation_count": 3,
+                        "asset_hosting_calls": 3,
                         "live_media_call_count": 0,
                         "will_use_live_media": False,
                         "workspace_path": f"C:/GamingAIFactory/artifacts/{request.run_id}",

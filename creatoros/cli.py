@@ -9,6 +9,7 @@ import re
 import sys
 from contextlib import redirect_stderr, redirect_stdout
 from dataclasses import dataclass
+from pathlib import Path
 from typing import TextIO
 from urllib.parse import urlsplit
 
@@ -661,8 +662,14 @@ def _build_parser() -> argparse.ArgumentParser:
     run_short.add_argument(
         "--video-provider",
         default="mock",
-        choices=["mock"],
+        choices=["mock", "kling"],
         help="Video provider for optional scene clips.",
+    )
+    run_short.add_argument(
+        "--hosting-provider",
+        default="mock",
+        choices=["mock", "cloudinary"],
+        help="Hosting provider for remote scene-image references used by scene video generation.",
     )
     run_short.add_argument(
         "--render-provider",
@@ -1413,8 +1420,73 @@ def _build_demo_approved_media_execution_request(args: argparse.Namespace):
                         "pronunciation_notes": f"Pronounce {normalized_game} clearly.",
                         "target_duration_seconds": 30,
                     },
-                    "scene_visuals": [],
-                    "scene_motions": [],
+                    "scene_visuals": [
+                        {
+                            "scene_number": 1,
+                            "subject": f"One recognizable {normalized_game} focal subject reacting to {normalized_topic}.",
+                            "environment": f"A fast {normalized_game} gameplay-inspired opening environment.",
+                            "action": "Immediate hook action that reinforces the opening claim.",
+                            "composition": "Tight vertical framing with clear readable subject separation.",
+                            "mood": "Curious and energetic.",
+                            "on_screen_text": title,
+                            "style_direction": "Clean vertical-short layout with readable contrast.",
+                            "negative_guidance": "Avoid clutter, extra characters, and unsupported visual claims.",
+                        },
+                        {
+                            "scene_number": 2,
+                            "subject": f"The key {normalized_game} explanation visualized clearly.",
+                            "environment": f"A readable explanatory {normalized_game} comparison frame.",
+                            "action": "Show the correction landing clearly and simply.",
+                            "composition": "Balanced center composition with clear informational hierarchy.",
+                            "mood": "Confident and informative.",
+                            "on_screen_text": "Quick Breakdown",
+                            "style_direction": "Readable educational short-form composition.",
+                            "negative_guidance": "Avoid busy overlays and unsupported evidence cues.",
+                        },
+                        {
+                            "scene_number": 3,
+                            "subject": f"A clean branded {normalized_game} closing frame.",
+                            "environment": f"A simple recognizable {normalized_game} ending backdrop.",
+                            "action": "Hold a stable closing beat that supports the CTA.",
+                            "composition": "Simple closing composition with strong text readability.",
+                            "mood": "Clear and inviting.",
+                            "on_screen_text": "What Next?",
+                            "style_direction": "Clean branded end-card layout.",
+                            "negative_guidance": "Avoid visual clutter and extra unsupported details.",
+                        },
+                    ],
+                    "scene_motions": [
+                        {
+                            "scene_number": 1,
+                            "primary_motion": "Short dynamic push-in.",
+                            "subject_movement": "Subtle reaction movement tied to the hook.",
+                            "camera_direction": "Push in slightly toward the subject.",
+                            "transition_guidance": "Start immediately with momentum.",
+                            "pacing": "Quick and attention-grabbing.",
+                            "avoid": "Avoid shaky motion and rapid unreadable cuts.",
+                            "duration_seconds": 10.0,
+                        },
+                        {
+                            "scene_number": 2,
+                            "primary_motion": "Controlled lateral motion across the explanation.",
+                            "subject_movement": "Minimal movement that preserves readability.",
+                            "camera_direction": "Slow steady lateral move.",
+                            "transition_guidance": "Bridge smoothly from the hook to the explanation.",
+                            "pacing": "Measured and readable.",
+                            "avoid": "Avoid abrupt zooms and distracting camera swings.",
+                            "duration_seconds": 12.0,
+                        },
+                        {
+                            "scene_number": 3,
+                            "primary_motion": "Gentle end-card drift.",
+                            "subject_movement": "Minimal closing movement.",
+                            "camera_direction": "Soft hold with slight drift.",
+                            "transition_guidance": "Settle cleanly into the CTA.",
+                            "pacing": "Calm and conclusive.",
+                            "avoid": "Avoid frantic motion and cluttered ending transitions.",
+                            "duration_seconds": 8.0,
+                        },
+                    ],
                 },
                 "review_results": {
                     "script_quality": {
@@ -1473,6 +1545,7 @@ def _build_demo_approved_media_execution_request(args: argparse.Namespace):
                 image_provider_name=args.image_provider,
                 tts_provider_name=args.tts_provider,
                 video_provider_name=args.video_provider,
+                hosting_provider_name=args.hosting_provider,
             ),
             "render_provider_name": args.render_provider,
             "confirm_live_media_calls": args.confirm_live_calls,
@@ -1488,7 +1561,9 @@ def _build_short_provider_registry(args: argparse.Namespace):
     """Create the provider registry for one controlled short-production execution."""
 
     from creatoros.providers import (
+        register_cloudinary_asset_hosting_provider,
         register_ffmpeg_render_provider,
+        register_kling_video_provider,
         register_openai_image_provider,
         register_openai_tts_provider,
     )
@@ -1498,6 +1573,10 @@ def _build_short_provider_registry(args: argparse.Namespace):
         register_openai_image_provider(provider_registry)
     if args.tts_provider == "openai-tts":
         register_openai_tts_provider(provider_registry)
+    if args.hosting_provider == "cloudinary":
+        register_cloudinary_asset_hosting_provider(provider_registry, allowed_roots=(Path.cwd(),))
+    if args.video_provider == "kling":
+        register_kling_video_provider(provider_registry)
     if args.render_provider == "ffmpeg":
         register_ffmpeg_render_provider(provider_registry)
     return provider_registry
@@ -1524,6 +1603,7 @@ def _handle_run_short(
         args.image_provider != "mock"
         or args.tts_provider != "mock"
         or args.video_provider != "mock"
+        or args.hosting_provider != "mock"
     )
     if live_media_requested and not args.confirm_live_calls and not args.plan:
         _write_error(
@@ -1549,11 +1629,13 @@ def _handle_run_short(
             ("image_provider", plan.image_provider),
             ("tts_provider", plan.tts_provider),
             ("video_provider", plan.video_provider),
+            ("hosting_provider", plan.hosting_provider),
             ("render_provider", plan.render_provider),
             ("scene_count", plan.scene_count),
             ("image_generation_calls", plan.image_generation_count),
             ("tts_generation_calls", plan.tts_generation_count),
             ("video_generation_calls", plan.video_generation_count),
+            ("asset_hosting_calls", plan.asset_hosting_calls),
             ("live_media_calls", plan.live_media_call_count),
             ("will_use_live_media", plan.will_use_live_media),
             ("workspace", plan.workspace_path),
@@ -1574,6 +1656,7 @@ def _handle_run_short(
         ("image_provider", result.provider_selection.image_provider_name if result.provider_selection is not None else settings.default_image_provider),
         ("tts_provider", result.provider_selection.tts_provider_name if result.provider_selection is not None else settings.default_tts_provider),
         ("video_provider", result.provider_selection.video_provider_name if result.provider_selection is not None else settings.default_video_provider),
+        ("hosting_provider", result.provider_selection.hosting_provider_name if result.provider_selection is not None else settings.default_asset_hosting_provider),
         ("render_provider", result.render_provider_name or settings.default_render_provider),
         ("storyboard_scenes", result.assembly.scene_count),
         ("materialized_workspace", result.materialized_media.workspace.workspace_path),

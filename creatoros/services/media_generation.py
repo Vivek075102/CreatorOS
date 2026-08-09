@@ -52,8 +52,14 @@ class MediaProviderSelection(CreatorOSModel):
     image_provider_name: str | None = None
     tts_provider_name: str | None = None
     video_provider_name: str | None = None
+    hosting_provider_name: str | None = None
 
-    @field_validator("image_provider_name", "tts_provider_name", "video_provider_name")
+    @field_validator(
+        "image_provider_name",
+        "tts_provider_name",
+        "video_provider_name",
+        "hosting_provider_name",
+    )
     @classmethod
     def normalize_provider_names(cls, value: str | None, info) -> str | None:
         """Normalize optional provider override identifiers."""
