@@ -268,6 +268,8 @@ def test_single_storyboard_scene_maps_to_one_scene_image() -> None:
     assert render_request.scenes[0].visual_asset_ref is not None
     assert render_request.scenes[0].visual_asset_ref.uri == "mock://generated/image/1.png"
     assert render_request.scenes[0].video_asset_ref is None
+    assert render_request.scenes[0].caption is not None
+    assert render_request.scenes[0].caption.position.value == "bottom"
     assert render_request.scenes[0].caption_text == "Caption 1"
     assert render_request.scenes[0].motion_instruction is None
     assert render_request.scenes[0].transition is RenderTransition.CUT

@@ -83,6 +83,8 @@ def test_default_paths_resolve_to_project_root_directories() -> None:
     settings = build_settings()
 
     assert settings.ffmpeg_path is None
+    assert settings.caption_font_name == "Arial"
+    assert settings.caption_font_file is None
     assert settings.artifact_root == PROJECT_ROOT / "artifacts"
     assert settings.assets_dir == PROJECT_ROOT / "assets"
     assert settings.logs_dir == PROJECT_ROOT / "logs"
@@ -171,6 +173,8 @@ def test_environment_variables_override_defaults() -> None:
             "PROVIDER_TIMEOUT_SECONDS": "45",
             "PROVIDER_MAX_RETRIES": "5",
             "FFMPEG_PATH": "tools/ffmpeg/bin/ffmpeg.exe",
+            "CAPTION_FONT_NAME": "Segoe UI",
+            "CAPTION_FONT_FILE": "fonts/caption.ttf",
             "ARTIFACT_ROOT": "runtime_artifacts",
             "ASSETS_DIR": "custom_assets",
             "LOGS_DIR": "custom_logs",
@@ -194,6 +198,8 @@ def test_environment_variables_override_defaults() -> None:
     assert settings.provider_timeout_seconds == 45.0
     assert settings.provider_max_retries == 5
     assert settings.ffmpeg_path == PROJECT_ROOT / Path("tools/ffmpeg/bin/ffmpeg.exe")
+    assert settings.caption_font_name == "Segoe UI"
+    assert settings.caption_font_file == PROJECT_ROOT / Path("fonts/caption.ttf")
     assert settings.artifact_root == PROJECT_ROOT / Path("runtime_artifacts")
     assert settings.assets_dir == PROJECT_ROOT / Path("custom_assets")
     assert settings.logs_dir == PROJECT_ROOT / Path("custom_logs")

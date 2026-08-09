@@ -29,6 +29,11 @@ from creatoros.providers.base import (
     ProviderResult,
     ProviderUsage,
 )
+from creatoros.providers.ffmpeg.captions import (
+    build_ass_subtitle_document,
+    build_subtitles_filter_arg,
+    build_timed_captions,
+)
 from creatoros.providers.render import RenderedVideo, RenderScene, ShortRenderRequest
 
 DEFAULT_FFMPEG_RENDER_PROVIDER_NAME = "ffmpeg"
@@ -97,11 +102,15 @@ class FFmpegRenderProvider:
         artifact_root: Path,
         ffmpeg_path: Path | str | None = None,
         timeout_seconds: float = 30.0,
+        caption_font_name: str = "Arial",
+        caption_font_file: Path | str | None = None,
         command_runner: FFmpegCommandRunner | None = None,
     ) -> None:
         self.artifact_root = Path(artifact_root).resolve()
         self.ffmpeg_path = ffmpeg_path
         self.timeout_seconds = timeout_seconds
+        self.caption_font_name = caption_font_name.strip()
+        self.caption_font_file = None if caption_font_file is None else Path(caption_font_file).expanduser().resolve()
         self.command_runner = _run_ffmpeg_command if command_runner is None else command_runner
         self._info = ProviderInfo(
             name=DEFAULT_FFMPEG_RENDER_PROVIDER_NAME,
@@ -150,10 +159,15 @@ class FFmpegRenderProvider:
                 scene_segments,
                 working_directory=working_directory,
             )
+            caption_subtitle_path = self._write_caption_subtitle_file(
+                request,
+                working_directory=working_directory,
+            )
             await self._compose_final_video(
                 ffmpeg_binary=ffmpeg_binary,
                 concat_list_path=concat_list_path,
                 narration_path=narration_path,
+                caption_subtitle_path=caption_subtitle_path,
                 output_path=output_path,
                 timeout_seconds=self._resolve_timeout_seconds(context),
             )
@@ -481,6 +495,7 @@ class FFmpegRenderProvider:
         ffmpeg_binary: Path,
         concat_list_path: Path,
         narration_path: Path | None,
+        caption_subtitle_path: Path | None,
         output_path: Path,
         timeout_seconds: float | None,
     ) -> None:
@@ -495,6 +510,16 @@ class FFmpegRenderProvider:
             "-i",
             str(concat_list_path),
         ]
+        if caption_subtitle_path is not None:
+            command.extend(
+                [
+                    "-vf",
+                    build_subtitles_filter_arg(
+                        subtitle_path=caption_subtitle_path,
+                        fonts_dir=self._resolve_caption_fonts_dir(),
+                    ),
+                ]
+            )
         if narration_path is not None:
             command.extend(
                 [
@@ -536,6 +561,62 @@ class FFmpegRenderProvider:
             timeout_seconds=timeout_seconds,
             failure_code="render_output_failed",
         )
+
+    def _write_caption_subtitle_file(
+        self,
+        request: ShortRenderRequest,
+        *,
+        working_directory: Path,
+    ) -> Path | None:
+        """Write one temporary ASS subtitle file when timed captions are present."""
+
+        timed_captions = build_timed_captions(request.scenes)
+        if not timed_captions:
+            return None
+
+        self._validate_caption_configuration()
+        subtitle_path = (working_directory / "captions.ass").resolve()
+        if not subtitle_path.is_relative_to(working_directory):
+            raise ArtifactPathError(
+                "caption subtitle file escaped the FFmpeg working directory",
+                code="render_subtitle_outside_workspace",
+            )
+
+        subtitle_document = build_ass_subtitle_document(
+            captions=timed_captions,
+            width=request.width,
+            height=request.height,
+            font_name=self.caption_font_name,
+        )
+        subtitle_path.write_text(subtitle_document, encoding="utf-8")
+        return subtitle_path
+
+    def _validate_caption_configuration(self) -> None:
+        """Validate the local caption font configuration before subtitle rendering."""
+
+        if not self.caption_font_name:
+            raise ProviderUnavailableError(
+                "Caption font configuration is invalid",
+                code="provider_invalid_configuration",
+                details={"provider_name": self.info.name},
+            )
+
+        if self.caption_font_file is None:
+            return
+
+        if not self.caption_font_file.exists() or not self.caption_font_file.is_file():
+            raise ProviderUnavailableError(
+                "Caption font file is unavailable",
+                code="provider_invalid_configuration",
+                details={"provider_name": self.info.name},
+            )
+
+    def _resolve_caption_fonts_dir(self) -> Path | None:
+        """Return the optional font directory for FFmpeg subtitle resolution."""
+
+        if self.caption_font_file is None:
+            return None
+        return self.caption_font_file.parent
 
     async def _execute_ffmpeg_command(
         self,
@@ -623,6 +704,7 @@ class FFmpegRenderProvider:
                     "duration_seconds": scene.duration_seconds,
                     "visual_asset_uri": None if scene.visual_asset_ref is None else scene.visual_asset_ref.uri,
                     "video_asset_uri": None if scene.video_asset_ref is None else scene.video_asset_ref.uri,
+                    "caption": None if scene.caption is None else scene.caption.model_dump(mode="json"),
                 }
                 for scene in request.scenes
             ],
@@ -631,6 +713,7 @@ class FFmpegRenderProvider:
             "height": request.height,
             "fps": request.fps,
             "output_format": request.output_format,
+            "caption_font_name": request.metadata.get("caption_font_name"),
         }
         return hashlib.sha256(json.dumps(payload, sort_keys=True).encode("utf-8")).hexdigest()[:16]
 

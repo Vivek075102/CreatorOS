@@ -7,6 +7,8 @@ from pydantic import ValidationError
 
 from creatoros.domain import AssetType, GeneratedAsset
 from creatoros.providers import (
+    CaptionOverlay,
+    CaptionPosition,
     GeneratedAudio,
     RenderedVideo,
     RenderScene,
@@ -62,6 +64,7 @@ def test_valid_render_scene_is_accepted() -> None:
 
     scene = build_scene()
 
+    assert scene.caption == CaptionOverlay(text="Caption text")
     assert scene.caption_text == "Caption text"
     assert scene.motion_instruction == "Slow push in"
 
@@ -85,6 +88,47 @@ def test_scene_requires_at_least_one_asset_reference() -> None:
 
     with pytest.raises(ValidationError):
         RenderScene(scene_number=1, duration_seconds=3.0)
+
+
+def test_blank_explicit_caption_is_rejected() -> None:
+    """Explicit caption overlays should reject blank text."""
+
+    with pytest.raises(ValidationError):
+        RenderScene(
+            scene_number=1,
+            duration_seconds=3.0,
+            visual_asset_ref=build_image_asset(),
+            caption={"text": "   "},
+        )
+
+
+def test_invalid_caption_position_is_rejected() -> None:
+    """Caption positions should stay within the provider-neutral enum."""
+
+    with pytest.raises(ValidationError):
+        RenderScene(
+            scene_number=1,
+            duration_seconds=3.0,
+            visual_asset_ref=build_image_asset(),
+            caption={"text": "Caption text", "position": "left"},
+        )
+
+
+def test_unicode_caption_serialization_is_deterministic() -> None:
+    """Caption overlays should serialize deterministically with Unicode text."""
+
+    scene = RenderScene(
+        scene_number=1,
+        duration_seconds=3.0,
+        visual_asset_ref=build_image_asset(),
+        caption=CaptionOverlay(text="Unicode myth π", position=CaptionPosition.TOP),
+    )
+
+    first_dump = scene.model_dump(mode="json")
+    second_dump = scene.model_dump(mode="json")
+
+    assert first_dump == second_dump
+    assert first_dump["caption"]["text"] == "Unicode myth π"
 
 
 def test_scene_rejects_wrong_asset_types() -> None:

@@ -65,6 +65,8 @@ def build_settings(
         provider_timeout_seconds=30.0,
         provider_max_retries=3,
         ffmpeg_path=ffmpeg_path,
+        caption_font_name="Arial",
+        caption_font_file=None,
         artifact_root=artifact_root,
         assets_dir=artifact_root.parent / "assets",
         logs_dir=artifact_root.parent / "logs",
@@ -98,6 +100,7 @@ def build_request(
     image_path: Path,
     video_path: Path | None = None,
     narration_path: Path | None = None,
+    caption_text: str | None = "CreatorOS caption",
 ) -> ShortRenderRequest:
     """Create a local-file-backed render request for FFmpeg tests."""
 
@@ -106,6 +109,7 @@ def build_request(
             scene_number=1,
             duration_seconds=2.0,
             visual_asset_ref=GeneratedAsset(asset_type=AssetType.IMAGE, uri=str(image_path)),
+            caption_text=caption_text,
         )
     ]
     if video_path is not None:
@@ -114,6 +118,7 @@ def build_request(
                 scene_number=2,
                 duration_seconds=3.0,
                 video_asset_ref=GeneratedAsset(asset_type=AssetType.VIDEO, uri=str(video_path)),
+                caption_text="Second caption",
             )
         )
 
@@ -147,6 +152,8 @@ class RecordingFFmpegRunner:
     calls: list[tuple[str, ...]] = field(default_factory=list)
     timeouts: list[float | None] = field(default_factory=list)
     concat_file_contents: list[str] = field(default_factory=list)
+    subtitle_file_contents: list[str] = field(default_factory=list)
+    final_filters: list[str] = field(default_factory=list)
 
     async def __call__(
         self,
@@ -160,6 +167,12 @@ class RecordingFFmpegRunner:
         if "-f" in argv and "concat" in argv:
             concat_path = Path(argv[argv.index("-i") + 1])
             self.concat_file_contents.append(concat_path.read_text(encoding="utf-8"))
+            captions_path = concat_path.parent / "captions.ass"
+            if captions_path.exists():
+                self.subtitle_file_contents.append(captions_path.read_text(encoding="utf-8"))
+
+        if "-vf" in argv:
+            self.final_filters.append(argv[argv.index("-vf") + 1])
 
         if self.timeout_at_call == call_index:
             raise TimeoutError("timed out")
@@ -440,6 +453,103 @@ def test_narration_is_omitted_when_absent(tmp_path: Path) -> None:
     final_call = runner.calls[-1]
     assert "-shortest" not in final_call
     assert "-an" in final_call
+
+
+def test_no_caption_request_preserves_existing_final_command_path(tmp_path: Path) -> None:
+    """Final composition should not add subtitle filtering when scenes have no captions."""
+
+    artifact_root, image_path, _video_path, _narration_path = create_workspace_files(tmp_path)
+    ffmpeg_binary = tmp_path / "ffmpeg.exe"
+    ffmpeg_binary.write_text("binary", encoding="utf-8")
+    runner = RecordingFFmpegRunner()
+    provider = build_provider(artifact_root=artifact_root, ffmpeg_path=ffmpeg_binary, command_runner=runner)
+
+    run_async(provider.render(build_request(image_path=image_path, caption_text=None)))
+
+    final_call = runner.calls[-1]
+    assert "-vf" not in final_call
+    assert runner.subtitle_file_contents == []
+
+
+def test_caption_request_adds_subtitle_filter_and_deterministic_ass_file(tmp_path: Path) -> None:
+    """Captioned renders should add one ASS subtitle filter at final composition time."""
+
+    artifact_root, image_path, _video_path, _narration_path = create_workspace_files(tmp_path)
+    ffmpeg_binary = tmp_path / "ffmpeg.exe"
+    ffmpeg_binary.write_text("binary", encoding="utf-8")
+    runner = RecordingFFmpegRunner()
+    provider = build_provider(artifact_root=artifact_root, ffmpeg_path=ffmpeg_binary, command_runner=runner)
+
+    run_async(provider.render(build_request(image_path=image_path, caption_text="Roblox: Funny Myths")))
+
+    final_call = runner.calls[-1]
+    assert "-vf" in final_call
+    assert runner.final_filters[-1].startswith("subtitles='")
+    assert "fontsdir=" not in runner.final_filters[-1]
+    assert runner.subtitle_file_contents
+    assert "PlayResX: 1080" in runner.subtitle_file_contents[-1]
+    assert r"{\an2}Roblox: Funny Myths" in runner.subtitle_file_contents[-1]
+
+
+def test_caption_filter_and_narration_can_coexist(tmp_path: Path) -> None:
+    """Caption overlays should coexist with optional narration muxing."""
+
+    artifact_root, image_path, _video_path, narration_path = create_workspace_files(tmp_path)
+    ffmpeg_binary = tmp_path / "ffmpeg.exe"
+    ffmpeg_binary.write_text("binary", encoding="utf-8")
+    runner = RecordingFFmpegRunner()
+    provider = build_provider(artifact_root=artifact_root, ffmpeg_path=ffmpeg_binary, command_runner=runner)
+
+    run_async(
+        provider.render(
+            build_request(
+                image_path=image_path,
+                narration_path=narration_path,
+                caption_text="CreatorOS caption test",
+            )
+        )
+    )
+
+    final_call = runner.calls[-1]
+    assert "-vf" in final_call
+    assert str(narration_path) in final_call
+    assert "-shortest" in final_call
+
+
+def test_caption_filter_preserves_multiple_scene_order(tmp_path: Path) -> None:
+    """Multiple captioned scenes should remain ordered in the ASS subtitle timeline."""
+
+    artifact_root, image_path, video_path, _narration_path = create_workspace_files(tmp_path)
+    ffmpeg_binary = tmp_path / "ffmpeg.exe"
+    ffmpeg_binary.write_text("binary", encoding="utf-8")
+    runner = RecordingFFmpegRunner()
+    provider = build_provider(artifact_root=artifact_root, ffmpeg_path=ffmpeg_binary, command_runner=runner)
+
+    run_async(provider.render(build_request(image_path=image_path, video_path=video_path)))
+
+    subtitle_contents = runner.subtitle_file_contents[-1]
+    assert "0:00:00.00,0:00:02.00" in subtitle_contents
+    assert "0:00:02.00,0:00:05.00" in subtitle_contents
+    assert subtitle_contents.index("CreatorOS caption") < subtitle_contents.index("Second caption")
+
+
+def test_invalid_caption_font_file_fails_safely_before_final_render(tmp_path: Path) -> None:
+    """Missing configured caption font files should fail with a safe provider error."""
+
+    artifact_root, image_path, _video_path, _narration_path = create_workspace_files(tmp_path)
+    ffmpeg_binary = tmp_path / "ffmpeg.exe"
+    ffmpeg_binary.write_text("binary", encoding="utf-8")
+    provider = build_provider(
+        artifact_root=artifact_root,
+        ffmpeg_path=ffmpeg_binary,
+        command_runner=RecordingFFmpegRunner(),
+    )
+    provider.caption_font_file = tmp_path / "missing_font.ttf"
+
+    with pytest.raises(ProviderUnavailableError) as exc_info:
+        run_async(provider.render(build_request(image_path=image_path)))
+
+    assert exc_info.value.code == "provider_invalid_configuration"
 
 
 def test_successful_render_returns_local_rendered_video(tmp_path: Path) -> None:

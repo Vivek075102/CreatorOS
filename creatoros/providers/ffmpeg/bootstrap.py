@@ -22,6 +22,8 @@ def register_ffmpeg_render_provider(
         artifact_root=settings.artifact_root,
         ffmpeg_path=settings.ffmpeg_path if ffmpeg_path is None else ffmpeg_path,
         timeout_seconds=settings.provider_timeout_seconds,
+        caption_font_name=getattr(settings, "caption_font_name", "Arial"),
+        caption_font_file=getattr(settings, "caption_font_file", None),
     )
     registry.register(provider, replace=replace)
     return provider

@@ -41,6 +41,8 @@ class Settings(BaseSettings):
     provider_timeout_seconds: float = Field(default=30.0, alias="PROVIDER_TIMEOUT_SECONDS")
     provider_max_retries: int = Field(default=3, alias="PROVIDER_MAX_RETRIES")
     ffmpeg_path: Path | None = Field(default=None, alias="FFMPEG_PATH")
+    caption_font_name: str = Field(default="Arial", alias="CAPTION_FONT_NAME")
+    caption_font_file: Path | None = Field(default=None, alias="CAPTION_FONT_FILE")
     artifact_root: Path = Field(default=PROJECT_ROOT / "artifacts", alias="ARTIFACT_ROOT")
     assets_dir: Path = Field(default=PROJECT_ROOT / "assets", alias="ASSETS_DIR")
     logs_dir: Path = Field(default=PROJECT_ROOT / "logs", alias="LOGS_DIR")
@@ -63,6 +65,7 @@ class Settings(BaseSettings):
         "default_video_provider",
         "default_render_provider",
         "database_url",
+        "caption_font_name",
     )
     @classmethod
     def validate_non_blank_strings(cls, value: str) -> str:
@@ -86,10 +89,10 @@ class Settings(BaseSettings):
             return None
         return normalized_value
 
-    @field_validator("ffmpeg_path", mode="before")
+    @field_validator("ffmpeg_path", "caption_font_file", mode="before")
     @classmethod
-    def normalize_optional_ffmpeg_path(cls, value: Path | str | None) -> Path | None:
-        """Normalize blank FFmpeg paths to ``None`` and resolve relative paths safely."""
+    def normalize_optional_paths(cls, value: Path | str | None) -> Path | None:
+        """Normalize blank optional paths to ``None`` and resolve relative paths safely."""
 
         if value is None:
             return None

@@ -64,6 +64,8 @@ from creatoros.providers.registry import (
     resolve_default_video_provider,
 )
 from creatoros.providers.render import (
+    CaptionOverlay,
+    CaptionPosition,
     RenderedVideo,
     RenderScene,
     RenderTransition,
@@ -78,6 +80,8 @@ __all__ = [
     "DEFAULT_OPENAI_TTS_MODEL",
     "DEFAULT_OPENAI_TTS_PROVIDER_NAME",
     "AnalyticsProvider",
+    "CaptionOverlay",
+    "CaptionPosition",
     "FFmpegCommandResult",
     "FFmpegRenderProvider",
     "GeneratedAudio",

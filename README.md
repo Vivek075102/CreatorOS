@@ -258,9 +258,25 @@ CreatorOS now also includes `FFmpegRenderProvider` as the first real local rende
 - Local video scenes are normalized to the requested dimensions, FPS, and duration before final composition.
 - Optional narration can be muxed into the final output as a bounded audio track.
 - Final output is a local H.264/AAC MP4 at `artifacts/<run_id>/video/final_short.mp4`.
+- Scene-level caption overlays can now be rendered as timed ASS subtitles derived from typed `RenderScene.caption` data.
+- Caption text is treated as renderer input only. The renderer does not generate, rewrite, or transcribe captions.
+- Caption wrapping is deterministic, UTF-8 subtitle files are generated inside the FFmpeg working directory, and subtitle temp files are cleaned after success or failure.
+- Caption positioning currently supports provider-neutral `bottom`, `center`, and `top` anchors with vertical-video-safe margins.
+- Local caption font selection is configurable through `CAPTION_FONT_NAME` and optional `CAPTION_FONT_FILE`.
 - `MockRenderProvider` remains the default renderer, so normal tests and local workflows stay offline and deterministic unless `ffmpeg` is explicitly registered and selected.
 - FFmpeg must be installed separately or configured through `FFMPEG_PATH`.
-- This milestone still does not add captions, subtitle timing, transitions, background music, overlays, GPU encoding, cloud rendering, or publishing.
+- This milestone still does not add word-level timing, animated captions, background music, overlays beyond simple text, GPU encoding, cloud rendering, or publishing.
+
+### Manual Caption Smoke Path
+
+After tests pass, a local manual caption smoke render may be performed with the already installed FFmpeg runtime.
+
+- Use one tiny local PNG already materialized under the artifact workspace.
+- Build a `ShortRenderRequest` with one 2-3 second image scene and caption text such as `CreatorOS caption test`.
+- Render at `1080x1920` with narration omitted.
+- Confirm the resulting local MP4 is playable and the caption appears within safe vertical-video margins.
+
+This smoke path is optional and local-only. It should not call a network service, OpenAI, speech-to-text, or publishing infrastructure.
 
 ## Approved Media Execution
 

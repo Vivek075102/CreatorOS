@@ -8,7 +8,7 @@ from creatoros.config import Settings
 from creatoros.core import CreatorOSValidationError
 from creatoros.domain import CreatorOSModel
 from creatoros.parsing.storyboard import StoryboardSceneBreakdownOutput
-from creatoros.providers import RenderedVideo, RenderScene, ShortRenderRequest
+from creatoros.providers import CaptionOverlay, RenderedVideo, RenderScene, ShortRenderRequest
 from creatoros.services.media_generation import GeneratedMediaPackage
 from creatoros.services.media_render import MediaRenderService, create_media_render_service
 
@@ -96,7 +96,11 @@ class ShortAssemblyService:
                     if not generated_media.scene_videos
                     else generated_media.scene_videos[index].artifact.model_copy(deep=True)
                 ),
-                caption_text=scene.on_screen_text,
+                caption=(
+                    None
+                    if scene.on_screen_text is None
+                    else CaptionOverlay(text=scene.on_screen_text)
+                ),
             )
             for index, scene in enumerate(request.storyboard.scenes)
         ]

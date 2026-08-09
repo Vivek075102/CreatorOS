@@ -50,6 +50,29 @@ class RenderTransition(StrEnum):
     FADE = "fade"
 
 
+class CaptionPosition(StrEnum):
+    """Provider-neutral caption anchor positions for simple Short overlays."""
+
+    TOP = "top"
+    CENTER = "center"
+    BOTTOM = "bottom"
+
+
+class CaptionOverlay(CreatorOSModel):
+    """Provider-neutral caption overlay instructions for one render scene."""
+
+    text: str
+    position: CaptionPosition = CaptionPosition.BOTTOM
+    max_lines: int = Field(default=2, gt=0)
+
+    @field_validator("text")
+    @classmethod
+    def validate_text(cls, value: str) -> str:
+        """Trim and reject blank caption text."""
+
+        return _validate_non_blank(value, field_name="text")
+
+
 class RenderScene(CreatorOSModel):
     """One planned scene in a future composed Short render."""
 
@@ -57,7 +80,7 @@ class RenderScene(CreatorOSModel):
     duration_seconds: float
     visual_asset_ref: GeneratedAsset | None = None
     video_asset_ref: GeneratedAsset | None = None
-    caption_text: str | None = None
+    caption: CaptionOverlay | None = None
     motion_instruction: str | None = None
     transition: RenderTransition = RenderTransition.CUT
 
@@ -77,12 +100,41 @@ class RenderScene(CreatorOSModel):
 
         return _validate_positive_finite_float(value, field_name="duration_seconds")
 
-    @field_validator("caption_text", "motion_instruction")
+    @field_validator("motion_instruction")
     @classmethod
     def normalize_optional_text(cls, value: str | None, info) -> str | None:
         """Normalize optional planning text."""
 
         return _normalize_optional_string(value, field_name=info.field_name)
+
+    @model_validator(mode="before")
+    @classmethod
+    def migrate_legacy_caption_fields(cls, value: object) -> object:
+        """Support legacy caption field inputs while normalizing to ``caption``."""
+
+        if not isinstance(value, dict):
+            return value
+
+        if value.get("caption") is not None:
+            return value
+
+        caption_text = value.pop("caption_text", None)
+        caption_position = value.pop("caption_position", None)
+        caption_max_lines = value.pop("caption_max_lines", None)
+        if caption_text is None:
+            return value
+
+        normalized_caption_text = caption_text.strip()
+        if not normalized_caption_text:
+            return value
+
+        caption_payload: dict[str, object] = {"text": normalized_caption_text}
+        if caption_position is not None:
+            caption_payload["position"] = caption_position
+        if caption_max_lines is not None:
+            caption_payload["max_lines"] = caption_max_lines
+        value["caption"] = caption_payload
+        return value
 
     @model_validator(mode="after")
     def validate_asset_references(self) -> RenderScene:
@@ -95,6 +147,14 @@ class RenderScene(CreatorOSModel):
         if self.video_asset_ref is not None and self.video_asset_ref.asset_type is not AssetType.VIDEO:
             raise ValueError("video_asset_ref.asset_type must be video")
         return self
+
+    @property
+    def caption_text(self) -> str | None:
+        """Return the legacy caption text convenience view."""
+
+        if self.caption is None:
+            return None
+        return self.caption.text
 
 
 class ShortRenderRequest(CreatorOSModel):
@@ -209,6 +269,8 @@ class RenderedVideo(CreatorOSModel):
 
 
 __all__ = [
+    "CaptionOverlay",
+    "CaptionPosition",
     "RenderScene",
     "RenderTransition",
     "RenderedVideo",
