@@ -77,6 +77,22 @@ def test_default_tts_voice_is_alloy() -> None:
     assert settings.default_tts_voice == "alloy"
 
 
+def test_default_video_model_is_unset() -> None:
+    """The real video model should remain unset until explicitly configured."""
+
+    settings = build_settings()
+
+    assert settings.default_video_model is None
+
+
+def test_default_kling_api_base_url_uses_verified_host() -> None:
+    """The Kling API base URL should default to the verified documented host."""
+
+    settings = build_settings()
+
+    assert settings.kling_api_base_url == "https://api-singapore.klingai.com"
+
+
 def test_default_database_url_uses_postgresql_psycopg() -> None:
     """The default database URL should use the PostgreSQL psycopg format."""
 
@@ -142,6 +158,20 @@ def test_negative_openai_image_timeout_is_rejected() -> None:
         build_settings(openai_image_timeout_seconds=-1.0)
 
 
+def test_negative_kling_video_timeout_is_rejected() -> None:
+    """Kling video timeouts must be positive."""
+
+    with pytest.raises(ValidationError):
+        build_settings(kling_video_timeout_seconds=-1.0)
+
+
+def test_negative_kling_video_poll_interval_is_rejected() -> None:
+    """Kling video poll intervals must be positive."""
+
+    with pytest.raises(ValidationError):
+        build_settings(kling_video_poll_interval_seconds=-1.0)
+
+
 def test_negative_provider_retry_count_is_rejected() -> None:
     """Provider retry counts must not be negative."""
 
@@ -185,10 +215,15 @@ def test_environment_variables_override_defaults() -> None:
             "DEFAULT_TTS_MODEL": "gpt-4o-mini-tts",
             "DEFAULT_TTS_VOICE": "nova",
             "DEFAULT_VIDEO_PROVIDER": "custom-video",
+            "DEFAULT_VIDEO_MODEL": "video-model-x",
             "DEFAULT_RENDER_PROVIDER": "custom-render",
             "PROVIDER_TIMEOUT_SECONDS": "45",
             "OPENAI_IMAGE_TIMEOUT_SECONDS": "300",
+            "KLING_VIDEO_TIMEOUT_SECONDS": "900",
+            "KLING_VIDEO_POLL_INTERVAL_SECONDS": "5",
             "PROVIDER_MAX_RETRIES": "5",
+            "KLING_API_KEY": "kling-secret",
+            "KLING_API_BASE_URL": "https://api-singapore.klingai.com",
             "FFMPEG_PATH": "tools/ffmpeg/bin/ffmpeg.exe",
             "CAPTION_FONT_NAME": "Segoe UI",
             "CAPTION_FONT_FILE": "fonts/caption.ttf",
@@ -212,9 +247,14 @@ def test_environment_variables_override_defaults() -> None:
     assert settings.default_tts_model == "gpt-4o-mini-tts"
     assert settings.default_tts_voice == "nova"
     assert settings.default_video_provider == "custom-video"
+    assert settings.default_video_model == "video-model-x"
     assert settings.default_render_provider == "custom-render"
+    assert settings.kling_api_key == "kling-secret"
+    assert settings.kling_api_base_url == "https://api-singapore.klingai.com"
     assert settings.provider_timeout_seconds == 45.0
     assert settings.openai_image_timeout_seconds == 300.0
+    assert settings.kling_video_timeout_seconds == 900.0
+    assert settings.kling_video_poll_interval_seconds == 5.0
     assert settings.provider_max_retries == 5
     assert settings.ffmpeg_path == PROJECT_ROOT / Path("tools/ffmpeg/bin/ffmpeg.exe")
     assert settings.caption_font_name == "Segoe UI"
@@ -248,3 +288,13 @@ def test_default_image_timeout_is_separate_from_generic_provider_timeout() -> No
 
     assert settings.provider_timeout_seconds == 30.0
     assert settings.openai_image_timeout_seconds == 300.0
+
+
+def test_default_kling_video_timing_settings_are_separate_from_generic_timeout() -> None:
+    """Kling video polling and timeout settings should remain provider-specific."""
+
+    settings = build_settings()
+
+    assert settings.provider_timeout_seconds == 30.0
+    assert settings.kling_video_timeout_seconds == 900.0
+    assert settings.kling_video_poll_interval_seconds == 5.0

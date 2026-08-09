@@ -308,6 +308,10 @@ The same rule applies to real speech adapters. `OpenAITTSProvider` may use the O
 
 The same separation applies to rendering and composition work. Future `VideoProvider` implementations may generate clips, but final edited-output assembly belongs behind a separate render or composition boundary such as `RenderProvider`. Render providers must accept typed platform-owned composition contracts, must not embed workflow or publishing logic, and must not silently invoke FFmpeg, MoviePy, local file creation, or other heavyweight rendering side effects outside an explicitly approved milestone.
 
+Asynchronous paid video providers follow the same boundary. Task submission, polling, output retrieval, and vendor-specific task states must remain fully encapsulated inside the adapter. CreatorOS services and orchestrators must continue to see only the stable `VideoGenerationRequest -> GeneratedVideo` contract rather than provider task-management details.
+
+When a provider's officially verified surface is incomplete, the adapter must stop at the verified boundary rather than guessing the rest. For example, a provider may implement a documented create-task path while leaving polling, status mapping, or output-field parsing gated until those exact official details are captured.
+
 Caption overlays follow the same rule. Render providers may consume typed caption instructions that already exist on platform-owned render contracts, but they must not generate captions, rewrite caption text, perform speech-to-text transcription, or call LLMs as part of rendering. Text overlay behavior should remain deterministic, safely escaped for the chosen render backend, and configurable through the shared settings system rather than machine-specific hardcoded font paths.
 
 Audio composition follows the same boundary. Render providers may consume typed narration references and a small provider-neutral audio policy, but they must not generate narration, inspect prompts, call TTS providers, call speech-to-text systems, or implement broad sound-design logic inside the renderer. The authoritative duration is the visual timeline. Audio fitting behavior such as silence padding or trim-to-duration should be deterministic, explicit in code, and implemented through safe FFmpeg filter construction rather than hidden heuristics.
@@ -365,6 +369,10 @@ When media-provider foundations are added, they should reuse the shared provider
 When a real image provider is added before storage or materialization services exist, the adapter must normalize results into safe provider-owned references rather than writing files opportunistically, exposing temporary signed URLs broadly, or retaining large base64 payloads in ordinary metadata.
 
 When a real TTS provider is added before storage or materialization services exist, the adapter must normalize results into safe provider-owned references rather than writing audio files opportunistically, exposing raw binary payloads broadly, or retaining large audio blobs in ordinary metadata.
+
+When a real dedicated video provider is added, CreatorOS may poll the same submitted provider task until it reaches a terminal state, but it must not automatically resubmit a second paid generation task when the outcome of the first request is uncertain.
+
+When a real image-to-video provider currently requires a provider-reachable image URL, CreatorOS must fail local-file or ephemeral-only reference images explicitly rather than inventing uploads, public hosting, or third-party storage workarounds inside the adapter.
 
 When a render-provider foundation is added before real rendering infrastructure exists, the initial implementation should stay contract-first. Deterministic mock rendering is acceptable for validating provider boundaries, request contracts, registry behavior, and service composition, but documentation and tests must state clearly that no binary video output, no FFmpeg execution, and no production render pipeline exist yet.
 

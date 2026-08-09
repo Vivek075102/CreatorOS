@@ -34,8 +34,14 @@ class Settings(BaseSettings):
     default_tts_model: str | None = Field(default=None, alias="DEFAULT_TTS_MODEL")
     default_tts_voice: str = Field(default="alloy", alias="DEFAULT_TTS_VOICE")
     default_video_provider: str = Field(default="mock", alias="DEFAULT_VIDEO_PROVIDER")
+    default_video_model: str | None = Field(default=None, alias="DEFAULT_VIDEO_MODEL")
     default_render_provider: str = Field(default="mock", alias="DEFAULT_RENDER_PROVIDER")
     openai_api_key: str | None = Field(default=None, alias="OPENAI_API_KEY")
+    kling_api_key: str | None = Field(default=None, alias="KLING_API_KEY")
+    kling_api_base_url: str = Field(
+        default="https://api-singapore.klingai.com",
+        alias="KLING_API_BASE_URL",
+    )
     anthropic_api_key: str | None = Field(default=None, alias="ANTHROPIC_API_KEY")
     youtube_client_id: str | None = Field(default=None, alias="YOUTUBE_CLIENT_ID")
     youtube_client_secret: str | None = Field(default=None, alias="YOUTUBE_CLIENT_SECRET")
@@ -43,6 +49,14 @@ class Settings(BaseSettings):
     openai_image_timeout_seconds: float = Field(
         default=300.0,
         alias="OPENAI_IMAGE_TIMEOUT_SECONDS",
+    )
+    kling_video_timeout_seconds: float = Field(
+        default=900.0,
+        alias="KLING_VIDEO_TIMEOUT_SECONDS",
+    )
+    kling_video_poll_interval_seconds: float = Field(
+        default=5.0,
+        alias="KLING_VIDEO_POLL_INTERVAL_SECONDS",
     )
     provider_max_retries: int = Field(default=3, alias="PROVIDER_MAX_RETRIES")
     ffmpeg_path: Path | None = Field(default=None, alias="FFMPEG_PATH")
@@ -71,6 +85,7 @@ class Settings(BaseSettings):
         "default_video_provider",
         "default_render_provider",
         "database_url",
+        "kling_api_base_url",
         "caption_font_name",
     )
     @classmethod
@@ -82,7 +97,7 @@ class Settings(BaseSettings):
             raise ValueError("value must not be blank")
         return normalized_value
 
-    @field_validator("default_image_model", "default_tts_model", mode="before")
+    @field_validator("default_image_model", "default_tts_model", "default_video_model", mode="before")
     @classmethod
     def normalize_optional_model_defaults(cls, value: str | None) -> str | None:
         """Normalize blank optional provider-model values to ``None``."""
@@ -125,7 +140,12 @@ class Settings(BaseSettings):
             )
         return normalized_value
 
-    @field_validator("provider_timeout_seconds", "openai_image_timeout_seconds")
+    @field_validator(
+        "provider_timeout_seconds",
+        "openai_image_timeout_seconds",
+        "kling_video_timeout_seconds",
+        "kling_video_poll_interval_seconds",
+    )
     @classmethod
     def validate_positive_timeout_seconds(cls, value: float) -> float:
         """Ensure configured timeout values are positive."""

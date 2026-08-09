@@ -172,6 +172,7 @@ Build the Research Engine and Opportunity Engine capabilities required to gather
 - Audio and visual composition rules for the FFmpeg render path, including typed narration-fit policy, silence padding for shorter narration, trim-to-video behavior for longer narration, deterministic AAC normalization, and caption compatibility during final muxing
 - First explicit real image adapter behind `ImageProvider`, using the OpenAI SDK through the existing provider boundary while keeping mock as the default
 - First explicit real TTS adapter behind `TTSProvider`, using the OpenAI SDK through the existing provider boundary while keeping mock as the default
+- First explicit real dedicated video-provider shell behind `VideoProvider`, with Kling as the initial adapter foundation, verified Kling 3.0 Turbo create-task HTTP transport, and live execution still gated until official query-task and output schemas are captured
 - Opportunity scoring rules and ranking pipeline
 - Research result persistence
 - Approval-ready content opportunity outputs
@@ -257,6 +258,7 @@ Build the Research Engine and Opportunity Engine capabilities required to gather
 - Artifact workspace retention policies, durable storage integration, richer video payload handling, and real renderer file consumption only when later milestones intentionally start that work
 - Dedicated real video-provider integration such as Kling only when the next explicit media milestone starts that provider work behind the existing `VideoProvider` contract
 - A staged image-to-video execution design that wires generated scene reference images into generated motion clips only when the next explicit media milestone starts that dependency work
+- Real live Kling task polling, output normalization, and scene-image-to-Kling motion clip wiring only when Phase 2.7C intentionally opens that paid execution boundary with the remaining official API details captured
 - Caption burn-in, text overlays, richer transitions, background music, and render-quality refinements only when later milestones intentionally start that work
 - Guarded live image smoke verification, binary materialization, and durable storage references only when later media milestones intentionally add those operational paths
 - Guarded live TTS smoke verification, binary audio materialization, and durable storage references only when later media milestones intentionally add those operational paths

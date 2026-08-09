@@ -32,6 +32,18 @@ from creatoros.providers.ffmpeg import (
     register_ffmpeg_render_provider,
     resolve_ffmpeg_binary,
 )
+from creatoros.providers.kling import (
+    DEFAULT_KLING_API_BASE_URL,
+    DEFAULT_KLING_IMAGE_TO_VIDEO_ENDPOINT_PATH,
+    DEFAULT_KLING_IMAGE_TO_VIDEO_MODEL,
+    DEFAULT_KLING_RESOLUTION_POLICY,
+    DEFAULT_KLING_TASKS_ENDPOINT_PATH,
+    DEFAULT_KLING_VIDEO_MODEL,
+    DEFAULT_KLING_VIDEO_PROVIDER_NAME,
+    KlingHTTPVideoTransport,
+    KlingVideoProvider,
+    register_kling_video_provider,
+)
 from creatoros.providers.media import (
     GeneratedAudio,
     GeneratedImage,
@@ -76,6 +88,13 @@ from creatoros.providers.render import (
 
 __all__ = [
     "DEFAULT_FFMPEG_RENDER_PROVIDER_NAME",
+    "DEFAULT_KLING_API_BASE_URL",
+    "DEFAULT_KLING_IMAGE_TO_VIDEO_ENDPOINT_PATH",
+    "DEFAULT_KLING_IMAGE_TO_VIDEO_MODEL",
+    "DEFAULT_KLING_RESOLUTION_POLICY",
+    "DEFAULT_KLING_TASKS_ENDPOINT_PATH",
+    "DEFAULT_KLING_VIDEO_MODEL",
+    "DEFAULT_KLING_VIDEO_PROVIDER_NAME",
     "DEFAULT_OPENAI_IMAGE_MODEL",
     "DEFAULT_OPENAI_IMAGE_PROVIDER_NAME",
     "DEFAULT_OPENAI_MODEL",
@@ -92,6 +111,8 @@ __all__ = [
     "GeneratedVideo",
     "ImageGenerationRequest",
     "ImageProvider",
+    "KlingHTTPVideoTransport",
+    "KlingVideoProvider",
     "LLMCapabilities",
     "LLMProvider",
     "LLMRequest",
@@ -125,6 +146,7 @@ __all__ = [
     "create_provider_registry",
     "get_provider_registry",
     "register_ffmpeg_render_provider",
+    "register_kling_video_provider",
     "register_openai_image_provider",
     "register_openai_provider",
     "register_openai_tts_provider",

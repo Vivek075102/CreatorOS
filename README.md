@@ -178,6 +178,7 @@ CreatorOS now also includes a provider-independent media provider foundation for
 
 - Separate typed provider-neutral request and result contracts now exist for image generation, speech/TTS generation, and video generation.
 - `VideoGenerationRequest` now supports both text-to-video and provider-neutral image-to-video requests through an optional `reference_image` asset reference.
+- The first real dedicated video-provider shell is now `KlingVideoProvider`, and the verified Kling 3.0 Turbo image-to-video create-task HTTP transport now exists behind it, but live polling remains intentionally gated until the official query-task path and result schema are captured.
 - The current capability-specific contracts are `ImageProvider`, `TTSProvider`, and `VideoProvider`, with the existing `VoiceProvider` kept as a backward-compatible compatibility contract for the deterministic demo path.
 - The shared `ProviderRegistry` is reused for media providers. No second provider framework was introduced.
 - Default provider settings now include `default_image_provider`, `default_tts_provider`, and `default_video_provider`, each defaulting to `mock`.
@@ -187,9 +188,12 @@ CreatorOS now also includes a provider-independent media provider foundation for
 - `OPENAI_API_KEY` is reused for the OpenAI TTS adapter, and `DEFAULT_TTS_MODEL` must be configured explicitly before any live TTS request can succeed.
 - Deterministic `MockImageProvider`, `MockTTSProvider`, and `MockVideoProvider` now return typed mock generation results without network calls, binary media generation, FFmpeg, file output, or vendor SDKs.
 - The image-to-video request path uses the existing `GeneratedAsset` abstraction rather than a raw path string, so future dedicated video providers remain replaceable.
+- The current verified Kling API contract uses one Bearer API key, the host `https://api-singapore.klingai.com`, the create path `/image-to-video/kling-3.0-turbo`, a fixed `1080p` resolution policy, integer durations from 3 through 15 seconds, and watermark disabled.
+- The current verified Kling image-to-video contract requires a provider-reachable first-frame URL. CreatorOS does not upload or host local images for Kling in this phase.
 - Mock remains the default image provider. Real OpenAI image generation is opt-in only and is not invoked automatically by `GamingMediaAgent`, the integrated content pipeline, or automated tests.
 - Mock remains the default TTS provider. Real OpenAI speech generation is opt-in only and is not invoked automatically by `GamingMediaAgent`, the integrated content pipeline, or automated tests.
 - Dedicated real video providers such as Kling remain planned but are not implemented in this milestone.
+- Kling is treated as visuals-only in CreatorOS. OpenAI TTS remains authoritative for narration, and FFmpeg composition plus captions remain unchanged.
 - OpenAI SDK client objects, temporary provider URLs, and binary image payloads remain inside the adapter boundary. No image files, storage uploads, or permanent asset materialization are created in this milestone.
 - OpenAI SDK client objects and binary speech payloads remain inside the adapter boundary. No narration files, storage uploads, or durable audio materialization are created in this milestone.
 - Capability-specific mock registry helpers now exist for image, TTS, and video provider setup in addition to the existing full mock registry bootstrap.
@@ -224,6 +228,8 @@ CreatorOS now also includes an application-layer `MediaGenerationService` for pr
 - The service does not invoke `GamingMediaAgent`, `LLMExecutionService`, `MediaRenderService`, `RenderProvider`, publishing providers, storage providers, or workflow-state mutation.
 - The generated media contracts may now carry an ephemeral `payload_bytes` field for local runtime materialization, but `MediaGenerationService` still does not write files itself.
 - The same ephemeral `GeneratedImage.payload_bytes` mechanism is the intended future handoff for real image-to-video adapters that need source image bytes without reordering the current pipeline.
+- Provider-specific task submission and polling stay inside the video adapter boundary. CreatorOS services and orchestrators still call `await provider.generate(VideoGenerationRequest)` and do not manage provider task state directly.
+- Paid video task submission is never retried automatically. Polling the same task is allowed, but CreatorOS must not silently resubmit a second paid generation request.
 - The next media stage will assemble a `GeneratedMediaPackage` into a `ShortRenderRequest` for rendering rather than mixing generation and rendering together.
 
 ## Artifact Materialization Foundation
@@ -299,6 +305,7 @@ CreatorOS now also includes an explicit post-approval media-execution pipeline:
 - Narration planning becomes a typed TTS request, and storyboard scenes become deterministic scene-image requests using existing approved planning data only.
 - Optional scene-video requests are created only when aligned typed scene-visual and scene-motion plans are actually available.
 - Scene image generation and scene video generation still happen in one bounded package pass before materialization, so true scene-image-to-video dependency wiring is not connected yet.
+- Kling live execution is still explicitly gated. Create-task transport is now implemented and fully offline-tested, but CreatorOS still does not make live Kling API calls in this phase because the official query-task path, status schema, and success output field still need to be captured.
 - Phase 2.7B is intended to add a dedicated real video adapter, and Phase 2.7C is intended to connect generated scene reference images to generated motion clips through a safe staged execution design.
 - Default providers remain mock-first, so normal execution stays offline and deterministic unless real providers are explicitly registered and selected.
 - Live non-mock media generation requires explicit confirmation before execution. API-key presence alone is not authorization.
