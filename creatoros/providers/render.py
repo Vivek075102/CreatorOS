@@ -84,12 +84,53 @@ class CaptionPosition(StrEnum):
     BOTTOM = "bottom"
 
 
+class CaptionEmphasis(StrEnum):
+    """Deterministic provider-neutral caption emphasis modes."""
+
+    NONE = "none"
+    KEYWORD = "keyword"
+    ACTIVE_PHRASE = "active_phrase"
+
+
+class CaptionFontSizeProfile(StrEnum):
+    """Provider-neutral caption font-size profiles."""
+
+    STANDARD = "standard"
+    LARGE = "large"
+
+
+class CaptionTextAlignment(StrEnum):
+    """Provider-neutral horizontal text alignment for captions."""
+
+    LEFT = "left"
+    CENTER = "center"
+    RIGHT = "right"
+
+
+class CaptionSafeMarginProfile(StrEnum):
+    """Provider-neutral safe-margin profiles for caption placement."""
+
+    COMFORTABLE = "comfortable"
+    TIGHT = "tight"
+
+
+class CaptionStylePolicy(CreatorOSModel):
+    """Provider-neutral styling policy for caption emphasis, wrapping, and safe placement."""
+
+    emphasis: CaptionEmphasis = CaptionEmphasis.NONE
+    font_size_profile: CaptionFontSizeProfile = CaptionFontSizeProfile.STANDARD
+    text_alignment: CaptionTextAlignment = CaptionTextAlignment.CENTER
+    safe_margin_profile: CaptionSafeMarginProfile = CaptionSafeMarginProfile.COMFORTABLE
+    max_chars_per_line: int = Field(default=32, gt=0)
+
+
 class CaptionOverlay(CreatorOSModel):
     """Provider-neutral caption overlay instructions for one render scene."""
 
     text: str
     position: CaptionPosition = CaptionPosition.BOTTOM
     max_lines: int = Field(default=2, gt=0)
+    style: CaptionStylePolicy = Field(default_factory=CaptionStylePolicy)
 
     @field_validator("text")
     @classmethod
@@ -156,6 +197,7 @@ class ProductionTimelineScene(CreatorOSModel):
     caption_text: str | None = None
     caption_position: CaptionPosition = CaptionPosition.BOTTOM
     caption_max_lines: int = Field(default=2, gt=0)
+    caption_style: CaptionStylePolicy = Field(default_factory=CaptionStylePolicy)
     narration_start_seconds: float | None = None
     narration_end_seconds: float | None = None
     visual_treatment: SceneVisualTreatment = Field(default_factory=SceneVisualTreatment)
@@ -361,6 +403,7 @@ class RenderScene(CreatorOSModel):
         caption_text = value.pop("caption_text", None)
         caption_position = value.pop("caption_position", None)
         caption_max_lines = value.pop("caption_max_lines", None)
+        caption_style = value.pop("caption_style", None)
         if caption_text is None:
             return value
 
@@ -373,6 +416,8 @@ class RenderScene(CreatorOSModel):
             caption_payload["position"] = caption_position
         if caption_max_lines is not None:
             caption_payload["max_lines"] = caption_max_lines
+        if caption_style is not None:
+            caption_payload["style"] = caption_style
         value["caption"] = caption_payload
         return value
 
@@ -542,6 +587,11 @@ def _build_legacy_production_timeline(
                     else scene.caption.position
                 ),
                 caption_max_lines=2 if scene.caption is None else scene.caption.max_lines,
+                caption_style=(
+                    CaptionStylePolicy()
+                    if scene.caption is None
+                    else scene.caption.style.model_copy(deep=True)
+                ),
                 narration_start_seconds=narration_start_seconds,
                 narration_end_seconds=narration_end_seconds,
                 visual_treatment=visual_treatment,
@@ -636,8 +686,13 @@ class RenderedVideo(CreatorOSModel):
 __all__ = [
     "DEFAULT_CROSSFADE_DURATION_SECONDS",
     "AudioCompositionPolicy",
+    "CaptionEmphasis",
+    "CaptionFontSizeProfile",
     "CaptionOverlay",
     "CaptionPosition",
+    "CaptionSafeMarginProfile",
+    "CaptionStylePolicy",
+    "CaptionTextAlignment",
     "NarrationTimingPolicy",
     "ProductionTimeline",
     "ProductionTimelineScene",

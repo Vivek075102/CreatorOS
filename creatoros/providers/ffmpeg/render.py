@@ -960,6 +960,7 @@ class FFmpegRenderProvider:
                         "caption_text": scene.caption_text,
                         "caption_position": scene.caption_position.value,
                         "caption_max_lines": scene.caption_max_lines,
+                        "caption_style": scene.caption_style.model_dump(mode="json"),
                         "narration_start_seconds": scene.narration_start_seconds,
                         "narration_end_seconds": scene.narration_end_seconds,
                         "visual_treatment": scene.visual_treatment.model_dump(mode="json"),
@@ -976,6 +977,7 @@ class FFmpegRenderProvider:
                     "visual_asset_uri": None if scene.visual_asset_ref is None else scene.visual_asset_ref.uri,
                     "video_asset_uri": None if scene.video_asset_ref is None else scene.video_asset_ref.uri,
                     "caption": None if scene.caption is None else scene.caption.model_dump(mode="json"),
+                    "caption_style": None if scene.caption is None else scene.caption.style.model_dump(mode="json"),
                 }
                 for scene in request.scenes
             ],

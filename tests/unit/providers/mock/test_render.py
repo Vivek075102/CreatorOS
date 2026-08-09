@@ -91,6 +91,7 @@ def test_mock_render_preserves_duration_dimensions_and_fps() -> None:
             "transition_duration_seconds": 0.0,
         },
     ]
+    assert result.data.metadata["caption_styles"][0]["emphasis"] == "none"
 
 
 def test_mock_render_provider_satisfies_runtime_protocol() -> None:

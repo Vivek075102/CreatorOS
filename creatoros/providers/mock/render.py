@@ -48,6 +48,7 @@ def _build_digest(request: ShortRenderRequest) -> str:
                     "caption_text": scene.caption_text,
                     "caption_position": scene.caption_position.value,
                     "caption_max_lines": scene.caption_max_lines,
+                    "caption_style": scene.caption_style.model_dump(mode="json"),
                     "narration_start_seconds": scene.narration_start_seconds,
                     "narration_end_seconds": scene.narration_end_seconds,
                     "visual_treatment": scene.visual_treatment.model_dump(mode="json"),
@@ -64,6 +65,7 @@ def _build_digest(request: ShortRenderRequest) -> str:
                 "visual_asset_uri": None if scene.visual_asset_ref is None else scene.visual_asset_ref.uri,
                 "video_asset_uri": None if scene.video_asset_ref is None else scene.video_asset_ref.uri,
                 "caption_text": scene.caption_text,
+                "caption_style": None if scene.caption is None else scene.caption.style.model_dump(mode="json"),
                 "motion_instruction": scene.motion_instruction,
                 "transition": scene.transition,
             }
@@ -124,6 +126,11 @@ class MockRenderProvider(MockProviderBase):
                 "output_format": request.output_format,
                 "has_narration": request.narration is not None,
                 "timeline_scene_count": len(request.scenes) if timeline is None else len(timeline.scenes),
+                "caption_styles": (
+                    []
+                    if timeline is None
+                    else [scene.caption_style.model_dump(mode="json") for scene in timeline.scenes]
+                ),
                 "visual_treatments": (
                     []
                     if timeline is None

@@ -11,7 +11,10 @@ from creatoros.core import CreatorOSValidationError
 from creatoros.domain import CreatorOSModel
 from creatoros.parsing.storyboard import StoryboardSceneBreakdownOutput
 from creatoros.providers import (
+    CaptionEmphasis,
+    CaptionFontSizeProfile,
     CaptionOverlay,
+    CaptionStylePolicy,
     ProductionTimeline,
     ProductionTimelineScene,
     RenderedVideo,
@@ -23,6 +26,16 @@ from creatoros.services.media_generation import GeneratedMediaPackage
 from creatoros.services.media_render import MediaRenderService, create_media_render_service
 
 _TIMELINE_SCALE = Decimal(1000000)
+
+
+def _default_caption_style_policy() -> CaptionStylePolicy:
+    """Return one deterministic caption-style default for assembled Shorts."""
+
+    return CaptionStylePolicy(
+        emphasis=CaptionEmphasis.KEYWORD,
+        font_size_profile=CaptionFontSizeProfile.LARGE,
+        max_chars_per_line=28,
+    )
 
 
 def _quantize_seconds(value: Decimal) -> float:
@@ -142,6 +155,7 @@ def _build_production_timeline(
                 duration_seconds=round(paced_duration, 6),
                 source_asset_ref=source_asset_ref,
                 caption_text=storyboard_scene.on_screen_text,
+                caption_style=_default_caption_style_policy(),
                 narration_start_seconds=narration_start_seconds,
                 narration_end_seconds=narration_end_seconds,
                 visual_treatment=build_default_visual_treatment(
@@ -252,7 +266,7 @@ class ShortAssemblyService:
                 caption=(
                     None
                     if scene.on_screen_text is None
-                    else CaptionOverlay(text=scene.on_screen_text)
+                    else CaptionOverlay(text=scene.on_screen_text, style=_default_caption_style_policy())
                 ),
             )
             for index, scene in enumerate(request.storyboard.scenes)

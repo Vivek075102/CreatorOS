@@ -258,6 +258,7 @@ CreatorOS now also includes a provider-independent final assembly layer for Shor
 - Asset-count mismatches fail before rendering. The service does not silently drop assets, duplicate assets, or reuse the last asset.
 - `ShortAssemblyService` now also builds a provider-neutral `ProductionTimeline` before final rendering so pacing decisions are explicit platform behavior rather than renderer-specific behavior.
 - The same assembly boundary now assigns provider-neutral visual treatment deterministically so still-image scenes can receive subtle editorial motion while generated-video scenes preserve native motion.
+- The same timeline handoff now also carries provider-neutral caption styling so emphasis, alignment, wrapping, and safe-area policy remain platform-owned decisions rather than FFmpeg-specific decisions.
 - Thumbnail output remains separate from the video timeline so it can be preserved for later publishing workflows without becoming an extra render scene.
 - Narration, when present, is forwarded as the existing typed `GeneratedAudio` reference. The assembly layer does not regenerate audio or invent missing duration values.
 - The production timeline remains authoritative. Scene pacing is deterministic, preserves approved storyboard order, and safely absorbs harmless rounding in the final scene rather than mutating approved input models.
@@ -277,7 +278,7 @@ CreatorOS now also includes `FFmpegRenderProvider` as the first real local rende
 - Local video scenes are normalized to the requested dimensions, FPS, and duration before final composition.
 - Optional narration can be muxed into the final output as a bounded audio track.
 - FFmpeg now consumes the explicit provider-neutral production timeline from `ShortRenderRequest` rather than inventing scene timing internally.
-- Provider-neutral visual treatment now flows through the same boundary as explicit scene timing: `ProductionTimeline -> Visual Treatment -> Render Provider -> Captions -> Final Short`.
+- Provider-neutral visual treatment now flows through the same boundary as explicit scene timing: `ProductionTimeline -> Visual Treatment -> Caption Styling -> Render Provider -> Final Short`.
 - Final output is a local H.264/AAC MP4 at `artifacts/<run_id>/video/final_short.mp4`.
 - Scene-level caption overlays can now be rendered as timed ASS subtitles derived from typed `RenderScene.caption` data.
 - Caption text is treated as renderer input only. The renderer does not generate, rewrite, or transcribe captions.
@@ -287,6 +288,8 @@ CreatorOS now also includes `FFmpegRenderProvider` as the first real local rende
 - Narration audio is normalized to AAC at 48 kHz stereo when present.
 - Still-image scenes can now receive deterministic subtle motion such as push-in or pan treatment, while generated-video scenes keep `motion=none` by default so CreatorOS does not double-animate already moving footage.
 - Provider-neutral `cut` and bounded `crossfade` transitions are now supported, with FFmpeg applying the actual local effect and captions remaining on the final post-treatment timeline.
+- Caption styling is now provider-neutral as well. CreatorOS can carry deterministic emphasis mode, font-size profile, text alignment, safe-margin policy, and wrapping bounds without exposing ASS syntax outside the FFmpeg provider.
+- Deterministic emphasis currently uses bounded keyword or active-phrase rules only. It does not use STT, an LLM, or any live provider call, and it does not alter caption timing.
 - The production timeline remains authoritative. Shorter narration may end before the visual timeline, known narration that exceeds the approved timeline is rejected earlier during assembly, and missing narration-duration metadata does not invent a measured runtime.
 - When narration is absent, the final MP4 currently has no audio stream rather than a fabricated silent track.
 - `MockRenderProvider` remains the default renderer, so normal tests and local workflows stay offline and deterministic unless `ffmpeg` is explicitly registered and selected.

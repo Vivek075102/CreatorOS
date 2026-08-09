@@ -531,7 +531,7 @@ def test_caption_request_adds_subtitle_filter_and_deterministic_ass_file(tmp_pat
     assert "fontsdir=" not in runner.final_filters[-1]
     assert runner.subtitle_file_contents
     assert "PlayResX: 1080" in runner.subtitle_file_contents[-1]
-    assert r"{\an2}Roblox: Funny Myths" in runner.subtitle_file_contents[-1]
+    assert r"{\an2}{\fs65}Roblox: Funny Myths" in runner.subtitle_file_contents[-1]
 
 
 def test_caption_filter_and_narration_can_coexist(tmp_path: Path) -> None:
