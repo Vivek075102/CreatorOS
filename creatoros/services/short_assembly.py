@@ -11,6 +11,9 @@ from creatoros.core import CreatorOSValidationError
 from creatoros.domain import CreatorOSModel
 from creatoros.parsing.storyboard import StoryboardSceneBreakdownOutput
 from creatoros.providers import (
+    AudioLoopPolicy,
+    AudioTrack,
+    AudioTrackRole,
     CaptionEmphasis,
     CaptionFontSizeProfile,
     CaptionOverlay,
@@ -178,6 +181,66 @@ def _copy_model[TModel: CreatorOSModel](value: TModel) -> TModel:
     return value.model_copy(deep=True)
 
 
+def _coerce_optional_metadata_float(value: object, *, default: float) -> float:
+    """Coerce simple numeric metadata values into floats with a safe default."""
+
+    if isinstance(value, int | float):
+        return float(value)
+    return default
+
+
+def _build_audio_tracks(generated_media: GeneratedMediaPackage) -> tuple[AudioTrack, ...]:
+    """Build deterministic provider-neutral non-scene audio tracks for final Short assembly."""
+
+    audio_tracks: list[AudioTrack] = []
+    if generated_media.background_music is not None:
+        audio_tracks.append(
+            AudioTrack(
+                source_asset_ref=generated_media.background_music.artifact.model_copy(deep=True),
+                role=AudioTrackRole.BACKGROUND_MUSIC,
+                start_seconds=0.0,
+                source_duration_seconds=generated_media.background_music.estimated_duration_seconds,
+                gain_db=-18.0,
+                fade_in_seconds=0.5,
+                fade_out_seconds=0.75,
+                loop_policy=AudioLoopPolicy.NO_LOOP,
+                duck_under_narration=True,
+            )
+        )
+
+    for sound_effect in generated_media.sound_effects:
+        start_seconds = _coerce_optional_metadata_float(
+            sound_effect.metadata.get("start_seconds"),
+            default=0.0,
+        )
+        gain_db = _coerce_optional_metadata_float(
+            sound_effect.metadata.get("gain_db"),
+            default=0.0,
+        )
+        fade_in_seconds = _coerce_optional_metadata_float(
+            sound_effect.metadata.get("fade_in_seconds"),
+            default=0.0,
+        )
+        fade_out_seconds = _coerce_optional_metadata_float(
+            sound_effect.metadata.get("fade_out_seconds"),
+            default=0.0,
+        )
+        audio_tracks.append(
+            AudioTrack(
+                source_asset_ref=sound_effect.artifact.model_copy(deep=True),
+                role=AudioTrackRole.SOUND_EFFECT,
+                start_seconds=start_seconds,
+                source_duration_seconds=sound_effect.estimated_duration_seconds,
+                gain_db=gain_db,
+                fade_in_seconds=fade_in_seconds,
+                fade_out_seconds=fade_out_seconds,
+                loop_policy=AudioLoopPolicy.NO_LOOP,
+            )
+        )
+
+    return tuple(audio_tracks)
+
+
 class ShortAssemblyRequest(CreatorOSModel):
     """Minimum typed inputs required to assemble a renderable Short request."""
 
@@ -280,6 +343,7 @@ class ShortAssemblyService:
                 if generated_media.narration is None
                 else generated_media.narration.model_copy(deep=True)
             ),
+            audio_tracks=_build_audio_tracks(generated_media),
             width=request.width,
             height=request.height,
             fps=request.fps,

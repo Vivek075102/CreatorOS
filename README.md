@@ -279,6 +279,7 @@ CreatorOS now also includes `FFmpegRenderProvider` as the first real local rende
 - Optional narration can be muxed into the final output as a bounded audio track.
 - FFmpeg now consumes the explicit provider-neutral production timeline from `ShortRenderRequest` rather than inventing scene timing internally.
 - Provider-neutral visual treatment now flows through the same boundary as explicit scene timing: `ProductionTimeline -> Visual Treatment -> Caption Styling -> Render Provider -> Final Short`.
+- Provider-neutral audio layering now also flows through the same boundary: `ProductionTimeline -> Visual Treatment -> Caption Styling -> Audio Layer -> Render Provider -> Final Short`.
 - Final output is a local H.264/AAC MP4 at `artifacts/<run_id>/video/final_short.mp4`.
 - Scene-level caption overlays can now be rendered as timed ASS subtitles derived from typed `RenderScene.caption` data.
 - Caption text is treated as renderer input only. The renderer does not generate, rewrite, or transcribe captions.
@@ -289,13 +290,16 @@ CreatorOS now also includes `FFmpegRenderProvider` as the first real local rende
 - Still-image scenes can now receive deterministic subtle motion such as push-in or pan treatment, while generated-video scenes keep `motion=none` by default so CreatorOS does not double-animate already moving footage.
 - Provider-neutral `cut` and bounded `crossfade` transitions are now supported, with FFmpeg applying the actual local effect and captions remaining on the final post-treatment timeline.
 - Caption styling is now provider-neutral as well. CreatorOS can carry deterministic emphasis mode, font-size profile, text alignment, safe-margin policy, and wrapping bounds without exposing ASS syntax outside the FFmpeg provider.
+- The provider-neutral audio layer now supports replaceable narration, background music, and sound-effect tracks without exposing FFmpeg filter syntax outside the FFmpeg provider.
+- Background music remains optional, can be trimmed or looped deterministically when explicitly allowed, supports fades and gain control, and can duck under narration so spoken content remains dominant.
+- Sound effects remain optional, use explicit timeline timestamps, support deterministic gain and fade control, and remain independent of visual transition logic even though the architecture now has a clean hook for future transition-accent cues.
 - Deterministic emphasis currently uses bounded keyword or active-phrase rules only. It does not use STT, an LLM, or any live provider call, and it does not alter caption timing.
 - The production timeline remains authoritative. Shorter narration may end before the visual timeline, known narration that exceeds the approved timeline is rejected earlier during assembly, and missing narration-duration metadata does not invent a measured runtime.
 - When narration is absent, the final MP4 currently has no audio stream rather than a fabricated silent track.
 - `MockRenderProvider` remains the default renderer, so normal tests and local workflows stay offline and deterministic unless `ffmpeg` is explicitly registered and selected.
 - FFmpeg must be installed separately or configured through `FFMPEG_PATH`.
 - Timeline and pacing remain provider-independent. Premium motion providers such as Kling, Higgsfield, or later alternatives may supply scene assets in future milestones, but they do not define the final edit timeline.
-- This milestone still does not add word-level timing, animated captions, background music, overlays beyond simple text, STT, GPU encoding, cloud rendering, or publishing.
+- This milestone still does not add word-level timing, animated captions, AI music generation, AI sound-effect generation, overlays beyond simple text, STT, GPU encoding, cloud rendering, or publishing.
 
 ### Manual Caption Smoke Path
 

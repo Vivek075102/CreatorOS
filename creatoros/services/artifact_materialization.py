@@ -173,6 +173,8 @@ class MaterializedMediaPackage(CreatorOSModel):
     workspace: ArtifactWorkspace
     thumbnail: MaterializedArtifact | None = None
     narration: MaterializedArtifact | None = None
+    background_music: MaterializedArtifact | None = None
+    sound_effects: tuple[MaterializedArtifact, ...] = Field(default_factory=tuple)
     scene_images: tuple[MaterializedArtifact, ...] = Field(default_factory=tuple)
     scene_videos: tuple[MaterializedArtifact, ...] = Field(default_factory=tuple)
 
@@ -342,6 +344,25 @@ class ArtifactMaterializationService:
                 )
                 created_paths.append(narration.path)
 
+            background_music = None
+            if package.background_music is not None:
+                background_music = self.materialize_audio(
+                    package.background_music,
+                    workspace=workspace,
+                    logical_name="background_music",
+                )
+                created_paths.append(background_music.path)
+
+            sound_effects: list[MaterializedArtifact] = []
+            for index, sound_effect in enumerate(package.sound_effects, start=1):
+                materialized_sound_effect = self.materialize_audio(
+                    sound_effect,
+                    workspace=workspace,
+                    logical_name=f"sfx_{index:03d}",
+                )
+                sound_effects.append(materialized_sound_effect)
+                created_paths.append(materialized_sound_effect.path)
+
             scene_images: list[MaterializedArtifact] = []
             for index, image in enumerate(package.scene_images, start=1):
                 materialized_image = self.materialize_image(
@@ -369,6 +390,8 @@ class ArtifactMaterializationService:
             workspace=workspace,
             thumbnail=thumbnail,
             narration=narration,
+            background_music=background_music,
+            sound_effects=tuple(sound_effects),
             scene_images=tuple(scene_images),
             scene_videos=tuple(scene_videos),
         )

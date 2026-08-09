@@ -29,7 +29,7 @@ from creatoros.providers.base import (
     ProviderResult,
     ProviderUsage,
 )
-from creatoros.providers.ffmpeg.audio import build_audio_render_plan
+from creatoros.providers.ffmpeg.audio import build_audio_filter_chain, build_audio_render_plan
 from creatoros.providers.ffmpeg.captions import (
     build_ass_subtitle_document,
     build_subtitles_filter_arg,
@@ -148,7 +148,8 @@ class FFmpegRenderProvider:
         """Render a local MP4 from materialized scene files and optional narration."""
 
         ffmpeg_binary = self._require_ffmpeg_binary()
-        run_id, workspace_video_dir, scene_sources, narration_path = self._resolve_inputs(request)
+        audio_plan = build_audio_render_plan(request)
+        run_id, workspace_video_dir, scene_sources, audio_paths = self._resolve_inputs(request)
         output_path = self._build_output_path(workspace_video_dir)
         working_directory = Path(
             tempfile.mkdtemp(prefix=".ffmpeg_render_", dir=workspace_video_dir),
@@ -176,7 +177,7 @@ class FFmpegRenderProvider:
                 ffmpeg_binary=ffmpeg_binary,
                 scene_segments=scene_segments,
                 concat_list_path=concat_list_path,
-                narration_path=narration_path,
+                audio_paths=audio_paths,
                 caption_subtitle_path=caption_subtitle_path,
                 output_path=output_path,
                 timeout_seconds=self._resolve_timeout_seconds(context),
@@ -210,12 +211,17 @@ class FFmpegRenderProvider:
             metadata={
                 "scene_count": len(request.scenes),
                 "output_format": request.output_format,
-                "has_narration": narration_path is not None,
-                "has_audio_stream": narration_path is not None,
-                "audio_codec": "aac" if narration_path is not None else "none",
+                "has_narration": audio_plan.has_narration,
+                "has_audio_stream": bool(audio_paths),
+                "audio_codec": "aac" if audio_paths else "none",
                 "audio_policy": request.audio_policy.narration_timing.value,
-                "audio_sample_rate_hz": 48_000 if narration_path is not None else None,
-                "audio_channel_layout": "stereo" if narration_path is not None else None,
+                "audio_sample_rate_hz": 48_000 if audio_paths else None,
+                "audio_channel_layout": "stereo" if audio_paths else None,
+                "audio_track_count": len(audio_paths),
+                "audio_roles": [track.role.value for track in audio_plan.tracks],
+                "has_background_music": any(track.role.value == "background_music" for track in audio_plan.tracks),
+                "has_sound_effects": any(track.role.value == "sound_effect" for track in audio_plan.tracks),
+                "uses_music_ducking": any(track.duck_under_narration for track in audio_plan.tracks),
                 "local": True,
             },
         )
@@ -224,7 +230,7 @@ class FFmpegRenderProvider:
             provider_name=self.info.name,
             request_id=rendered_video.request_id,
             scene_count=len(request.scenes),
-            has_narration=narration_path is not None,
+            has_narration=audio_plan.has_narration,
             output_filename=output_path.name,
             success=True,
         )
@@ -256,7 +262,7 @@ class FFmpegRenderProvider:
     def _resolve_inputs(
         self,
         request: ShortRenderRequest,
-    ) -> tuple[str, Path, list[Path], Path | None]:
+    ) -> tuple[str, Path, list[Path], tuple[Path, ...]]:
         """Resolve all render inputs into validated local artifact paths."""
 
         scene_sources: list[Path] = []
@@ -275,21 +281,23 @@ class FFmpegRenderProvider:
                     code="render_workspace_mismatch",
                 )
 
-        narration_path = None
-        if request.narration is not None:
-            narration_path = self._resolve_local_asset_path(
-                request.narration.artifact.uri,
-                asset_label="narration",
+        audio_paths: list[Path] = []
+        audio_plan = build_audio_render_plan(request)
+        for track_index, track in enumerate(audio_plan.tracks, start=1):
+            audio_path = self._resolve_local_asset_path(
+                track.source_asset_ref.uri,
+                asset_label=f"audio_track_{track_index}_{track.role.value}",
                 expected_asset_type=AssetType.AUDIO,
             )
-            narration_run_id = self._extract_run_id(narration_path)
+            resolved_audio_run_id = self._extract_run_id(audio_path)
             if run_id is None:
-                run_id = narration_run_id
-            elif narration_run_id != run_id:
+                run_id = resolved_audio_run_id
+            elif resolved_audio_run_id != run_id:
                 raise ArtifactPathError(
-                    "narration must come from the same artifact workspace as scene assets",
+                    "audio tracks must come from the same artifact workspace as scene assets",
                     code="render_workspace_mismatch",
                 )
+            audio_paths.append(audio_path)
 
         if run_id is None:
             raise ArtifactPathError(
@@ -299,7 +307,7 @@ class FFmpegRenderProvider:
 
         workspace_video_dir = (self.artifact_root / run_id / "video").resolve()
         workspace_video_dir.mkdir(parents=True, exist_ok=True)
-        return run_id, workspace_video_dir, scene_sources, narration_path
+        return run_id, workspace_video_dir, scene_sources, tuple(audio_paths)
 
     def _resolve_scene_source_path(self, scene: ProductionTimelineScene) -> Path:
         """Resolve the preferred local source path for one render scene."""
@@ -517,12 +525,12 @@ class FFmpegRenderProvider:
         ffmpeg_binary: Path,
         scene_segments: Sequence[Path],
         concat_list_path: Path,
-        narration_path: Path | None,
+        audio_paths: Sequence[Path],
         caption_subtitle_path: Path | None,
         output_path: Path,
         timeout_seconds: float | None,
         ) -> None:
-        """Compose normalized scene segments and optional narration into the final MP4."""
+        """Compose normalized scene segments and optional audio layers into the final MP4."""
 
         audio_plan = build_audio_render_plan(request)
         assert request.production_timeline is not None
@@ -531,7 +539,7 @@ class FFmpegRenderProvider:
                 request=request,
                 ffmpeg_binary=ffmpeg_binary,
                 scene_segments=scene_segments,
-                narration_path=narration_path,
+                audio_paths=audio_paths,
                 caption_subtitle_path=caption_subtitle_path,
                 output_path=output_path,
                 audio_plan=audio_plan,
@@ -541,7 +549,7 @@ class FFmpegRenderProvider:
                 request=request,
                 ffmpeg_binary=ffmpeg_binary,
                 concat_list_path=concat_list_path,
-                narration_path=narration_path,
+                audio_paths=audio_paths,
                 caption_subtitle_path=caption_subtitle_path,
                 output_path=output_path,
                 audio_plan=audio_plan,
@@ -558,7 +566,7 @@ class FFmpegRenderProvider:
         request: ShortRenderRequest,
         ffmpeg_binary: Path,
         concat_list_path: Path,
-        narration_path: Path | None,
+        audio_paths: Sequence[Path],
         caption_subtitle_path: Path | None,
         output_path: Path,
         audio_plan,
@@ -574,8 +582,10 @@ class FFmpegRenderProvider:
             "-i",
             str(concat_list_path),
         ]
-        if audio_plan.include_audio_stream and narration_path is not None:
-            command.extend(["-i", str(narration_path)])
+        for track, audio_path in zip(audio_plan.tracks, audio_paths, strict=True):
+            if track.loop_policy.value == "loop_to_fit":
+                command.extend(["-stream_loop", "-1"])
+            command.extend(["-i", str(audio_path)])
         if caption_subtitle_path is not None:
             command.extend(
                 [
@@ -586,16 +596,21 @@ class FFmpegRenderProvider:
                     ),
                 ]
             )
-        if audio_plan.include_audio_stream and narration_path is not None:
-            assert audio_plan.filter_chain is not None
+        if audio_plan.include_audio_stream:
             command.extend(
                 [
                     "-filter_complex",
-                    audio_plan.filter_chain,
+                    build_audio_filter_chain(
+                        plan=audio_plan,
+                        target_duration_seconds=request.total_duration_seconds,
+                        input_stream_indexes=tuple(range(1, len(audio_plan.tracks) + 1)),
+                        audio_policy=request.audio_policy,
+                        production_timeline=request.production_timeline,
+                    ),
                     "-map",
                     "0:v:0",
                     "-map",
-                    "[narration_out]",
+                    "[audio_out]",
                     "-c:v",
                     "libx264",
                     "-pix_fmt",
@@ -640,7 +655,7 @@ class FFmpegRenderProvider:
         request: ShortRenderRequest,
         ffmpeg_binary: Path,
         scene_segments: Sequence[Path],
-        narration_path: Path | None,
+        audio_paths: Sequence[Path],
         caption_subtitle_path: Path | None,
         output_path: Path,
         audio_plan,
@@ -651,10 +666,12 @@ class FFmpegRenderProvider:
         command = [str(ffmpeg_binary)]
         for segment_path in scene_segments:
             command.extend(["-i", str(segment_path)])
-        narration_input_index = None
-        if audio_plan.include_audio_stream and narration_path is not None:
-            narration_input_index = len(scene_segments)
-            command.extend(["-i", str(narration_path)])
+        audio_input_indexes: list[int] = []
+        for offset, (track, audio_path) in enumerate(zip(audio_plan.tracks, audio_paths, strict=True)):
+            if track.loop_policy.value == "loop_to_fit":
+                command.extend(["-stream_loop", "-1"])
+            audio_input_indexes.append(len(scene_segments) + offset)
+            command.extend(["-i", str(audio_path)])
 
         filter_chains: list[str] = []
         previous_label = "[0:v]"
@@ -688,11 +705,15 @@ class FFmpegRenderProvider:
             )
             mapped_video_label = caption_label
 
-        if audio_plan.include_audio_stream and narration_path is not None:
-            assert narration_input_index is not None
-            assert audio_plan.filter_chain is not None
+        if audio_plan.include_audio_stream:
             filter_chains.append(
-                audio_plan.filter_chain.replace("[1:a]", f"[{narration_input_index}:a]")
+                build_audio_filter_chain(
+                    plan=audio_plan,
+                    target_duration_seconds=request.total_duration_seconds,
+                    input_stream_indexes=tuple(audio_input_indexes),
+                    audio_policy=request.audio_policy,
+                    production_timeline=request.production_timeline,
+                )
             )
 
         if filter_chains:
@@ -700,11 +721,11 @@ class FFmpegRenderProvider:
 
         command.extend(["-map", mapped_video_label])
         command.extend(["-c:v", "libx264", "-pix_fmt", "yuv420p"])
-        if audio_plan.include_audio_stream and narration_path is not None:
+        if audio_plan.include_audio_stream:
             command.extend(
                 [
                     "-map",
-                    "[narration_out]",
+                    "[audio_out]",
                     "-c:a",
                     audio_plan.codec,
                     "-ar",
@@ -983,6 +1004,23 @@ class FFmpegRenderProvider:
             ],
             "production_timeline": production_timeline,
             "narration_uri": None if request.narration is None else request.narration.artifact.uri,
+            "audio_tracks": [
+                {
+                    "source_asset_type": track.source_asset_ref.asset_type.value,
+                    "source_asset_uri": track.source_asset_ref.uri,
+                    "role": track.role.value,
+                    "start_seconds": track.start_seconds,
+                    "end_seconds": track.end_seconds,
+                    "duration_seconds": track.duration_seconds,
+                    "source_duration_seconds": track.source_duration_seconds,
+                    "gain_db": track.gain_db,
+                    "fade_in_seconds": track.fade_in_seconds,
+                    "fade_out_seconds": track.fade_out_seconds,
+                    "loop_policy": track.loop_policy.value,
+                    "duck_under_narration": track.duck_under_narration,
+                }
+                for track in request.audio_tracks
+            ],
             "audio_policy": request.audio_policy.model_dump(mode="json"),
             "width": request.width,
             "height": request.height,

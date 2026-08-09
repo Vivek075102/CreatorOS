@@ -76,6 +76,21 @@ class NarrationTimingPolicy(StrEnum):
     FIT_TO_VIDEO = "fit_to_video"
 
 
+class AudioTrackRole(StrEnum):
+    """Provider-neutral roles for deterministic final-Short audio layers."""
+
+    NARRATION = "narration"
+    BACKGROUND_MUSIC = "background_music"
+    SOUND_EFFECT = "sound_effect"
+
+
+class AudioLoopPolicy(StrEnum):
+    """Provider-neutral looping policies for reusable audio layers."""
+
+    NO_LOOP = "no_loop"
+    LOOP_TO_FIT = "loop_to_fit"
+
+
 class CaptionPosition(StrEnum):
     """Provider-neutral caption anchor positions for simple Short overlays."""
 
@@ -122,6 +137,102 @@ class CaptionStylePolicy(CreatorOSModel):
     text_alignment: CaptionTextAlignment = CaptionTextAlignment.CENTER
     safe_margin_profile: CaptionSafeMarginProfile = CaptionSafeMarginProfile.COMFORTABLE
     max_chars_per_line: int = Field(default=32, gt=0)
+
+
+class AudioTrack(CreatorOSModel):
+    """Provider-neutral timed audio track instructions for final Short composition."""
+
+    source_asset_ref: GeneratedAsset
+    role: AudioTrackRole
+    start_seconds: float = 0.0
+    end_seconds: float | None = None
+    duration_seconds: float | None = None
+    source_duration_seconds: float | None = None
+    gain_db: float = 0.0
+    fade_in_seconds: float = 0.0
+    fade_out_seconds: float = 0.0
+    loop_policy: AudioLoopPolicy = AudioLoopPolicy.NO_LOOP
+    duck_under_narration: bool = False
+
+    @field_validator(
+        "start_seconds",
+        "end_seconds",
+        "duration_seconds",
+        "source_duration_seconds",
+        "fade_in_seconds",
+        "fade_out_seconds",
+    )
+    @classmethod
+    def validate_optional_non_negative_floats(cls, value: float | None, info) -> float | None:
+        """Require finite non-negative timing values when supplied."""
+
+        if value is None:
+            return None
+        if not math.isfinite(value):
+            raise ValueError(f"{info.field_name} must be finite")
+        if value < 0:
+            raise ValueError(f"{info.field_name} must be zero or greater")
+        return round(value, 6)
+
+    @field_validator("gain_db")
+    @classmethod
+    def validate_gain_db(cls, value: float) -> float:
+        """Require finite gain values within a conservative deterministic range."""
+
+        if not math.isfinite(value):
+            raise ValueError("gain_db must be finite")
+        if value < -60.0 or value > 12.0:
+            raise ValueError("gain_db must be between -60 and 12 dB")
+        return round(value, 6)
+
+    @model_validator(mode="after")
+    def validate_audio_track(self) -> AudioTrack:
+        """Require internally coherent provider-neutral audio track semantics."""
+
+        if self.source_asset_ref.asset_type not in {AssetType.AUDIO, AssetType.NARRATION}:
+            raise ValueError("source_asset_ref.asset_type must be audio or narration")
+        if self.end_seconds is not None and self.end_seconds <= self.start_seconds:
+            raise ValueError("end_seconds must be greater than start_seconds")
+        if self.duration_seconds is not None and self.duration_seconds <= 0:
+            raise ValueError("duration_seconds must be greater than zero")
+        if (
+            self.end_seconds is not None
+            and self.duration_seconds is not None
+            and not math.isclose(
+                self.end_seconds - self.start_seconds,
+                self.duration_seconds,
+                rel_tol=0.0,
+                abs_tol=1e-6,
+            )
+        ):
+            raise ValueError("duration_seconds must equal end_seconds - start_seconds when both are supplied")
+
+        effective_duration = self.duration_seconds
+        if effective_duration is None and self.end_seconds is not None:
+            effective_duration = round(self.end_seconds - self.start_seconds, 6)
+        if effective_duration is None:
+            effective_duration = self.source_duration_seconds
+
+        if effective_duration is not None:
+            if self.fade_in_seconds > effective_duration + 1e-6:
+                raise ValueError("fade_in_seconds must not exceed the playable track duration")
+            if self.fade_out_seconds > effective_duration + 1e-6:
+                raise ValueError("fade_out_seconds must not exceed the playable track duration")
+            if self.fade_in_seconds + self.fade_out_seconds > effective_duration + 1e-6:
+                raise ValueError("fade_in_seconds plus fade_out_seconds must not exceed the playable track duration")
+
+        if self.role is AudioTrackRole.NARRATION:
+            if self.loop_policy is not AudioLoopPolicy.NO_LOOP:
+                raise ValueError("narration tracks must not loop")
+            if self.duck_under_narration:
+                raise ValueError("narration tracks must not duck under narration")
+        if self.role is AudioTrackRole.SOUND_EFFECT and self.loop_policy is not AudioLoopPolicy.NO_LOOP:
+            raise ValueError("sound-effect tracks must not loop")
+        if self.role is AudioTrackRole.BACKGROUND_MUSIC and self.duck_under_narration is False:
+            return self
+        if self.role is AudioTrackRole.SOUND_EFFECT and self.duck_under_narration:
+            raise ValueError("sound-effect tracks must not duck under narration")
+        return self
 
 
 class CaptionOverlay(CreatorOSModel):
@@ -344,6 +455,20 @@ class AudioCompositionPolicy(CreatorOSModel):
     """Provider-neutral audio-composition policy for initial narration handling."""
 
     narration_timing: NarrationTimingPolicy = NarrationTimingPolicy.FIT_TO_VIDEO
+    narration_ducking_gain_db: float = -12.0
+
+    @field_validator("narration_ducking_gain_db")
+    @classmethod
+    def validate_narration_ducking_gain_db(cls, value: float) -> float:
+        """Require a finite negative ducking value so narration remains dominant."""
+
+        if not math.isfinite(value):
+            raise ValueError("narration_ducking_gain_db must be finite")
+        if value >= 0:
+            raise ValueError("narration_ducking_gain_db must be less than zero")
+        if value < -60.0:
+            raise ValueError("narration_ducking_gain_db must not be lower than -60 dB")
+        return round(value, 6)
 
 
 class RenderScene(CreatorOSModel):
@@ -448,6 +573,7 @@ class ShortRenderRequest(CreatorOSModel):
     scenes: list[RenderScene]
     production_timeline: ProductionTimeline | None = None
     narration: GeneratedAudio | None = None
+    audio_tracks: tuple[AudioTrack, ...] = Field(default_factory=tuple)
     audio_policy: AudioCompositionPolicy = Field(default_factory=AudioCompositionPolicy)
     width: int = Field(default=1080, gt=0)
     height: int = Field(default=1920, gt=0)
@@ -470,6 +596,22 @@ class ShortRenderRequest(CreatorOSModel):
         """Require positive finite frame-rate values."""
 
         return _validate_positive_finite_float(value, field_name="fps")
+
+    @field_validator("audio_tracks", mode="before")
+    @classmethod
+    def copy_audio_tracks(cls, value: object) -> tuple[AudioTrack, ...]:
+        """Normalize optional audio tracks into immutable deep-copied tuples."""
+
+        if value is None:
+            return ()
+        if isinstance(value, tuple):
+            return tuple(track.model_copy(deep=True) for track in value)
+        if isinstance(value, list):
+            return tuple(
+                track.model_copy(deep=True) if isinstance(track, AudioTrack) else AudioTrack.model_validate(track)
+                for track in value
+            )
+        raise TypeError("audio_tracks must be a list or tuple of AudioTrack values")
 
     @field_validator("output_format")
     @classmethod
@@ -504,6 +646,21 @@ class ShortRenderRequest(CreatorOSModel):
             raise ValueError(
                 "narration estimated_duration_seconds must not exceed total_duration_seconds",
             )
+
+        explicit_narration_tracks = [
+            track for track in self.audio_tracks if track.role is AudioTrackRole.NARRATION
+        ]
+        if self.narration is not None and explicit_narration_tracks:
+            raise ValueError("narration and audio_tracks narration entries cannot both be supplied")
+
+        for track in self.audio_tracks:
+            if track.start_seconds > self.total_duration_seconds + 1e-6:
+                raise ValueError("audio track start_seconds must fall within the total_duration_seconds")
+            if (
+                track.end_seconds is not None
+                and track.end_seconds > self.total_duration_seconds + 1e-6
+            ):
+                raise ValueError("audio track end_seconds must not exceed total_duration_seconds")
         return self
 
     if TYPE_CHECKING:
@@ -686,6 +843,9 @@ class RenderedVideo(CreatorOSModel):
 __all__ = [
     "DEFAULT_CROSSFADE_DURATION_SECONDS",
     "AudioCompositionPolicy",
+    "AudioLoopPolicy",
+    "AudioTrack",
+    "AudioTrackRole",
     "CaptionEmphasis",
     "CaptionFontSizeProfile",
     "CaptionOverlay",

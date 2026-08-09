@@ -21,6 +21,9 @@ from creatoros.core import (
 from creatoros.domain import AssetType, GeneratedAsset
 from creatoros.providers import (
     DEFAULT_FFMPEG_RENDER_PROVIDER_NAME,
+    AudioLoopPolicy,
+    AudioTrack,
+    AudioTrackRole,
     GeneratedAudio,
     ProductionTimeline,
     ProductionTimelineScene,
@@ -568,7 +571,7 @@ def test_caption_filter_and_narration_can_coexist(tmp_path: Path) -> None:
     assert str(narration_path) in final_call
     assert "-filter_complex" in final_call
     assert "0:v:0" in final_call
-    assert "[narration_out]" in final_call
+    assert "[audio_out]" in final_call
 
 
 def test_narration_audio_is_normalized_to_aac_48khz_stereo(tmp_path: Path) -> None:
@@ -587,6 +590,86 @@ def test_narration_audio_is_normalized_to_aac_48khz_stereo(tmp_path: Path) -> No
     assert "-ar" in final_call and "48000" in final_call
     assert "-ac" in final_call and "2" in final_call
     assert "-b:a" in final_call and "192k" in final_call
+
+
+def test_background_music_and_sfx_are_mixed_deterministically(tmp_path: Path) -> None:
+    """Background music and ordered SFX should join narration in the final FFmpeg mix."""
+
+    artifact_root, image_path, _video_path, narration_path = create_workspace_files(tmp_path)
+    music_path = artifact_root / "run_001" / "audio" / "background_music.wav"
+    music_path.write_bytes(b"music-bytes")
+    sfx_path = artifact_root / "run_001" / "audio" / "whoosh.wav"
+    sfx_path.write_bytes(b"sfx-bytes")
+    ffmpeg_binary = tmp_path / "ffmpeg.exe"
+    ffmpeg_binary.write_text("binary", encoding="utf-8")
+    runner = RecordingFFmpegRunner()
+    provider = build_provider(artifact_root=artifact_root, ffmpeg_path=ffmpeg_binary, command_runner=runner)
+    request = build_request(image_path=image_path, narration_path=narration_path).model_copy(
+        update={
+            "audio_tracks": (
+                AudioTrack(
+                    source_asset_ref=GeneratedAsset(asset_type=AssetType.AUDIO, uri=str(music_path)),
+                    role=AudioTrackRole.BACKGROUND_MUSIC,
+                    source_duration_seconds=1.0,
+                    gain_db=-18.0,
+                    fade_in_seconds=0.5,
+                    fade_out_seconds=0.5,
+                    loop_policy=AudioLoopPolicy.LOOP_TO_FIT,
+                    duck_under_narration=True,
+                ),
+                AudioTrack(
+                    source_asset_ref=GeneratedAsset(asset_type=AssetType.AUDIO, uri=str(sfx_path)),
+                    role=AudioTrackRole.SOUND_EFFECT,
+                    start_seconds=0.75,
+                    source_duration_seconds=0.2,
+                    gain_db=-3.0,
+                ),
+            )
+        }
+    )
+
+    run_async(provider.render(request))
+
+    final_call = runner.calls[-1]
+    filter_complex = runner.filter_complex_values[-1]
+    assert "-stream_loop" in final_call
+    assert str(music_path) in final_call
+    assert str(sfx_path) in final_call
+    assert "amix=inputs=3" in filter_complex
+    assert "volume='if(gt(" in filter_complex
+    assert "adelay=750|750" in filter_complex
+    assert "[audio_out]" in final_call
+
+
+def test_music_only_audio_layer_is_supported_without_narration(tmp_path: Path) -> None:
+    """Music-only requests should still produce a bounded audio stream."""
+
+    artifact_root, image_path, _video_path, _narration_path = create_workspace_files(tmp_path)
+    music_path = artifact_root / "run_001" / "audio" / "background_music.wav"
+    music_path.write_bytes(b"music-bytes")
+    ffmpeg_binary = tmp_path / "ffmpeg.exe"
+    ffmpeg_binary.write_text("binary", encoding="utf-8")
+    runner = RecordingFFmpegRunner()
+    provider = build_provider(artifact_root=artifact_root, ffmpeg_path=ffmpeg_binary, command_runner=runner)
+    request = build_request(image_path=image_path).model_copy(
+        update={
+            "audio_tracks": (
+                AudioTrack(
+                    source_asset_ref=GeneratedAsset(asset_type=AssetType.AUDIO, uri=str(music_path)),
+                    role=AudioTrackRole.BACKGROUND_MUSIC,
+                    source_duration_seconds=5.0,
+                    gain_db=-20.0,
+                ),
+            )
+        }
+    )
+
+    run_async(provider.render(request))
+
+    final_call = runner.calls[-1]
+    assert "-an" not in final_call
+    assert str(music_path) in final_call
+    assert "[audio_out]" in final_call
 
 
 def test_shorter_narration_uses_silence_padding_without_looping(tmp_path: Path) -> None:
@@ -662,7 +745,9 @@ def test_unknown_narration_duration_remains_accepted_without_fake_values(tmp_pat
     )
 
     assert runner.filter_complex_values[-1] == (
-        "[1:a]aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo,apad,atrim=duration=2[narration_out]"
+        "[1:a]aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo,"
+        "atrim=duration=2,apad,atrim=duration=2[audio_track_0];"
+        "[audio_track_0]alimiter=limit=0.95,atrim=duration=2[audio_out]"
     )
 
 

@@ -106,10 +106,12 @@ class GeneratedMediaPackage(CreatorOSModel):
 
     thumbnail: GeneratedImage | None = None
     narration: GeneratedAudio | None = None
+    background_music: GeneratedAudio | None = None
+    sound_effects: tuple[GeneratedAudio, ...] = Field(default_factory=tuple)
     scene_images: tuple[GeneratedImage, ...] = Field(default_factory=tuple)
     scene_videos: tuple[GeneratedVideo, ...] = Field(default_factory=tuple)
 
-    @field_validator("scene_images", "scene_videos", mode="before")
+    @field_validator("sound_effects", "scene_images", "scene_videos", mode="before")
     @classmethod
     def copy_generated_collections(cls, value: object, info) -> tuple[CreatorOSModel, ...]:
         """Normalize generated result collections into immutable tuples."""

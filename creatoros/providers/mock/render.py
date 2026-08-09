@@ -57,6 +57,24 @@ def _build_digest(request: ShortRenderRequest) -> str:
             ],
         }
 
+    normalized_audio_tracks = [
+        {
+            "source_asset_type": track.source_asset_ref.asset_type.value,
+            "source_asset_uri": track.source_asset_ref.uri,
+            "role": track.role.value,
+            "start_seconds": track.start_seconds,
+            "end_seconds": track.end_seconds,
+            "duration_seconds": track.duration_seconds,
+            "source_duration_seconds": track.source_duration_seconds,
+            "gain_db": track.gain_db,
+            "fade_in_seconds": track.fade_in_seconds,
+            "fade_out_seconds": track.fade_out_seconds,
+            "loop_policy": track.loop_policy.value,
+            "duck_under_narration": track.duck_under_narration,
+        }
+        for track in request.audio_tracks
+    ]
+
     payload = {
         "scenes": [
             {
@@ -76,6 +94,8 @@ def _build_digest(request: ShortRenderRequest) -> str:
         "narration_duration": (
             None if request.narration is None else request.narration.estimated_duration_seconds
         ),
+        "audio_tracks": normalized_audio_tracks,
+        "audio_policy": request.audio_policy.model_dump(mode="json"),
         "width": request.width,
         "height": request.height,
         "fps": request.fps,
@@ -131,6 +151,10 @@ class MockRenderProvider(MockProviderBase):
                     if timeline is None
                     else [scene.caption_style.model_dump(mode="json") for scene in timeline.scenes]
                 ),
+                "audio_tracks": [track.model_dump(mode="json") for track in request.audio_tracks],
+                "audio_roles": [track.role.value for track in request.audio_tracks],
+                "has_background_music": any(track.role.value == "background_music" for track in request.audio_tracks),
+                "has_sound_effects": any(track.role.value == "sound_effect" for track in request.audio_tracks),
                 "visual_treatments": (
                     []
                     if timeline is None

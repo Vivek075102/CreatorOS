@@ -226,6 +226,18 @@ def _materialize_generated_media_for_assembly(
             code="media_execution_materialization_mismatch",
             details={"asset_name": "narration"},
         )
+    if (generated_media.background_music is None) != (materialized_media.background_music is None):
+        raise CreatorOSValidationError(
+            "background music materialization did not match generated media",
+            code="media_execution_materialization_mismatch",
+            details={"asset_name": "background_music"},
+        )
+    if len(generated_media.sound_effects) != len(materialized_media.sound_effects):
+        raise CreatorOSValidationError(
+            "sound-effect materialization count did not match generated media",
+            code="media_execution_materialization_mismatch",
+            details={"asset_name": "sound_effects"},
+        )
     if len(generated_media.scene_images) != len(materialized_media.scene_images):
         raise CreatorOSValidationError(
             "scene image materialization count did not match generated media",
@@ -288,6 +300,25 @@ def _materialize_generated_media_for_assembly(
             ),
         )
 
+    background_music = None
+    if generated_media.background_music is not None and materialized_media.background_music is not None:
+        background_music = cast(
+            GeneratedAudio,
+            _with_local_artifact(
+                generated_media.background_music,
+                str(materialized_media.background_music.path),
+            ),
+        )
+
+    sound_effects = tuple(
+        cast(GeneratedAudio, _with_local_artifact(sound_effect, str(materialized.path)))
+        for sound_effect, materialized in zip(
+            generated_media.sound_effects,
+            materialized_media.sound_effects,
+            strict=True,
+        )
+    )
+
     scene_images = tuple(
         cast(GeneratedImage, _with_local_artifact(image, str(materialized.path)))
         for image, materialized in zip(
@@ -308,6 +339,8 @@ def _materialize_generated_media_for_assembly(
     return GeneratedMediaPackage(
         thumbnail=thumbnail,
         narration=narration,
+        background_music=background_music,
+        sound_effects=sound_effects,
         scene_images=scene_images,
         scene_videos=scene_videos,
     )

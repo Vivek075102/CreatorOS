@@ -12,6 +12,7 @@ from creatoros.core import CreatorOSValidationError, ProviderNotFoundError
 from creatoros.domain import AssetType, GeneratedAsset
 from creatoros.parsing.storyboard import StoryboardSceneBreakdownOutput, StoryboardScenePlan
 from creatoros.providers import (
+    AudioTrackRole,
     GeneratedAudio,
     GeneratedImage,
     GeneratedVideo,
@@ -392,6 +393,30 @@ def test_narration_maps_without_inventing_duration() -> None:
     assert without_duration.narration.estimated_duration_seconds is None
     assert without_duration.production_timeline is not None
     assert all(scene.narration_end_seconds is None for scene in without_duration.production_timeline.scenes)
+
+
+def test_optional_background_music_and_sound_effects_map_into_audio_tracks() -> None:
+    """Assembly should preserve optional music and sound effects without mutating narration behavior."""
+
+    render_service, _provider = build_render_service()
+    service = ShortAssemblyService(render_service)
+    request = build_request()
+    request.generated_media.background_music = build_generated_audio(estimated_duration_seconds=3.5)
+    request.generated_media.sound_effects = (
+        build_generated_audio(estimated_duration_seconds=0.4).model_copy(
+            update={"metadata": {"start_seconds": 1.25, "gain_db": -4.0}}
+        ),
+    )
+
+    render_request = service.build_render_request(request)
+
+    assert render_request.narration is not None
+    assert [track.role for track in render_request.audio_tracks] == [
+        AudioTrackRole.BACKGROUND_MUSIC,
+        AudioTrackRole.SOUND_EFFECT,
+    ]
+    assert render_request.audio_tracks[0].duck_under_narration is True
+    assert render_request.audio_tracks[1].start_seconds == 1.25
 
 
 def test_build_render_request_is_deterministic_and_does_not_mutate_source_request() -> None:

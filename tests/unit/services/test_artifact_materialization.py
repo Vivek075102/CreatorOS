@@ -273,6 +273,8 @@ def test_materialize_package_returns_typed_result_and_preserves_order(tmp_path: 
     package = GeneratedMediaPackage(
         thumbnail=build_image(),
         narration=build_audio(),
+        background_music=build_audio(),
+        sound_effects=(build_audio(),),
         scene_images=(build_image(), build_image(payload_bytes=MINIMAL_PNG_BYTES + b"2")),
     )
 
@@ -281,6 +283,8 @@ def test_materialize_package_returns_typed_result_and_preserves_order(tmp_path: 
     assert isinstance(result, MaterializedMediaPackage)
     assert result.thumbnail is not None and result.thumbnail.path.name == "thumbnail.png"
     assert result.narration is not None and result.narration.path.name == "narration.wav"
+    assert result.background_music is not None and result.background_music.path.name == "background_music.wav"
+    assert [artifact.path.name for artifact in result.sound_effects] == ["sfx_001.wav"]
     assert [artifact.path.name for artifact in result.scene_images] == ["scene_001.png", "scene_002.png"]
     assert result.scene_videos == ()
 

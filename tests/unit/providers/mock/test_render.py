@@ -6,7 +6,14 @@ import asyncio
 from pathlib import Path
 
 from creatoros.domain import AssetType, GeneratedAsset
-from creatoros.providers import GeneratedAudio, RenderedVideo, RenderProvider, ShortRenderRequest
+from creatoros.providers import (
+    AudioTrack,
+    AudioTrackRole,
+    GeneratedAudio,
+    RenderedVideo,
+    RenderProvider,
+    ShortRenderRequest,
+)
 from creatoros.providers.mock import MockRenderProvider
 from creatoros.providers.render import RenderScene
 
@@ -41,6 +48,15 @@ def build_request() -> ShortRenderRequest:
             model="mock-tts-model",
             mime_type="audio/wav",
             estimated_duration_seconds=7.0,
+        ),
+        audio_tracks=(
+            AudioTrack(
+                source_asset_ref=GeneratedAsset(asset_type=AssetType.AUDIO, uri="mock://generated/audio/music.wav"),
+                role=AudioTrackRole.BACKGROUND_MUSIC,
+                source_duration_seconds=7.0,
+                duck_under_narration=True,
+                gain_db=-18.0,
+            ),
         ),
         fps=30.0,
     )
@@ -92,6 +108,8 @@ def test_mock_render_preserves_duration_dimensions_and_fps() -> None:
         },
     ]
     assert result.data.metadata["caption_styles"][0]["emphasis"] == "none"
+    assert result.data.metadata["audio_roles"] == ["background_music"]
+    assert result.data.metadata["has_background_music"] is True
 
 
 def test_mock_render_provider_satisfies_runtime_protocol() -> None:
