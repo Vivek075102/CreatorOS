@@ -1648,12 +1648,18 @@ def build_safe_config_summary() -> dict[str, object]:
         "database_host": database_summary.host,
         "database_name": database_summary.name,
         "default_llm_provider": settings.default_llm_provider,
+        "default_asset_hosting_provider": settings.default_asset_hosting_provider,
         "provider_timeout_seconds": settings.provider_timeout_seconds,
         "provider_max_retries": settings.provider_max_retries,
         "assets_dir": str(settings.assets_dir),
         "logs_dir": str(settings.logs_dir),
         "prompts_dir": str(settings.prompts_dir),
         "openai_configured": _is_configured(settings.openai_api_key),
+        "cloudinary_configured": (
+            _is_configured(settings.cloudinary_cloud_name)
+            and _is_configured(settings.cloudinary_api_key)
+            and _is_configured(settings.cloudinary_api_secret)
+        ),
         "anthropic_configured": _is_configured(settings.anthropic_api_key),
         "youtube_configured": _is_configured(settings.youtube_client_id) and _is_configured(settings.youtube_client_secret),
     }

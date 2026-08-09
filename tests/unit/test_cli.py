@@ -42,7 +42,11 @@ class StubSettings:
     default_tts_model: str | None = None
     default_video_provider: str = "mock"
     default_render_provider: str = "mock"
+    default_asset_hosting_provider: str = "mock"
     openai_api_key: str | None = "openai-secret"
+    cloudinary_cloud_name: str | None = "demo-cloud"
+    cloudinary_api_key: str | None = "cloudinary-key"
+    cloudinary_api_secret: str | None = "cloudinary-secret"
     anthropic_api_key: str | None = "anthropic-secret"
     youtube_client_id: str | None = "youtube-client"
     youtube_client_secret: str | None = "youtube-secret"
@@ -287,6 +291,7 @@ def test_providers_list_mock_displays_every_expected_provider_type(cli_module) -
     assert exit_code == 0
     for provider_type in [
         "analytics",
+        "hosting",
         "image",
         "llm",
         "publishing",
@@ -308,6 +313,7 @@ def test_providers_list_output_is_predictably_sorted(cli_module) -> None:
 
     assert lines == [
         "analytics | mock | 1.0 | analytics",
+        "hosting | mock | 1.0 | asset_hosting",
         "image | mock | 1.0 | image_generation",
         "llm | mock | 1.0 | structured_generation, text_generation",
         "publishing | mock | 1.0 | publishing",

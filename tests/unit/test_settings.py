@@ -51,6 +51,7 @@ def test_default_media_providers_are_mock() -> None:
     assert settings.default_tts_provider == "mock"
     assert settings.default_video_provider == "mock"
     assert settings.default_render_provider == "mock"
+    assert settings.default_asset_hosting_provider == "mock"
 
 
 def test_default_image_model_is_unset() -> None:
@@ -113,6 +114,17 @@ def test_default_paths_resolve_to_project_root_directories() -> None:
     assert settings.assets_dir == PROJECT_ROOT / "assets"
     assert settings.logs_dir == PROJECT_ROOT / "logs"
     assert settings.prompts_dir == PROJECT_ROOT / "prompts"
+
+
+def test_default_cloudinary_configuration_is_safe_and_optional() -> None:
+    """Cloudinary hosting should default to mock-first safe local configuration."""
+
+    settings = build_settings()
+
+    assert settings.cloudinary_cloud_name is None
+    assert settings.cloudinary_api_key is None
+    assert settings.cloudinary_api_secret is None
+    assert settings.cloudinary_asset_folder == "creatoros"
 
 
 def test_lowercase_log_levels_are_normalized_to_uppercase() -> None:
@@ -217,6 +229,11 @@ def test_environment_variables_override_defaults() -> None:
             "DEFAULT_VIDEO_PROVIDER": "custom-video",
             "DEFAULT_VIDEO_MODEL": "video-model-x",
             "DEFAULT_RENDER_PROVIDER": "custom-render",
+            "DEFAULT_ASSET_HOSTING_PROVIDER": "cloudinary",
+            "CLOUDINARY_CLOUD_NAME": "demo-cloud",
+            "CLOUDINARY_API_KEY": "cloudinary-key",
+            "CLOUDINARY_API_SECRET": "cloudinary-secret",
+            "CLOUDINARY_ASSET_FOLDER": "creatoros-assets",
             "PROVIDER_TIMEOUT_SECONDS": "45",
             "OPENAI_IMAGE_TIMEOUT_SECONDS": "300",
             "KLING_VIDEO_TIMEOUT_SECONDS": "900",
@@ -249,6 +266,11 @@ def test_environment_variables_override_defaults() -> None:
     assert settings.default_video_provider == "custom-video"
     assert settings.default_video_model == "video-model-x"
     assert settings.default_render_provider == "custom-render"
+    assert settings.default_asset_hosting_provider == "cloudinary"
+    assert settings.cloudinary_cloud_name == "demo-cloud"
+    assert settings.cloudinary_api_key == "cloudinary-key"
+    assert settings.cloudinary_api_secret == "cloudinary-secret"
+    assert settings.cloudinary_asset_folder == "creatoros-assets"
     assert settings.kling_api_key == "kling-secret"
     assert settings.kling_api_base_url == "https://api-singapore.klingai.com"
     assert settings.provider_timeout_seconds == 45.0
@@ -298,3 +320,50 @@ def test_default_kling_video_timing_settings_are_separate_from_generic_timeout()
     assert settings.provider_timeout_seconds == 30.0
     assert settings.kling_video_timeout_seconds == 900.0
     assert settings.kling_video_poll_interval_seconds == 5.0
+
+
+def test_blank_cloudinary_values_normalize_safely() -> None:
+    """Blank Cloudinary credential values should normalize to ``None`` safely."""
+
+    settings = build_settings(
+        cloudinary_cloud_name="   ",
+        cloudinary_api_key="",
+        cloudinary_api_secret="\t",
+    )
+
+    assert settings.cloudinary_cloud_name is None
+    assert settings.cloudinary_api_key is None
+    assert settings.cloudinary_api_secret is None
+
+
+def test_env_example_contains_cloudinary_placeholders_only() -> None:
+    """The example env file should document Cloudinary settings without real secrets."""
+
+    env_example = (PROJECT_ROOT / ".env.example").read_text(encoding="utf-8")
+
+    assert "DEFAULT_ASSET_HOSTING_PROVIDER=mock" in env_example
+    assert "CLOUDINARY_CLOUD_NAME=" in env_example
+    assert "CLOUDINARY_API_KEY=" in env_example
+    assert "CLOUDINARY_API_SECRET=" in env_example
+    assert "CLOUDINARY_ASSET_FOLDER=creatoros" in env_example
+
+
+def test_safe_config_output_excludes_cloudinary_secrets(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Safe configuration output should report Cloudinary readiness without exposing secrets."""
+
+    from creatoros.cli import build_safe_config_summary
+
+    settings = build_settings(
+        default_asset_hosting_provider="cloudinary",
+        cloudinary_cloud_name="demo-cloud",
+        cloudinary_api_key="cloudinary-key",
+        cloudinary_api_secret="cloudinary-secret",
+    )
+    monkeypatch.setattr("creatoros.cli.get_settings", lambda: settings)
+
+    summary = build_safe_config_summary()
+
+    assert summary["default_asset_hosting_provider"] == "cloudinary"
+    assert summary["cloudinary_configured"] is True
+    assert "cloudinary_api_key" not in summary
+    assert "cloudinary_api_secret" not in summary

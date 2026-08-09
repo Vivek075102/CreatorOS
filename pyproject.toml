@@ -17,7 +17,8 @@ dependencies = [
     "structlog>=25.4",
     "tenacity>=9.1",
     "httpx>=0.28",
-    "openai>=2.53,<3"
+    "openai>=2.53,<3",
+    "cloudinary>=1.45,<2"
 ]
 
 [project.scripts]

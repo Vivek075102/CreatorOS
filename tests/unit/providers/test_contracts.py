@@ -8,6 +8,7 @@ from creatoros.domain import (
     AssetType,
     ContentPlatform,
     GeneratedAsset,
+    HostedAsset,
     NarrationTrack,
     PerformanceReport,
     PublishedPost,
@@ -15,6 +16,7 @@ from creatoros.domain import (
 )
 from creatoros.providers import (
     AnalyticsProvider,
+    AssetHostingProvider,
     GeneratedAudio,
     GeneratedImage,
     GeneratedVideo,
@@ -255,6 +257,28 @@ class FakeStorageProvider(FakeProvider):
         return ProviderResult[bool](data=bool(asset_id), provider=self.info)
 
 
+class FakeAssetHostingProvider(FakeProvider):
+    """Minimal fake object satisfying the AssetHostingProvider protocol."""
+
+    @property
+    def info(self) -> ProviderInfo:
+        return build_provider_info(ProviderCapability.ASSET_HOSTING)
+
+    async def host(self, asset: GeneratedAsset, *, context=None) -> ProviderResult[HostedAsset]:
+        return ProviderResult[HostedAsset](
+            data=HostedAsset(
+                source_asset=asset,
+                public_url="https://example.com/public/image.png",
+                provider_name=self.info.name,
+                provider_asset_id="creatoros/run_001/asset_123",
+            ),
+            provider=self.info,
+        )
+
+    async def delete(self, hosted_asset: HostedAsset, *, context=None) -> ProviderResult[bool]:
+        return ProviderResult[bool](data=bool(hosted_asset.provider_asset_id), provider=self.info)
+
+
 class FakePublishingProvider(FakeProvider):
     """Minimal fake object satisfying the PublishingProvider protocol."""
 
@@ -348,6 +372,12 @@ def test_storage_provider_protocol_accepts_minimal_fake() -> None:
     """A minimal structural storage provider should satisfy the protocol."""
 
     assert isinstance(FakeStorageProvider(), StorageProvider)
+
+
+def test_asset_hosting_provider_protocol_accepts_minimal_fake() -> None:
+    """A minimal structural asset-hosting provider should satisfy the protocol."""
+
+    assert isinstance(FakeAssetHostingProvider(), AssetHostingProvider)
 
 
 def test_publishing_provider_protocol_accepts_minimal_fake() -> None:

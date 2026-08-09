@@ -1,5 +1,6 @@
 """Stable provider contracts and shared provider boundary models for CreatorOS."""
 
+from creatoros.domain import HostedAsset
 from creatoros.providers.base import (
     LLMCapabilities,
     LLMRequest,
@@ -11,8 +12,14 @@ from creatoros.providers.base import (
     ProviderResult,
     ProviderUsage,
 )
+from creatoros.providers.cloudinary import (
+    DEFAULT_CLOUDINARY_ASSET_HOSTING_PROVIDER_NAME,
+    CloudinaryAssetHostingProvider,
+    register_cloudinary_asset_hosting_provider,
+)
 from creatoros.providers.contracts import (
     AnalyticsProvider,
+    AssetHostingProvider,
     ImageProvider,
     LLMProvider,
     Provider,
@@ -69,6 +76,7 @@ from creatoros.providers.registry import (
     ProviderRegistry,
     create_provider_registry,
     get_provider_registry,
+    resolve_default_asset_hosting_provider,
     resolve_default_image_provider,
     resolve_default_llm_provider,
     resolve_default_render_provider,
@@ -87,6 +95,7 @@ from creatoros.providers.render import (
 )
 
 __all__ = [
+    "DEFAULT_CLOUDINARY_ASSET_HOSTING_PROVIDER_NAME",
     "DEFAULT_FFMPEG_RENDER_PROVIDER_NAME",
     "DEFAULT_KLING_API_BASE_URL",
     "DEFAULT_KLING_IMAGE_TO_VIDEO_ENDPOINT_PATH",
@@ -101,14 +110,17 @@ __all__ = [
     "DEFAULT_OPENAI_TTS_MODEL",
     "DEFAULT_OPENAI_TTS_PROVIDER_NAME",
     "AnalyticsProvider",
+    "AssetHostingProvider",
     "AudioCompositionPolicy",
     "CaptionOverlay",
     "CaptionPosition",
+    "CloudinaryAssetHostingProvider",
     "FFmpegCommandResult",
     "FFmpegRenderProvider",
     "GeneratedAudio",
     "GeneratedImage",
     "GeneratedVideo",
+    "HostedAsset",
     "ImageGenerationRequest",
     "ImageProvider",
     "KlingHTTPVideoTransport",
@@ -145,11 +157,13 @@ __all__ = [
     "VoiceProvider",
     "create_provider_registry",
     "get_provider_registry",
+    "register_cloudinary_asset_hosting_provider",
     "register_ffmpeg_render_provider",
     "register_kling_video_provider",
     "register_openai_image_provider",
     "register_openai_provider",
     "register_openai_tts_provider",
+    "resolve_default_asset_hosting_provider",
     "resolve_default_image_provider",
     "resolve_default_llm_provider",
     "resolve_default_render_provider",

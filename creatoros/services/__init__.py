@@ -8,6 +8,7 @@ from creatoros.services.artifact_materialization import (
     MaterializedMediaPackage,
     create_artifact_materialization_service,
 )
+from creatoros.services.asset_hosting import AssetHostingService, create_asset_hosting_service
 from creatoros.services.llm_execution import (
     LLMExecutionRequest,
     LLMExecutionResult,
@@ -33,6 +34,7 @@ __all__ = [
     "ArtifactKind",
     "ArtifactMaterializationService",
     "ArtifactWorkspace",
+    "AssetHostingService",
     "GeneratedMediaPackage",
     "LLMExecutionRequest",
     "LLMExecutionResult",
@@ -47,6 +49,7 @@ __all__ = [
     "ShortAssemblyResult",
     "ShortAssemblyService",
     "create_artifact_materialization_service",
+    "create_asset_hosting_service",
     "create_llm_execution_service",
     "create_media_generation_service",
     "create_media_render_service",

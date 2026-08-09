@@ -293,6 +293,8 @@ The Asset Production Layer is responsible for turning structured content plans i
 - Editing and rendering
 - Asset validation
 
+Public asset delivery is a separate concern from both local materialization and video generation. When a downstream provider requires a provider-reachable HTTPS asset reference, CreatorOS should use a provider-neutral asset-hosting boundary rather than coupling one media provider directly to one storage or CDN implementation.
+
 This layer should use provider interfaces rather than concrete vendor APIs directly. Its outputs should be normalized into `GeneratedAsset` and related domain records so that downstream systems can operate consistently regardless of which provider or tool produced the asset.
 
 Within this layer, AI video generation and final edited-output composition are separate concerns. A future `VideoProvider` may produce provider-owned clips from prompts or motion instructions, while a separate render or composition boundary is responsible for assembling prepared scene assets, narration references, captions, and transitions into a final Short. Those responsibilities should not be collapsed into one provider contract unless a later decision record explicitly changes that boundary.
@@ -302,6 +304,8 @@ Media planning is also separate from media execution. Planning agents may recomm
 CreatorOS now includes that next stage as a separate application boundary. `ShortAssemblyService` accepts typed storyboard output plus a generated-media package, aligns scene assets deterministically, builds a `ShortRenderRequest`, and delegates final composition through `MediaRenderService`. This keeps media generation and final Short assembly distinct while proving that typed generated-media references can feed the render layer without introducing workflow, publishing, or storage coupling.
 
 The provider-neutral clip-generation contract now also supports image-to-video inputs. `VideoGenerationRequest` may carry an optional `reference_image` represented as an existing `GeneratedAsset` with `asset_type=image`. That asset reference may point to either a local materialized file or a provider-owned transient URI, and later video adapters are responsible for translating the reference into the upload or fetch mechanism required by the concrete provider. CreatorOS does not add raw vendor request fields, raw filesystem path strings, or provider SDK objects to express this capability.
+
+When a later adapter requires a public delivery URL instead of a local path or transient provider reference, CreatorOS should introduce that translation through a dedicated `AssetHostingProvider` boundary that returns a normalized `HostedAsset` contract. The hosting boundary should remain independent from any specific downstream video provider so implementations such as Cloudinary, S3, R2, or provider-native hosting can be replaced without changing the video-provider contract.
 
 The first dedicated real video-provider shell is now `KlingVideoProvider`. It exists behind the same `VideoProvider` boundary as future providers such as Veo or later Kling variants, and it keeps provider-specific task submission, polling, and output retrieval inside the adapter boundary. CreatorOS continues to treat dedicated video providers as visual generation only. Narration remains owned by the TTS boundary, captions remain render instructions, and final composition remains owned by the render boundary.
 

@@ -6,6 +6,7 @@ from typing import Protocol, TypeVar, runtime_checkable
 
 from creatoros.domain import (
     GeneratedAsset,
+    HostedAsset,
     NarrationTrack,
     PerformanceReport,
     PublishedPost,
@@ -208,6 +209,27 @@ class StorageProvider(Provider, Protocol):
 
 
 @runtime_checkable
+class AssetHostingProvider(Provider, Protocol):
+    """Provider contract for public hosting of generated assets."""
+
+    async def host(
+        self,
+        asset: GeneratedAsset,
+        *,
+        context: ProviderRequestContext | None = None,
+    ) -> ProviderResult[HostedAsset]:
+        """Host one generated asset and return its public HTTPS reference."""
+
+    async def delete(
+        self,
+        hosted_asset: HostedAsset,
+        *,
+        context: ProviderRequestContext | None = None,
+    ) -> ProviderResult[bool]:
+        """Delete one previously hosted asset by provider-specific identifier."""
+
+
+@runtime_checkable
 class PublishingProvider(Provider, Protocol):
     """Provider contract for publishing content to external platforms."""
 
@@ -243,6 +265,7 @@ class AnalyticsProvider(Provider, Protocol):
 
 __all__ = [
     "AnalyticsProvider",
+    "AssetHostingProvider",
     "ImageProvider",
     "LLMProvider",
     "Provider",

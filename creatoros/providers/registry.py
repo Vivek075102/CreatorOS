@@ -14,6 +14,7 @@ from creatoros.core import (
 )
 from creatoros.providers.base import ProviderInfo
 from creatoros.providers.contracts import (
+    AssetHostingProvider,
     ImageProvider,
     LLMProvider,
     Provider,
@@ -180,6 +181,20 @@ def resolve_default_image_provider(registry: ProviderRegistry) -> ImageProvider:
     return provider
 
 
+def resolve_default_asset_hosting_provider(registry: ProviderRegistry) -> AssetHostingProvider:
+    """Resolve the configured default asset-hosting provider from the supplied registry."""
+
+    settings = get_settings()
+    provider = registry.get("hosting", settings.default_asset_hosting_provider)
+    if not isinstance(provider, AssetHostingProvider):
+        raise ProviderTypeMismatchError(
+            "hosting",
+            settings.default_asset_hosting_provider.strip().lower(),
+            "AssetHostingProvider",
+        )
+    return provider
+
+
 def resolve_default_tts_provider(registry: ProviderRegistry) -> TTSProvider:
     """Resolve the configured default speech provider from the supplied registry."""
 
@@ -218,6 +233,7 @@ __all__ = [
     "ProviderRegistry",
     "create_provider_registry",
     "get_provider_registry",
+    "resolve_default_asset_hosting_provider",
     "resolve_default_image_provider",
     "resolve_default_llm_provider",
     "resolve_default_render_provider",

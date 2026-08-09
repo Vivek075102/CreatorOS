@@ -178,6 +178,9 @@ CreatorOS now also includes a provider-independent media provider foundation for
 
 - Separate typed provider-neutral request and result contracts now exist for image generation, speech/TTS generation, and video generation.
 - `VideoGenerationRequest` now supports both text-to-video and provider-neutral image-to-video requests through an optional `reference_image` asset reference.
+- CreatorOS now also includes a provider-neutral `AssetHostingProvider` contract plus `AssetHostingService` for future public HTTPS asset delivery when a downstream provider cannot read local files.
+- The first real hosting implementation is `CloudinaryAssetHostingProvider`, but Cloudinary remains an optional adapter rather than an architectural dependency of Kling or any other media provider.
+- Hosted assets normalize into a dedicated `HostedAsset` contract so public delivery references remain distinct from local generated or materialized assets.
 - The first real dedicated video-provider shell is now `KlingVideoProvider`, and the verified Kling 3.0 Turbo image-to-video create-task HTTP transport now exists behind it, but live polling remains intentionally gated until the official query-task path and result schema are captured.
 - The current capability-specific contracts are `ImageProvider`, `TTSProvider`, and `VideoProvider`, with the existing `VoiceProvider` kept as a backward-compatible compatibility contract for the deterministic demo path.
 - The shared `ProviderRegistry` is reused for media providers. No second provider framework was introduced.
@@ -190,6 +193,8 @@ CreatorOS now also includes a provider-independent media provider foundation for
 - The image-to-video request path uses the existing `GeneratedAsset` abstraction rather than a raw path string, so future dedicated video providers remain replaceable.
 - The current verified Kling API contract uses one Bearer API key, the host `https://api-singapore.klingai.com`, the create path `/image-to-video/kling-3.0-turbo`, a fixed `1080p` resolution policy, integer durations from 3 through 15 seconds, and watermark disabled.
 - The current verified Kling image-to-video contract requires a provider-reachable first-frame URL. CreatorOS does not upload or host local images for Kling in this phase.
+- Cloudinary hosting currently supports local image assets only, produces HTTPS delivery URLs, uses deterministic run-scoped public IDs, and exposes explicit delete support for later post-Kling cleanup orchestration.
+- Hosting remains a visible network boundary. It is not hidden inside `KlingVideoProvider`, and Phase 2.7D is the milestone that will connect hosted scene images to Kling image-to-video execution.
 - Mock remains the default image provider. Real OpenAI image generation is opt-in only and is not invoked automatically by `GamingMediaAgent`, the integrated content pipeline, or automated tests.
 - Mock remains the default TTS provider. Real OpenAI speech generation is opt-in only and is not invoked automatically by `GamingMediaAgent`, the integrated content pipeline, or automated tests.
 - Dedicated real video providers such as Kling remain planned but are not implemented in this milestone.

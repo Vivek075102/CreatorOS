@@ -374,6 +374,8 @@ When a real dedicated video provider is added, CreatorOS may poll the same submi
 
 When a real image-to-video provider currently requires a provider-reachable image URL, CreatorOS must fail local-file or ephemeral-only reference images explicitly rather than inventing uploads, public hosting, or third-party storage workarounds inside the adapter.
 
+When CreatorOS later needs a public HTTPS asset reference for a downstream provider, that translation must happen through an explicit provider-neutral asset-hosting boundary rather than inside the downstream media adapter. A video provider such as Kling must not silently import, construct, or depend on a specific hosting implementation such as Cloudinary.
+
 When a render-provider foundation is added before real rendering infrastructure exists, the initial implementation should stay contract-first. Deterministic mock rendering is acceptable for validating provider boundaries, request contracts, registry behavior, and service composition, but documentation and tests must state clearly that no binary video output, no FFmpeg execution, and no production render pipeline exist yet.
 
 When a media-generation application service is added, it must remain a provider coordinator only. It may resolve providers, forward typed generation requests, and aggregate normalized generated-media results, but it must not execute prompts, import planning agents, invoke render providers, materialize files, upload assets, or mutate workflow state. Planning, generation, and rendering are separate stages and should remain independently testable.
@@ -418,6 +420,7 @@ The following rules are mandatory:
 - MIME-to-extension mapping must be allowlisted explicitly rather than trusting provider-supplied filenames or extensions.
 - Ephemeral provider payload bytes must be excluded from normal serialization and logging.
 - Local artifact materialization is distinct from durable storage, cloud upload, publishing, and rendering.
+- Public asset hosting must normalize into explicit hosted-asset records with HTTPS delivery URLs, provider asset identifiers, and safe metadata rather than raw provider responses.
 - Real local renderers must consume validated local files from the artifact workspace rather than provider-owned transient URLs.
 - FFmpeg command execution must use separate argv arguments with explicit timeouts and cleanup.
 - Subtitle and caption temp files must stay inside the controlled render working directory, use UTF-8 encoding, and be cleaned on success or failure.

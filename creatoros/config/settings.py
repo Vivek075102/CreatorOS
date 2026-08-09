@@ -36,7 +36,15 @@ class Settings(BaseSettings):
     default_video_provider: str = Field(default="mock", alias="DEFAULT_VIDEO_PROVIDER")
     default_video_model: str | None = Field(default=None, alias="DEFAULT_VIDEO_MODEL")
     default_render_provider: str = Field(default="mock", alias="DEFAULT_RENDER_PROVIDER")
+    default_asset_hosting_provider: str = Field(
+        default="mock",
+        alias="DEFAULT_ASSET_HOSTING_PROVIDER",
+    )
     openai_api_key: str | None = Field(default=None, alias="OPENAI_API_KEY")
+    cloudinary_cloud_name: str | None = Field(default=None, alias="CLOUDINARY_CLOUD_NAME")
+    cloudinary_api_key: str | None = Field(default=None, alias="CLOUDINARY_API_KEY")
+    cloudinary_api_secret: str | None = Field(default=None, alias="CLOUDINARY_API_SECRET")
+    cloudinary_asset_folder: str = Field(default="creatoros", alias="CLOUDINARY_ASSET_FOLDER")
     kling_api_key: str | None = Field(default=None, alias="KLING_API_KEY")
     kling_api_base_url: str = Field(
         default="https://api-singapore.klingai.com",
@@ -84,7 +92,9 @@ class Settings(BaseSettings):
         "default_tts_voice",
         "default_video_provider",
         "default_render_provider",
+        "default_asset_hosting_provider",
         "database_url",
+        "cloudinary_asset_folder",
         "kling_api_base_url",
         "caption_font_name",
     )
@@ -101,6 +111,29 @@ class Settings(BaseSettings):
     @classmethod
     def normalize_optional_model_defaults(cls, value: str | None) -> str | None:
         """Normalize blank optional provider-model values to ``None``."""
+
+        if value is None:
+            return None
+
+        normalized_value = value.strip()
+        if not normalized_value:
+            return None
+        return normalized_value
+
+    @field_validator(
+        "openai_api_key",
+        "cloudinary_cloud_name",
+        "cloudinary_api_key",
+        "cloudinary_api_secret",
+        "kling_api_key",
+        "anthropic_api_key",
+        "youtube_client_id",
+        "youtube_client_secret",
+        mode="before",
+    )
+    @classmethod
+    def normalize_optional_secret_like_values(cls, value: str | None) -> str | None:
+        """Normalize blank optional credential-style values to ``None``."""
 
         if value is None:
             return None

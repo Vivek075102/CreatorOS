@@ -11,6 +11,7 @@ from creatoros.core import (
     ProviderTypeMismatchError,
 )
 from creatoros.providers import (
+    AssetHostingProvider,
     ImageProvider,
     LLMCapabilities,
     LLMProvider,
@@ -23,6 +24,7 @@ from creatoros.providers import (
     VideoProvider,
     create_provider_registry,
     get_provider_registry,
+    resolve_default_asset_hosting_provider,
     resolve_default_image_provider,
     resolve_default_llm_provider,
     resolve_default_render_provider,
@@ -154,6 +156,30 @@ class FakeVoiceProvider:
         raise NotImplementedError
 
     async def generate_voice(self, text: str, *, context=None):
+        raise NotImplementedError
+
+
+class FakeAssetHostingProvider:
+    """Minimal fake hosting provider for default-resolution registry tests."""
+
+    def __init__(self, *, name: str, provider_type: str = "hosting") -> None:
+        self._info = build_provider_info(
+            name=name,
+            provider_type=provider_type,
+            capability=ProviderCapability.ASSET_HOSTING,
+        )
+
+    @property
+    def info(self) -> ProviderInfo:
+        return self._info
+
+    async def health_check(self) -> bool:
+        return True
+
+    async def host(self, asset, *, context=None):
+        raise NotImplementedError
+
+    async def delete(self, hosted_asset, *, context=None):
         raise NotImplementedError
 
 
@@ -500,6 +526,25 @@ def test_resolve_default_tts_provider_uses_settings_and_returns_configured_provi
 
     assert resolved is provider
     assert isinstance(resolved, TTSProvider)
+
+
+def test_resolve_default_asset_hosting_provider_uses_settings_and_returns_configured_provider(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Default hosting resolution should respect the configured provider name."""
+
+    class StubSettings:
+        default_asset_hosting_provider = "mock"
+
+    registry = create_provider_registry()
+    provider = FakeAssetHostingProvider(name="Mock")
+    registry.register(provider)
+    monkeypatch.setattr("creatoros.providers.registry.get_settings", lambda: StubSettings())
+
+    resolved = resolve_default_asset_hosting_provider(registry)
+
+    assert resolved is provider
+    assert isinstance(resolved, AssetHostingProvider)
 
 
 def test_resolve_default_video_provider_uses_settings_and_returns_configured_provider(

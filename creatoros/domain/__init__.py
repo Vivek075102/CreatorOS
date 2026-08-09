@@ -12,6 +12,7 @@ from creatoros.domain.enums import (
 )
 from creatoros.domain.integration import (
     GeneratedAsset,
+    HostedAsset,
     NarrationTrack,
     PerformanceReport,
     PublishedPost,
@@ -29,6 +30,7 @@ __all__ = [
     "ContentStatus",
     "CreatorOSModel",
     "GeneratedAsset",
+    "HostedAsset",
     "NarrationTrack",
     "PerformanceReport",
     "PublishedPost",

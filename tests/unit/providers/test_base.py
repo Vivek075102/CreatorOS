@@ -177,3 +177,9 @@ def test_provider_request_context_normalizes_blank_optional_identifiers() -> Non
     assert context.job_id is None
     assert context.step_id is None
     assert context.workflow_name is None
+
+
+def test_provider_capability_includes_asset_hosting() -> None:
+    """Provider capabilities should expose the provider-neutral hosting capability."""
+
+    assert ProviderCapability.ASSET_HOSTING.value == "asset_hosting"

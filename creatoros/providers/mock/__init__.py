@@ -3,6 +3,7 @@
 from creatoros.providers.mock.analytics import MockAnalyticsProvider
 from creatoros.providers.mock.base import MockProviderBase
 from creatoros.providers.mock.bootstrap import (
+    create_mock_asset_hosting_provider_registry,
     create_mock_image_provider_registry,
     create_mock_provider_registry,
     create_mock_render_provider_registry,
@@ -10,6 +11,7 @@ from creatoros.providers.mock.bootstrap import (
     create_mock_video_provider_registry,
     register_mock_providers,
 )
+from creatoros.providers.mock.hosting import MockAssetHostingProvider
 from creatoros.providers.mock.llm import MockLLMProvider
 from creatoros.providers.mock.media import (
     MockImageProvider,
@@ -25,6 +27,7 @@ from creatoros.providers.mock.trends import MockTrendProvider
 
 __all__ = [
     "MockAnalyticsProvider",
+    "MockAssetHostingProvider",
     "MockImageProvider",
     "MockLLMProvider",
     "MockProviderBase",
@@ -36,6 +39,7 @@ __all__ = [
     "MockTrendProvider",
     "MockVideoProvider",
     "MockVoiceProvider",
+    "create_mock_asset_hosting_provider_registry",
     "create_mock_image_provider_registry",
     "create_mock_provider_registry",
     "create_mock_render_provider_registry",

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from creatoros.providers.mock.analytics import MockAnalyticsProvider
+from creatoros.providers.mock.hosting import MockAssetHostingProvider
 from creatoros.providers.mock.llm import MockLLMProvider
 from creatoros.providers.mock.media import (
     MockImageProvider,
@@ -33,6 +34,7 @@ def register_mock_providers(
         MockVideoProvider(),
         MockRenderProvider(),
         MockVoiceProvider(),
+        MockAssetHostingProvider(),
         MockStorageProvider(),
         MockPublishingProvider(),
         MockAnalyticsProvider(),
@@ -64,6 +66,14 @@ def create_mock_tts_provider_registry() -> ProviderRegistry:
     return registry
 
 
+def create_mock_asset_hosting_provider_registry() -> ProviderRegistry:
+    """Return a fresh registry containing only the deterministic mock hosting provider."""
+
+    registry = create_provider_registry()
+    registry.register(MockAssetHostingProvider())
+    return registry
+
+
 def create_mock_video_provider_registry() -> ProviderRegistry:
     """Return a fresh registry containing only the deterministic mock video provider."""
 
@@ -81,6 +91,7 @@ def create_mock_render_provider_registry() -> ProviderRegistry:
 
 
 __all__ = [
+    "create_mock_asset_hosting_provider_registry",
     "create_mock_image_provider_registry",
     "create_mock_provider_registry",
     "create_mock_render_provider_registry",

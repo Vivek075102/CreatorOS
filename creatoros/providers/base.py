@@ -43,6 +43,7 @@ class ProviderCapability(StrEnum):
     RENDERING = "rendering"
     VOICE_GENERATION = "voice_generation"
     MUSIC_GENERATION = "music_generation"
+    ASSET_HOSTING = "asset_hosting"
     STORAGE = "storage"
     PUBLISHING = "publishing"
     ANALYTICS = "analytics"

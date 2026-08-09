@@ -5,6 +5,7 @@ import pytest
 from creatoros.core import ProviderAlreadyRegisteredError
 from creatoros.providers import (
     AnalyticsProvider,
+    AssetHostingProvider,
     ImageProvider,
     LLMProvider,
     Provider,
@@ -20,6 +21,7 @@ from creatoros.providers import (
 )
 from creatoros.providers.mock import (
     MockAnalyticsProvider,
+    MockAssetHostingProvider,
     MockImageProvider,
     MockLLMProvider,
     MockPublishingProvider,
@@ -30,6 +32,7 @@ from creatoros.providers.mock import (
     MockTTSProvider,
     MockVideoProvider,
     MockVoiceProvider,
+    create_mock_asset_hosting_provider_registry,
     create_mock_image_provider_registry,
     create_mock_provider_registry,
     create_mock_render_provider_registry,
@@ -48,6 +51,7 @@ def test_register_mock_providers_registers_all_expected_provider_types() -> None
 
     assert {info.provider_type for info in registry.list_providers()} == {
         "analytics",
+        "hosting",
         "image",
         "llm",
         "publishing",
@@ -107,6 +111,7 @@ def test_every_mock_provider_satisfies_declared_runtime_protocol() -> None:
     render = MockRenderProvider()
     voice = MockVoiceProvider()
     storage = MockStorageProvider()
+    hosting = MockAssetHostingProvider()
     publishing = MockPublishingProvider()
     analytics = MockAnalyticsProvider()
 
@@ -120,6 +125,7 @@ def test_every_mock_provider_satisfies_declared_runtime_protocol() -> None:
     assert isinstance(render, RenderProvider)
     assert isinstance(voice, VoiceProvider)
     assert isinstance(storage, StorageProvider)
+    assert isinstance(hosting, AssetHostingProvider)
     assert isinstance(publishing, PublishingProvider)
     assert isinstance(analytics, AnalyticsProvider)
 
@@ -137,15 +143,18 @@ def test_capability_specific_mock_registry_factories_return_isolated_registries(
     """Capability-specific mock registry factories should stay isolated and minimal."""
 
     image_registry = create_mock_image_provider_registry()
+    hosting_registry = create_mock_asset_hosting_provider_registry()
     render_registry = create_mock_render_provider_registry()
     tts_registry = create_mock_tts_provider_registry()
     video_registry = create_mock_video_provider_registry()
 
     assert image_registry.contains("image", "mock") is True
+    assert hosting_registry.contains("hosting", "mock") is True
     assert render_registry.contains("render", "mock") is True
     assert tts_registry.contains("voice", "mock") is True
     assert video_registry.contains("video", "mock") is True
     assert image_registry.list_providers("voice") == ()
+    assert hosting_registry.list_providers("image") == ()
     assert render_registry.list_providers("image") == ()
     assert tts_registry.list_providers("image") == ()
     assert video_registry.list_providers("llm") == ()

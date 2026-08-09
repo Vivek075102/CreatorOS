@@ -173,6 +173,7 @@ Build the Research Engine and Opportunity Engine capabilities required to gather
 - First explicit real image adapter behind `ImageProvider`, using the OpenAI SDK through the existing provider boundary while keeping mock as the default
 - First explicit real TTS adapter behind `TTSProvider`, using the OpenAI SDK through the existing provider boundary while keeping mock as the default
 - First explicit real dedicated video-provider shell behind `VideoProvider`, with Kling as the initial adapter foundation, verified Kling 3.0 Turbo create-task HTTP transport, and live execution still gated until official query-task and output schemas are captured
+- Provider-neutral asset-hosting foundation with a dedicated `AssetHostingProvider` contract, deterministic mock hosting provider, `AssetHostingService`, and Cloudinary as the first optional real hosting implementation
 - Opportunity scoring rules and ranking pipeline
 - Research result persistence
 - Approval-ready content opportunity outputs
@@ -226,6 +227,7 @@ Build the Research Engine and Opportunity Engine capabilities required to gather
 - Review-agent completion in this milestone means advisory evaluation integration only. It does not mean automatic revision, approval, workflow mutation, or publishing are complete
 - Integrated-pipeline completion in this milestone means pre-publication orchestration only. It does not mean retries, checkpoints, resume behavior, binary media generation, publishing, or approval-state mutation are complete
 - Media-provider-foundation completion in this milestone means contract and mock-provider readiness only. It does not mean real image generation, real speech synthesis, real video rendering, storage upload, or media execution inside the integrated pipeline are complete
+- Asset-hosting-foundation completion in this milestone means provider-neutral hosting contracts and one optional Cloudinary adapter only. It does not mean live hosting is enabled in the default pipeline, Kling is coupled to Cloudinary, or automatic hosted-asset cleanup has been wired into production orchestration yet
 - Media-generation-service completion in this milestone means application-layer provider orchestration plus controlled production-pipeline integration only. It does not mean durable storage, publishing, retries, or background-job execution are complete
 - Artifact-materialization completion in this milestone means deterministic local workspace preparation for controlled rendering only. It does not mean durable storage, cloud upload, publishing, or automatic cleanup policies beyond the current bounded workspace behavior are complete
 - FFmpeg-renderer completion in this milestone means local MP4 composition plus foundational timed caption overlays and basic narration fitting only. It does not mean word-level subtitles, animated captions, background music, sound design, GPU encoding, cloud rendering, publishing, or production-grade editing effects are complete
@@ -258,7 +260,7 @@ Build the Research Engine and Opportunity Engine capabilities required to gather
 - Artifact workspace retention policies, durable storage integration, richer video payload handling, and real renderer file consumption only when later milestones intentionally start that work
 - Dedicated real video-provider integration such as Kling only when the next explicit media milestone starts that provider work behind the existing `VideoProvider` contract
 - A staged image-to-video execution design that wires generated scene reference images into generated motion clips only when the next explicit media milestone starts that dependency work
-- Real live Kling task polling, output normalization, and scene-image-to-Kling motion clip wiring only when Phase 2.7C intentionally opens that paid execution boundary with the remaining official API details captured
+- Real live Kling task polling, output normalization, and hosted-scene-image-to-Kling motion clip wiring only when Phase 2.7D intentionally opens that paid execution boundary with the remaining official API details captured
 - Caption burn-in, text overlays, richer transitions, background music, and render-quality refinements only when later milestones intentionally start that work
 - Guarded live image smoke verification, binary materialization, and durable storage references only when later media milestones intentionally add those operational paths
 - Guarded live TTS smoke verification, binary audio materialization, and durable storage references only when later media milestones intentionally add those operational paths
