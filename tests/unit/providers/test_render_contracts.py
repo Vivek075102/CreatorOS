@@ -7,9 +7,11 @@ from pydantic import ValidationError
 
 from creatoros.domain import AssetType, GeneratedAsset
 from creatoros.providers import (
+    AudioCompositionPolicy,
     CaptionOverlay,
     CaptionPosition,
     GeneratedAudio,
+    NarrationTimingPolicy,
     RenderedVideo,
     RenderScene,
     RenderTransition,
@@ -151,6 +153,9 @@ def test_valid_short_render_request_is_accepted() -> None:
     )
 
     assert request.total_duration_seconds == 7.5
+    assert request.audio_policy == AudioCompositionPolicy(
+        narration_timing=NarrationTimingPolicy.FIT_TO_VIDEO,
+    )
 
 
 def test_request_requires_at_least_one_scene() -> None:

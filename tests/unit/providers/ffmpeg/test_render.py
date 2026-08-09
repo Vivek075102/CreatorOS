@@ -35,6 +35,8 @@ from creatoros.providers.ffmpeg import FFmpegCommandResult, FFmpegRenderProvider
 from creatoros.providers.mock import MockRenderProvider
 from creatoros.providers.render import RenderScene
 
+_USE_DEFAULT_NARRATION_DURATION = object()
+
 
 def build_settings(
     *,
@@ -100,6 +102,7 @@ def build_request(
     image_path: Path,
     video_path: Path | None = None,
     narration_path: Path | None = None,
+    narration_duration: float | None | object = _USE_DEFAULT_NARRATION_DURATION,
     caption_text: str | None = "CreatorOS caption",
 ) -> ShortRenderRequest:
     """Create a local-file-backed render request for FFmpeg tests."""
@@ -129,7 +132,11 @@ def build_request(
             provider_name="mock",
             model="mock-tts-model",
             mime_type="audio/wav",
-            estimated_duration_seconds=5.0 if video_path is not None else 2.0,
+            estimated_duration_seconds=(
+                5.0 if video_path is not None else 2.0
+                if narration_duration is _USE_DEFAULT_NARRATION_DURATION
+                else narration_duration
+            ),
         )
 
     return ShortRenderRequest(
@@ -154,6 +161,7 @@ class RecordingFFmpegRunner:
     concat_file_contents: list[str] = field(default_factory=list)
     subtitle_file_contents: list[str] = field(default_factory=list)
     final_filters: list[str] = field(default_factory=list)
+    filter_complex_values: list[str] = field(default_factory=list)
 
     async def __call__(
         self,
@@ -173,6 +181,8 @@ class RecordingFFmpegRunner:
 
         if "-vf" in argv:
             self.final_filters.append(argv[argv.index("-vf") + 1])
+        if "-filter_complex" in argv:
+            self.filter_complex_values.append(argv[argv.index("-filter_complex") + 1])
 
         if self.timeout_at_call == call_index:
             raise TimeoutError("timed out")
@@ -435,7 +445,8 @@ def test_narration_is_added_when_present_and_not_looped(tmp_path: Path) -> None:
 
     final_call = runner.calls[-1]
     assert str(narration_path) in final_call
-    assert "-shortest" in final_call
+    assert "-filter_complex" in final_call
+    assert "-t" in final_call and "2" in final_call
     assert "-stream_loop" not in final_call
 
 
@@ -511,9 +522,116 @@ def test_caption_filter_and_narration_can_coexist(tmp_path: Path) -> None:
     )
 
     final_call = runner.calls[-1]
+    concat_input_flag_index = final_call.index("-i")
+    narration_input_flag_index = final_call.index("-i", concat_input_flag_index + 1)
+    vf_index = final_call.index("-vf")
+    filter_complex_index = final_call.index("-filter_complex")
+
+    assert final_call[concat_input_flag_index + 1].endswith("concat_list.txt")
+    assert final_call[narration_input_flag_index + 1] == str(narration_path)
+    assert concat_input_flag_index < narration_input_flag_index
+    assert narration_input_flag_index < vf_index
+    assert narration_input_flag_index < filter_complex_index
     assert "-vf" in final_call
     assert str(narration_path) in final_call
-    assert "-shortest" in final_call
+    assert "-filter_complex" in final_call
+    assert "0:v:0" in final_call
+    assert "[narration_out]" in final_call
+
+
+def test_narration_audio_is_normalized_to_aac_48khz_stereo(tmp_path: Path) -> None:
+    """Narration should be normalized to a deterministic output audio policy."""
+
+    artifact_root, image_path, _video_path, narration_path = create_workspace_files(tmp_path)
+    ffmpeg_binary = tmp_path / "ffmpeg.exe"
+    ffmpeg_binary.write_text("binary", encoding="utf-8")
+    runner = RecordingFFmpegRunner()
+    provider = build_provider(artifact_root=artifact_root, ffmpeg_path=ffmpeg_binary, command_runner=runner)
+
+    run_async(provider.render(build_request(image_path=image_path, narration_path=narration_path)))
+
+    final_call = runner.calls[-1]
+    assert "-c:a" in final_call and "aac" in final_call
+    assert "-ar" in final_call and "48000" in final_call
+    assert "-ac" in final_call and "2" in final_call
+    assert "-b:a" in final_call and "192k" in final_call
+
+
+def test_shorter_narration_uses_silence_padding_without_looping(tmp_path: Path) -> None:
+    """Short narration should be padded with silence to match the video timeline."""
+
+    artifact_root, image_path, video_path, narration_path = create_workspace_files(tmp_path)
+    ffmpeg_binary = tmp_path / "ffmpeg.exe"
+    ffmpeg_binary.write_text("binary", encoding="utf-8")
+    runner = RecordingFFmpegRunner()
+    provider = build_provider(artifact_root=artifact_root, ffmpeg_path=ffmpeg_binary, command_runner=runner)
+
+    run_async(
+        provider.render(
+            build_request(
+                image_path=image_path,
+                video_path=video_path,
+                narration_path=narration_path,
+                narration_duration=2.5,
+            )
+        )
+    )
+
+    filter_complex = runner.filter_complex_values[-1]
+    final_call = runner.calls[-1]
+    assert "apad" in filter_complex
+    assert "atrim=duration=5" in filter_complex
+    assert "-stream_loop" not in final_call
+
+
+def test_longer_narration_is_trimmed_to_video_timeline(tmp_path: Path) -> None:
+    """Long narration should be trimmed to the authoritative video duration."""
+
+    artifact_root, image_path, video_path, narration_path = create_workspace_files(tmp_path)
+    ffmpeg_binary = tmp_path / "ffmpeg.exe"
+    ffmpeg_binary.write_text("binary", encoding="utf-8")
+    runner = RecordingFFmpegRunner()
+    provider = build_provider(artifact_root=artifact_root, ffmpeg_path=ffmpeg_binary, command_runner=runner)
+
+    run_async(
+        provider.render(
+            build_request(
+                image_path=image_path,
+                video_path=video_path,
+                narration_path=narration_path,
+                narration_duration=5.5,
+            )
+        )
+    )
+
+    filter_complex = runner.filter_complex_values[-1]
+    final_call = runner.calls[-1]
+    assert "atrim=duration=5" in filter_complex
+    assert "-t" in final_call and "5" in final_call
+
+
+def test_unknown_narration_duration_remains_accepted_without_fake_values(tmp_path: Path) -> None:
+    """Missing narration duration metadata should still use the bounded audio path."""
+
+    artifact_root, image_path, _video_path, narration_path = create_workspace_files(tmp_path)
+    ffmpeg_binary = tmp_path / "ffmpeg.exe"
+    ffmpeg_binary.write_text("binary", encoding="utf-8")
+    runner = RecordingFFmpegRunner()
+    provider = build_provider(artifact_root=artifact_root, ffmpeg_path=ffmpeg_binary, command_runner=runner)
+
+    run_async(
+        provider.render(
+            build_request(
+                image_path=image_path,
+                narration_path=narration_path,
+                narration_duration=None,
+            )
+        )
+    )
+
+    assert runner.filter_complex_values[-1] == (
+        "[1:a]aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo,apad,atrim=duration=2[narration_out]"
+    )
 
 
 def test_caption_filter_preserves_multiple_scene_order(tmp_path: Path) -> None:

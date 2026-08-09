@@ -50,6 +50,12 @@ class RenderTransition(StrEnum):
     FADE = "fade"
 
 
+class NarrationTimingPolicy(StrEnum):
+    """Provider-neutral narration timing policy for final Short composition."""
+
+    FIT_TO_VIDEO = "fit_to_video"
+
+
 class CaptionPosition(StrEnum):
     """Provider-neutral caption anchor positions for simple Short overlays."""
 
@@ -71,6 +77,12 @@ class CaptionOverlay(CreatorOSModel):
         """Trim and reject blank caption text."""
 
         return _validate_non_blank(value, field_name="text")
+
+
+class AudioCompositionPolicy(CreatorOSModel):
+    """Provider-neutral audio-composition policy for initial narration handling."""
+
+    narration_timing: NarrationTimingPolicy = NarrationTimingPolicy.FIT_TO_VIDEO
 
 
 class RenderScene(CreatorOSModel):
@@ -162,6 +174,7 @@ class ShortRenderRequest(CreatorOSModel):
 
     scenes: list[RenderScene]
     narration: GeneratedAudio | None = None
+    audio_policy: AudioCompositionPolicy = Field(default_factory=AudioCompositionPolicy)
     width: int = Field(default=1080, gt=0)
     height: int = Field(default=1920, gt=0)
     fps: float = 30.0
@@ -269,8 +282,10 @@ class RenderedVideo(CreatorOSModel):
 
 
 __all__ = [
+    "AudioCompositionPolicy",
     "CaptionOverlay",
     "CaptionPosition",
+    "NarrationTimingPolicy",
     "RenderScene",
     "RenderTransition",
     "RenderedVideo",

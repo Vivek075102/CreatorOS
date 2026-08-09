@@ -29,6 +29,7 @@ from creatoros.providers.base import (
     ProviderResult,
     ProviderUsage,
 )
+from creatoros.providers.ffmpeg.audio import build_audio_render_plan
 from creatoros.providers.ffmpeg.captions import (
     build_ass_subtitle_document,
     build_subtitles_filter_arg,
@@ -164,6 +165,7 @@ class FFmpegRenderProvider:
                 working_directory=working_directory,
             )
             await self._compose_final_video(
+                request=request,
                 ffmpeg_binary=ffmpeg_binary,
                 concat_list_path=concat_list_path,
                 narration_path=narration_path,
@@ -201,6 +203,11 @@ class FFmpegRenderProvider:
                 "scene_count": len(request.scenes),
                 "output_format": request.output_format,
                 "has_narration": narration_path is not None,
+                "has_audio_stream": narration_path is not None,
+                "audio_codec": "aac" if narration_path is not None else "none",
+                "audio_policy": request.audio_policy.narration_timing.value,
+                "audio_sample_rate_hz": 48_000 if narration_path is not None else None,
+                "audio_channel_layout": "stereo" if narration_path is not None else None,
                 "local": True,
             },
         )
@@ -492,6 +499,7 @@ class FFmpegRenderProvider:
     async def _compose_final_video(
         self,
         *,
+        request: ShortRenderRequest,
         ffmpeg_binary: Path,
         concat_list_path: Path,
         narration_path: Path | None,
@@ -501,6 +509,7 @@ class FFmpegRenderProvider:
     ) -> None:
         """Compose normalized scene segments and optional narration into the final MP4."""
 
+        audio_plan = build_audio_render_plan(request)
         command = [
             str(ffmpeg_binary),
             "-f",
@@ -510,6 +519,8 @@ class FFmpegRenderProvider:
             "-i",
             str(concat_list_path),
         ]
+        if audio_plan.include_audio_stream and narration_path is not None:
+            command.extend(["-i", str(narration_path)])
         if caption_subtitle_path is not None:
             command.extend(
                 [
@@ -520,24 +531,32 @@ class FFmpegRenderProvider:
                     ),
                 ]
             )
-        if narration_path is not None:
+        if audio_plan.include_audio_stream and narration_path is not None:
+            assert audio_plan.filter_chain is not None
             command.extend(
                 [
-                    "-i",
-                    str(narration_path),
+                    "-filter_complex",
+                    audio_plan.filter_chain,
                     "-map",
                     "0:v:0",
                     "-map",
-                    "1:a:0",
+                    "[narration_out]",
                     "-c:v",
                     "libx264",
                     "-pix_fmt",
                     "yuv420p",
                     "-c:a",
-                    "aac",
+                    audio_plan.codec,
+                    "-ar",
+                    str(audio_plan.sample_rate_hz),
+                    "-ac",
+                    "2",
+                    "-b:a",
+                    audio_plan.bitrate,
                     "-movflags",
                     "+faststart",
-                    "-shortest",
+                    "-t",
+                    self._format_seconds(request.total_duration_seconds),
                     str(output_path),
                 ]
             )
@@ -553,6 +572,8 @@ class FFmpegRenderProvider:
                     "-an",
                     "-movflags",
                     "+faststart",
+                    "-t",
+                    self._format_seconds(request.total_duration_seconds),
                     str(output_path),
                 ]
             )
@@ -709,6 +730,7 @@ class FFmpegRenderProvider:
                 for scene in request.scenes
             ],
             "narration_uri": None if request.narration is None else request.narration.artifact.uri,
+            "audio_policy": request.audio_policy.model_dump(mode="json"),
             "width": request.width,
             "height": request.height,
             "fps": request.fps,

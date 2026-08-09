@@ -243,6 +243,7 @@ CreatorOS now also includes a provider-independent final assembly layer for Shor
 - Asset-count mismatches fail before rendering. The service does not silently drop assets, duplicate assets, or reuse the last asset.
 - Thumbnail output remains separate from the video timeline so it can be preserved for later publishing workflows without becoming an extra render scene.
 - Narration, when present, is forwarded as the existing typed `GeneratedAudio` reference. The assembly layer does not regenerate audio or invent missing duration values.
+- The video scene timeline remains authoritative. Narration is composition input only and does not extend or shorten the visual timeline.
 - Scene captions currently come only from existing typed storyboard `on_screen_text` fields and remain render instructions only.
 - `MediaRenderService` remains the render boundary. `ShortAssemblyService` builds the request and delegates rendering through that existing application service.
 - The default render path remains the deterministic mock renderer, which returns a typed `RenderedVideo` reference only.
@@ -263,20 +264,24 @@ CreatorOS now also includes `FFmpegRenderProvider` as the first real local rende
 - Caption wrapping is deterministic, UTF-8 subtitle files are generated inside the FFmpeg working directory, and subtitle temp files are cleaned after success or failure.
 - Caption positioning currently supports provider-neutral `bottom`, `center`, and `top` anchors with vertical-video-safe margins.
 - Local caption font selection is configurable through `CAPTION_FONT_NAME` and optional `CAPTION_FONT_FILE`.
+- Narration audio is normalized to AAC at 48 kHz stereo when present.
+- The visual timeline remains authoritative. Shorter narration is padded with silence, longer narration is trimmed to the video duration, and missing narration-duration metadata does not invent a measured runtime.
+- When narration is absent, the final MP4 currently has no audio stream rather than a fabricated silent track.
 - `MockRenderProvider` remains the default renderer, so normal tests and local workflows stay offline and deterministic unless `ffmpeg` is explicitly registered and selected.
 - FFmpeg must be installed separately or configured through `FFMPEG_PATH`.
-- This milestone still does not add word-level timing, animated captions, background music, overlays beyond simple text, GPU encoding, cloud rendering, or publishing.
+- This milestone still does not add word-level timing, animated captions, background music, overlays beyond simple text, STT, GPU encoding, cloud rendering, or publishing.
 
 ### Manual Caption Smoke Path
 
 After tests pass, a local manual caption smoke render may be performed with the already installed FFmpeg runtime.
 
 - Use one tiny local PNG already materialized under the artifact workspace.
-- Build a `ShortRenderRequest` with one 2-3 second image scene and caption text such as `CreatorOS caption test`.
-- Render at `1080x1920` with narration omitted.
-- Confirm the resulting local MP4 is playable and the caption appears within safe vertical-video margins.
+- Generate a tiny local test audio file with FFmpeg `sine` or `anullsrc`.
+- Build a `ShortRenderRequest` with one 2-3 second image scene, one caption such as `CreatorOS caption test`, and the local narration/test-audio asset.
+- Render at `1080x1920`.
+- Confirm the resulting local MP4 is playable, the caption appears within safe vertical-video margins, and the audio track is present for the full video duration.
 
-This smoke path is optional and local-only. It should not call a network service, OpenAI, speech-to-text, or publishing infrastructure.
+This smoke path is optional and local-only. It should not call a network service, OpenAI, text-to-speech generation, speech-to-text, or publishing infrastructure.
 
 ## Approved Media Execution
 

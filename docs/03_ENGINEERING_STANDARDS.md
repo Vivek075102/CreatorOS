@@ -304,6 +304,8 @@ The same separation applies to rendering and composition work. Future `VideoProv
 
 Caption overlays follow the same rule. Render providers may consume typed caption instructions that already exist on platform-owned render contracts, but they must not generate captions, rewrite caption text, perform speech-to-text transcription, or call LLMs as part of rendering. Text overlay behavior should remain deterministic, safely escaped for the chosen render backend, and configurable through the shared settings system rather than machine-specific hardcoded font paths.
 
+Audio composition follows the same boundary. Render providers may consume typed narration references and a small provider-neutral audio policy, but they must not generate narration, inspect prompts, call TTS providers, call speech-to-text systems, or implement broad sound-design logic inside the renderer. The authoritative duration is the visual timeline. Audio fitting behavior such as silence padding or trim-to-duration should be deterministic, explicit in code, and implemented through safe FFmpeg filter construction rather than hidden heuristics.
+
 ## 17. Prompt Engineering Standards
 
 Prompts are version-controlled product assets.
@@ -403,6 +405,7 @@ The following rules are mandatory:
 - Real local renderers must consume validated local files from the artifact workspace rather than provider-owned transient URLs.
 - FFmpeg command execution must use separate argv arguments with explicit timeouts and cleanup.
 - Subtitle and caption temp files must stay inside the controlled render working directory, use UTF-8 encoding, and be cleaned on success or failure.
+- Audio filter graphs must be deterministic, avoid hidden looping, and normalize source narration into explicit output codec, sample-rate, and channel settings when audio is included in the final MP4.
 
 File and asset operations should preserve traceability, reproducibility, and recovery.
 
