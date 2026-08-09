@@ -381,6 +381,8 @@ def test_register_openai_provider_registers_adapter_without_changing_default_res
     assert registry.contains("llm", "openai")
     assert provider.info.name == "openai"
     assert provider.info.provider_type == "llm"
+    assert provider._timeout_seconds == 30.0
+    assert provider._max_retries == 0
 
     run_async(provider.generate_text("Use helper defaults."))
     assert fake_responses.calls[0]["model"] == DEFAULT_OPENAI_MODEL

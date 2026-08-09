@@ -55,8 +55,8 @@ def register_openai_image_provider(
         api_key=settings.openai_api_key if api_key is None else api_key,
         client=client,
         default_model=settings.default_image_model if default_model is None else default_model,
-        timeout_seconds=settings.provider_timeout_seconds,
-        max_retries=settings.provider_max_retries,
+        timeout_seconds=settings.openai_image_timeout_seconds,
+        max_retries=0,
     )
     registry.register(provider, replace=replace)
     return provider

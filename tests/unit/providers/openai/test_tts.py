@@ -434,6 +434,8 @@ def test_register_openai_tts_provider_registers_explicitly_without_changing_mock
     assert provider is registry.get("voice", "openai-tts")
     assert registry.contains("voice", "openai-tts")
     assert resolve_default_tts_provider(registry).info.name == "mock"
+    assert provider._timeout_seconds == 30.0
+    assert provider._max_retries == 3
 
 
 def test_openai_tts_module_contains_no_file_or_pipeline_side_effects() -> None:

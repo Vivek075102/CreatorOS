@@ -563,6 +563,7 @@ def test_register_openai_image_provider_registers_explicitly_without_changing_mo
         openai_api_key = "sk-test"
         default_image_model = "gpt-image-1"
         default_image_provider = "mock"
+        openai_image_timeout_seconds = 300.0
         provider_timeout_seconds = 30.0
         provider_max_retries = 3
 
@@ -579,6 +580,61 @@ def test_register_openai_image_provider_registers_explicitly_without_changing_mo
     assert provider is registry.get("image", "openai-image")
     assert registry.contains("image", "openai-image")
     assert resolve_default_image_provider(registry).info.name == "mock"
+    assert provider._timeout_seconds == 300.0
+    assert provider._max_retries == 0
+
+
+def test_registered_image_provider_uses_image_specific_timeout_not_generic_timeout(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Bootstrap should preserve the slower dedicated image timeout policy."""
+
+    class StubSettings:
+        openai_api_key = "sk-test"
+        default_image_model = "gpt-image-1"
+        default_image_provider = "mock"
+        openai_image_timeout_seconds = 300.0
+        provider_timeout_seconds = 30.0
+        provider_max_retries = 3
+
+    registry = create_provider_registry()
+    monkeypatch.setattr("creatoros.providers.openai.bootstrap.get_settings", lambda: StubSettings())
+
+    provider = register_openai_image_provider(
+        registry,
+        client=FakeOpenAIImageClient(FakeImagesClient(response=build_image_response())),
+    )
+
+    assert provider._timeout_seconds == StubSettings.openai_image_timeout_seconds
+    assert provider._timeout_seconds != StubSettings.provider_timeout_seconds
+    assert provider._max_retries == 0
+
+
+def test_direct_and_registered_image_providers_share_the_same_safe_timeout_policy(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Bootstrap registration should match direct provider construction for image timeout safety."""
+
+    class StubSettings:
+        openai_api_key = "sk-test"
+        default_image_model = "gpt-image-1"
+        default_image_provider = "mock"
+        openai_image_timeout_seconds = 300.0
+        provider_timeout_seconds = 30.0
+        provider_max_retries = 3
+
+    monkeypatch.setattr("creatoros.providers.openai.image.get_settings", lambda: StubSettings())
+    monkeypatch.setattr("creatoros.providers.openai.bootstrap.get_settings", lambda: StubSettings())
+
+    direct_provider = OpenAIImageProvider(api_key="sk-test", default_model="gpt-image-1")
+    registry = create_provider_registry()
+    registered_provider = register_openai_image_provider(
+        registry,
+        client=FakeOpenAIImageClient(FakeImagesClient(response=build_image_response())),
+    )
+
+    assert direct_provider._timeout_seconds == registered_provider._timeout_seconds == 300.0
+    assert direct_provider._max_retries == registered_provider._max_retries == 0
 
 
 def test_openai_image_module_contains_no_file_or_pipeline_side_effects() -> None:
