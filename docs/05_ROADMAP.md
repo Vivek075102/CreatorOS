@@ -174,6 +174,7 @@ Build the Research Engine and Opportunity Engine capabilities required to gather
 - First explicit real TTS adapter behind `TTSProvider`, using the OpenAI SDK through the existing provider boundary while keeping mock as the default
 - First explicit real dedicated video-provider shell behind `VideoProvider`, with Kling as the initial adapter foundation, verified Kling 3.0 Turbo create-task HTTP transport, and live execution still gated until official query-task and output schemas are captured
 - Provider-neutral asset-hosting foundation with a dedicated `AssetHostingProvider` contract, deterministic mock hosting provider, `AssetHostingService`, and Cloudinary as the first optional real hosting implementation
+- A controlled single-scene `run video-smoke` CLI path for one hosted-image-to-one-video provider comparison run, with offline plan mode, explicit live confirmation, materialized clip output, and best-effort hosted-reference cleanup
 - Opportunity scoring rules and ranking pipeline
 - Research result persistence
 - Approval-ready content opportunity outputs
@@ -228,6 +229,7 @@ Build the Research Engine and Opportunity Engine capabilities required to gather
 - Integrated-pipeline completion in this milestone means pre-publication orchestration only. It does not mean retries, checkpoints, resume behavior, binary media generation, publishing, or approval-state mutation are complete
 - Media-provider-foundation completion in this milestone means contract and mock-provider readiness only. It does not mean real image generation, real speech synthesis, real video rendering, storage upload, or media execution inside the integrated pipeline are complete
 - Asset-hosting-foundation completion in this milestone means provider-neutral hosting contracts and one optional Cloudinary adapter only. It does not mean live hosting is enabled in the default pipeline, Kling is coupled to Cloudinary, or automatic hosted-asset cleanup has been wired into production orchestration yet
+- Single-scene-video-smoke completion in this milestone means one bounded comparison command only. It does not mean full multi-scene Shorts, narration composition, publishing, analytics, retries, or automatic provider benchmarking are complete
 - Media-generation-service completion in this milestone means application-layer provider orchestration plus controlled production-pipeline integration only. It does not mean durable storage, publishing, retries, or background-job execution are complete
 - Artifact-materialization completion in this milestone means deterministic local workspace preparation for controlled rendering only. It does not mean durable storage, cloud upload, publishing, or automatic cleanup policies beyond the current bounded workspace behavior are complete
 - FFmpeg-renderer completion in this milestone means local MP4 composition plus foundational timed caption overlays and basic narration fitting only. It does not mean word-level subtitles, animated captions, background music, sound design, GPU encoding, cloud rendering, publishing, or production-grade editing effects are complete
@@ -265,6 +267,7 @@ Build the Research Engine and Opportunity Engine capabilities required to gather
 - Guarded live image smoke verification, binary materialization, and durable storage references only when later media milestones intentionally add those operational paths
 - Guarded live TTS smoke verification, binary audio materialization, and durable storage references only when later media milestones intentionally add those operational paths
 - Broader live-provider diagnostics only after the guarded smoke-test path proves operationally safe
+- Multi-provider motion-quality comparison workflows only when later milestones intentionally expand the current single-scene smoke path into a broader evaluation framework
 - Usage persistence, monetary cost estimation, and analytics storage only when later milestones justify them
 - Retry, repair, fallback, streaming, and workflow-state integration only when later milestones justify them
 - Resume, checkpoint restart, provider failover, and cost estimation only when later milestones intentionally design those capabilities rather than inferring them from the current controlled production path

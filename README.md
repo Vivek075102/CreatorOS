@@ -340,6 +340,24 @@ python -m creatoros run short --game Roblox --topic "funny myths" --approve --im
 - If a run fails after successful materialization, CreatorOS preserves those materialized artifacts for diagnostics, cleans renderer temporary working directories, and never reports false success. Automatic retry and resume are not part of this milestone.
 - The command does not publish, schedule, upload, or run analytics.
 
+## Single-Scene Video Smoke CLI
+
+CreatorOS now also includes one explicit single-scene image-to-video smoke command for provider comparison work:
+
+```bash
+python -m creatoros run video-smoke --image-path assets/example.png --prompt "slow cinematic camera push-in" --duration 5 --plan
+python -m creatoros run video-smoke --image-path assets/example.png --prompt "slow cinematic camera push-in" --duration 5 --hosting-provider mock --video-provider mock
+python -m creatoros run video-smoke --image-path assets/example.png --prompt "smooth cinematic camera movement, natural environmental motion" --duration 5 --hosting-provider cloudinary --video-provider kling --confirm-live-calls
+```
+
+- `run video-smoke` performs one local-image-to-one-video clip path only. It does not build a full Short, generate narration, publish, or call YouTube.
+- `run video-smoke --plan` validates the local image, derives the run workspace, and prints `image_input: local`, `hosting_calls: 1`, `video_generation_calls: 1`, `will_use_live_media`, and `execution_started: false` without making any network call.
+- Mock mode exercises the full hosting, video-generation, materialization, and cleanup path offline by routing through the same provider-neutral services used for live execution.
+- Live execution remains explicitly gated. API credentials alone are not authorization, and non-mock hosting or video providers still require `--confirm-live-calls`.
+- The command materializes the resulting clip at `artifacts/<run_id>/video/clip_001.mp4`.
+- Hosted reference cleanup is best-effort after execution. Cleanup failure does not erase a successful local video result.
+- The command is intended for controlled Kling or future provider quality comparison only, not for full workflow automation.
+
 ## Controlled OpenAI Smoke Test
 
 CreatorOS now includes one explicit opt-in CLI path for a controlled live OpenAI smoke test:

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from pathlib import Path
 from typing import Literal
 
 from pydantic import Field, field_validator, model_validator
@@ -246,6 +247,85 @@ class ProductionExecutionPlan(CreatorOSModel):
         return _validate_non_blank(value, field_name=info.field_name)
 
 
+class VideoSmokeRequest(CreatorOSModel):
+    """Typed single-scene image-to-video smoke-test request."""
+
+    image_path: Path
+    prompt: str
+    duration_seconds: float = Field(gt=0)
+    run_id: str
+    provider_selection: MediaProviderSelection
+    confirm_live_media_calls: bool = False
+
+    @field_validator("image_path", mode="before")
+    @classmethod
+    def normalize_image_path(cls, value: Path | str) -> Path:
+        """Normalize the local source image path to an absolute path."""
+
+        return Path(value).resolve()
+
+    @field_validator("prompt")
+    @classmethod
+    def validate_prompt(cls, value: str, info) -> str:
+        """Trim and reject blank motion prompts."""
+
+        return _validate_non_blank(value, field_name=info.field_name)
+
+    @field_validator("run_id")
+    @classmethod
+    def validate_run_id(cls, value: str) -> str:
+        """Reuse artifact workspace run-id validation for smoke-test requests."""
+
+        from creatoros.services.artifact_materialization import ArtifactWorkspace
+
+        return ArtifactWorkspace.validate_run_id(value)
+
+
+class VideoSmokePlan(CreatorOSModel):
+    """Typed offline preflight summary for one single-scene smoke execution."""
+
+    run_id: str
+    image_input: Literal["local"] = "local"
+    hosting_provider: str
+    video_provider: str
+    hosting_calls: int = Field(default=1, ge=0)
+    video_generation_calls: int = Field(default=1, ge=0)
+    will_use_live_media: bool
+    workspace_path: str
+    execution_started: bool = False
+
+    @field_validator("run_id", "hosting_provider", "video_provider", "workspace_path")
+    @classmethod
+    def validate_required_text(cls, value: str, info) -> str:
+        """Trim and reject blank smoke-plan text fields."""
+
+        return _validate_non_blank(value, field_name=info.field_name)
+
+
+class VideoSmokeResult(CreatorOSModel):
+    """Typed single-scene smoke execution result."""
+
+    run_id: str
+    provider_selection: MediaProviderSelection
+    duration_seconds: float = Field(gt=0)
+    materialized_workspace: Path
+    final_video_path: Path
+
+    @field_validator("run_id")
+    @classmethod
+    def validate_run_id(cls, value: str, info) -> str:
+        """Trim and reject blank smoke-result run IDs."""
+
+        return _validate_non_blank(value, field_name=info.field_name)
+
+    @field_validator("materialized_workspace", "final_video_path", mode="before")
+    @classmethod
+    def normalize_paths(cls, value: Path | str) -> Path:
+        """Normalize result paths to absolute paths."""
+
+        return Path(value).resolve()
+
+
 class MediaExecutionResult(CreatorOSModel):
     """Typed post-approval aggregate result for media execution."""
 
@@ -309,4 +389,7 @@ __all__ = [
     "HumanApproval",
     "MediaExecutionResult",
     "ProductionExecutionPlan",
+    "VideoSmokePlan",
+    "VideoSmokeRequest",
+    "VideoSmokeResult",
 ]

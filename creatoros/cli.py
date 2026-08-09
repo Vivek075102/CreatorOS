@@ -10,7 +10,7 @@ import sys
 from contextlib import redirect_stderr, redirect_stdout
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TextIO
+from typing import Protocol, TextIO
 from urllib.parse import urlsplit
 
 from pydantic import ValidationError
@@ -27,9 +27,15 @@ from creatoros.core import (
     ProviderNotFoundError,
     ProviderUnavailableError,
 )
-from creatoros.domain import ContentPlatform
+from creatoros.domain import AssetType, ContentPlatform, GeneratedAsset
 from creatoros.observability import configure_logging, get_logger
-from creatoros.orchestrator import GamingWorkflowInput, run_demo_gaming_workflow
+from creatoros.orchestrator import (
+    GamingWorkflowInput,
+    VideoSmokePlan,
+    VideoSmokeRequest,
+    VideoSmokeResult,
+    run_demo_gaming_workflow,
+)
 from creatoros.parsing import (
     GamingCTAOutput,
     build_builtin_parser_registry,
@@ -89,6 +95,9 @@ EXIT_UNEXPECTED_FAILURE = 1
 EXIT_USAGE_ERROR = 2
 EXIT_CONFIGURATION_ERROR = 3
 EXIT_RESOURCE_UNAVAILABLE = 4
+_VIDEO_SMOKE_SUPPORTED_IMAGE_SUFFIXES = frozenset({".jpg", ".jpeg", ".png"})
+_KLING_MIN_DURATION_SECONDS = 3.0
+_KLING_MAX_DURATION_SECONDS = 15.0
 
 
 class _FallbackLogger:
@@ -109,6 +118,11 @@ class _FallbackLogger:
 
         del event, kwargs
 
+    def warning(self, event: str, **kwargs: object) -> None:
+        """Ignore warning log calls when structured logging is unavailable."""
+
+        del event, kwargs
+
 
 @dataclass(slots=True)
 class DatabaseSummary:
@@ -117,6 +131,13 @@ class DatabaseSummary:
     driver: str = "unknown"
     host: str = "unknown"
     name: str = "unknown"
+
+
+class _WarningLogger(Protocol):
+    """Minimal logger interface for best-effort warning emission."""
+
+    def warning(self, event: str, **kwargs: object) -> None:
+        """Record one warning-level event."""
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -690,6 +711,59 @@ def _build_parser() -> argparse.ArgumentParser:
         command_group="run",
         command_name="short",
         handler=_handle_run_short,
+    )
+
+    run_video_smoke = run_subparsers.add_parser(
+        "video-smoke",
+        help="Run one controlled single-scene image-to-video smoke workflow.",
+    )
+    run_video_smoke.add_argument(
+        "--image-path",
+        required=True,
+        help="Local PNG or JPEG image used as the single reference frame.",
+    )
+    run_video_smoke.add_argument(
+        "--prompt",
+        required=True,
+        help="Provider-neutral motion prompt for the generated clip.",
+    )
+    run_video_smoke.add_argument(
+        "--duration",
+        default=5.0,
+        type=float,
+        help="Requested clip duration in seconds.",
+    )
+    run_video_smoke.add_argument(
+        "--run-id",
+        default=None,
+        help="Stable artifact workspace run ID. If omitted, a deterministic safe run ID is derived.",
+    )
+    run_video_smoke.add_argument(
+        "--plan",
+        action="store_true",
+        help="Validate inputs and print the offline execution plan without hosting or video generation.",
+    )
+    run_video_smoke.add_argument(
+        "--hosting-provider",
+        default="mock",
+        choices=["mock", "cloudinary"],
+        help="Hosting provider used to convert the local image into a provider-reachable HTTPS reference.",
+    )
+    run_video_smoke.add_argument(
+        "--video-provider",
+        default="mock",
+        choices=["mock", "kling"],
+        help="Video provider used to generate the single scene clip.",
+    )
+    run_video_smoke.add_argument(
+        "--confirm-live-calls",
+        action="store_true",
+        help="Required acknowledgement before any live non-mock hosting or video provider is used.",
+    )
+    run_video_smoke.set_defaults(
+        command_group="run",
+        command_name="video-smoke",
+        handler=_handle_run_video_smoke,
     )
 
     return parser
@@ -1305,6 +1379,121 @@ def _build_default_short_run_id(*, game: str, topic: str) -> str:
     return f"short_{normalized_seed}"
 
 
+def _build_default_video_smoke_run_id(*, image_path: Path) -> str:
+    """Create one deterministic safe run ID from the source image name."""
+
+    normalized_seed = re.sub(r"[^0-9A-Za-z._-]+", "_", image_path.stem.strip().lower())
+    normalized_seed = re.sub(r"_+", "_", normalized_seed).strip("._-")
+    if not normalized_seed:
+        normalized_seed = "image"
+    return f"video_smoke_{normalized_seed}"
+
+
+def _validate_video_smoke_image_path(raw_path: str) -> Path:
+    """Validate one local source image path before any provider call."""
+
+    candidate_path = Path(_normalize_cli_text(raw_path, field_name="image_path"))
+    try:
+        resolved_path = candidate_path.resolve(strict=True)
+    except OSError as error:
+        raise CreatorOSValidationError(
+            "image_path must point to an existing local file",
+            code="cli_invalid_image_path",
+            details={"field_name": "image_path"},
+        ) from error
+    if not resolved_path.is_file():
+        raise CreatorOSValidationError(
+            "image_path must point to an existing local file",
+            code="cli_invalid_image_path",
+            details={"field_name": "image_path"},
+        )
+
+    if resolved_path.suffix.lower() not in _VIDEO_SMOKE_SUPPORTED_IMAGE_SUFFIXES:
+        raise CreatorOSValidationError(
+            "image_path must use a supported PNG or JPEG extension",
+            code="cli_invalid_image_path",
+            details={"field_name": "image_path"},
+        )
+
+    if resolved_path.stat().st_size <= 0:
+        raise CreatorOSValidationError(
+            "image_path must point to a non-empty local file",
+            code="cli_invalid_image_path",
+            details={"field_name": "image_path"},
+        )
+
+    return resolved_path
+
+
+def _validate_video_smoke_duration(*, duration_seconds: float, video_provider: str) -> float:
+    """Validate one requested smoke-test duration with provider-specific guardrails."""
+
+    if duration_seconds <= 0:
+        raise CreatorOSValidationError(
+            "duration must be greater than zero",
+            code="cli_invalid_duration",
+            details={"field_name": "duration"},
+        )
+
+    if video_provider == "kling":
+        if duration_seconds < _KLING_MIN_DURATION_SECONDS:
+            raise CreatorOSValidationError(
+                "Kling video smoke duration must be at least 3 seconds",
+                code="cli_invalid_duration",
+                details={"field_name": "duration", "provider_name": "kling"},
+            )
+        if duration_seconds > _KLING_MAX_DURATION_SECONDS:
+            raise CreatorOSValidationError(
+                "Kling video smoke duration must not exceed 15 seconds",
+                code="cli_invalid_duration",
+                details={"field_name": "duration", "provider_name": "kling"},
+            )
+    return duration_seconds
+
+
+def _build_video_smoke_request(args: argparse.Namespace) -> VideoSmokeRequest:
+    """Build one validated single-scene video smoke request from CLI inputs."""
+
+    from creatoros.services import MediaProviderSelection
+
+    image_path = _validate_video_smoke_image_path(args.image_path)
+    duration_seconds = _validate_video_smoke_duration(
+        duration_seconds=args.duration,
+        video_provider=args.video_provider,
+    )
+    run_id = (
+        _normalize_cli_text(args.run_id, field_name="run_id")
+        if args.run_id is not None
+        else _build_default_video_smoke_run_id(image_path=image_path)
+    )
+    return VideoSmokeRequest(
+        image_path=image_path,
+        prompt=_normalize_cli_text(args.prompt, field_name="prompt"),
+        duration_seconds=duration_seconds,
+        run_id=run_id,
+        provider_selection=MediaProviderSelection(
+            hosting_provider_name=args.hosting_provider,
+            video_provider_name=args.video_provider,
+        ),
+        confirm_live_media_calls=args.confirm_live_calls,
+    )
+
+
+def _build_video_smoke_plan(*, request: VideoSmokeRequest, settings) -> VideoSmokePlan:
+    """Build one offline preflight summary for the single-scene smoke workflow."""
+
+    return VideoSmokePlan(
+        run_id=request.run_id,
+        hosting_provider=request.provider_selection.hosting_provider_name or settings.default_asset_hosting_provider,
+        video_provider=request.provider_selection.video_provider_name or settings.default_video_provider,
+        will_use_live_media=(
+            (request.provider_selection.hosting_provider_name or settings.default_asset_hosting_provider) != "mock"
+            or (request.provider_selection.video_provider_name or settings.default_video_provider) != "mock"
+        ),
+        workspace_path=str((settings.artifact_root / request.run_id).resolve()),
+    )
+
+
 def _build_demo_approved_media_execution_request(args: argparse.Namespace):
     """Build one deterministic approved short-production request from CLI inputs."""
 
@@ -1580,6 +1769,207 @@ def _build_short_provider_registry(args: argparse.Namespace):
     if args.render_provider == "ffmpeg":
         register_ffmpeg_render_provider(provider_registry)
     return provider_registry
+
+
+def _build_video_smoke_provider_registry(
+    args: argparse.Namespace,
+    *,
+    allowed_image_path: Path,
+):
+    """Create the provider registry for one controlled single-scene smoke execution."""
+
+    from creatoros.providers import (
+        register_cloudinary_asset_hosting_provider,
+        register_kling_video_provider,
+    )
+
+    provider_registry = create_mock_provider_registry()
+    if args.hosting_provider == "cloudinary":
+        register_cloudinary_asset_hosting_provider(
+            provider_registry,
+            allowed_roots=(Path.cwd(), allowed_image_path.parent.resolve()),
+        )
+    if args.video_provider == "kling":
+        register_kling_video_provider(provider_registry)
+    return provider_registry
+
+
+def _create_video_smoke_services(*, provider_registry, settings):
+    """Create the bounded services used by the video-smoke CLI path."""
+
+    from creatoros.services import (
+        ArtifactMaterializationService,
+        AssetHostingService,
+        MediaGenerationService,
+    )
+
+    return (
+        AssetHostingService(provider_registry, settings),
+        MediaGenerationService(provider_registry, settings),
+        ArtifactMaterializationService(settings),
+    )
+
+
+async def _execute_video_smoke_workflow(
+    *,
+    request: VideoSmokeRequest,
+    settings,
+    provider_registry,
+    logger: _WarningLogger,
+) -> VideoSmokeResult:
+    """Execute one hosted-image single-scene video smoke workflow."""
+
+    from creatoros.providers import ProviderRequestContext, VideoGenerationRequest
+    from creatoros.services import GeneratedMediaPackage
+
+    hosting_service, media_generation_service, materialization_service = _create_video_smoke_services(
+        provider_registry=provider_registry,
+        settings=settings,
+    )
+    hosting_provider_name = (
+        request.provider_selection.hosting_provider_name or settings.default_asset_hosting_provider
+    )
+    video_provider_name = (
+        request.provider_selection.video_provider_name or settings.default_video_provider
+    )
+    context = ProviderRequestContext(
+        workflow_name="video_smoke",
+        step_id="single_scene",
+        metadata={"run_id": request.run_id},
+    )
+    local_image_asset = GeneratedAsset(
+        asset_type=AssetType.IMAGE,
+        uri=str(request.image_path),
+        metadata={"image_input": "local"},
+    )
+    hosted_asset = None
+    execution_error: Exception | None = None
+
+    try:
+        hosted_asset = await hosting_service.host_asset(
+            local_image_asset,
+            provider_name=hosting_provider_name,
+            context=context,
+        )
+        hosted_reference = GeneratedAsset(
+            asset_type=AssetType.IMAGE,
+            uri=hosted_asset.public_url,
+            metadata={"provider_reference_kind": "public_https_url"},
+        )
+        generated_video = await media_generation_service.generate_video(
+            VideoGenerationRequest(
+                prompt=request.prompt,
+                duration_seconds=request.duration_seconds,
+                reference_image=hosted_reference,
+            ),
+            provider_name=video_provider_name,
+            context=context,
+        )
+        materialized_package = materialization_service.materialize_package(
+            GeneratedMediaPackage(scene_videos=(generated_video,)),
+            run_id=request.run_id,
+        )
+        final_video = materialized_package.scene_videos[0]
+        return VideoSmokeResult(
+            run_id=request.run_id,
+            provider_selection=request.provider_selection,
+            duration_seconds=request.duration_seconds,
+            materialized_workspace=materialized_package.workspace.workspace_path,
+            final_video_path=final_video.path,
+        )
+    except Exception as error:
+        execution_error = error
+        raise
+    finally:
+        if hosted_asset is not None:
+            try:
+                await hosting_service.delete_hosted_asset(
+                    hosted_asset,
+                    provider_name=hosting_provider_name,
+                    context=context,
+                )
+            except CreatorOSError as cleanup_error:
+                logger.warning(
+                    "video_smoke_cleanup_failed",
+                    run_id=request.run_id,
+                    provider_name=hosting_provider_name,
+                    error_type=type(cleanup_error).__name__,
+                    execution_failed=execution_error is not None,
+                )
+                if execution_error is not None:
+                    pass
+
+
+def _handle_run_video_smoke(
+    args: argparse.Namespace,
+    *,
+    stdout: TextIO,
+    stderr: TextIO,
+) -> int:
+    """Run one controlled single-scene image-to-video smoke workflow."""
+
+    request = _build_video_smoke_request(args)
+    settings = get_settings()
+    plan = _build_video_smoke_plan(request=request, settings=settings)
+
+    if args.plan:
+        _write_rows(
+            stdout,
+            [
+                ("workflow", "video smoke"),
+                ("mode", "plan"),
+                ("run_id", plan.run_id),
+                ("image_input", plan.image_input),
+                ("hosting_provider", plan.hosting_provider),
+                ("video_provider", plan.video_provider),
+                ("hosting_calls", plan.hosting_calls),
+                ("video_generation_calls", plan.video_generation_calls),
+                ("will_use_live_media", plan.will_use_live_media),
+                ("workspace", plan.workspace_path),
+                ("execution_started", plan.execution_started),
+            ],
+        )
+        return EXIT_SUCCESS
+
+    if plan.will_use_live_media and not request.confirm_live_media_calls:
+        _write_error(
+            stderr,
+            "Error: non-mock hosting or video providers require --confirm-live-calls before execution.",
+        )
+        return EXIT_CONFIGURATION_ERROR
+
+    result = asyncio.run(
+        _execute_video_smoke_workflow(
+            request=request,
+            settings=settings,
+            provider_registry=_build_video_smoke_provider_registry(
+                args,
+                allowed_image_path=request.image_path,
+            ),
+            logger=get_logger("cli"),
+        )
+    )
+    _write_rows(
+        stdout,
+        [
+            ("workflow", "video smoke"),
+            ("mode", "execute"),
+            ("run_id", result.run_id),
+            (
+                "hosting_provider",
+                result.provider_selection.hosting_provider_name or settings.default_asset_hosting_provider,
+            ),
+            (
+                "video_provider",
+                result.provider_selection.video_provider_name or settings.default_video_provider,
+            ),
+            ("duration", result.duration_seconds),
+            ("materialized_workspace", result.materialized_workspace),
+            ("final_video", result.final_video_path),
+            ("success", True),
+        ],
+    )
+    return EXIT_SUCCESS
 
 
 def _handle_run_short(

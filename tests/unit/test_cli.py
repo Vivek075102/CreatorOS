@@ -12,8 +12,15 @@ from typing import cast
 import pytest
 
 from creatoros import __version__, cli
-from creatoros.config import get_settings
-from creatoros.core import ConfigurationError, ProviderAuthenticationError, ProviderNotFoundError
+from creatoros.config import Settings, get_settings
+from creatoros.core import (
+    ConfigurationError,
+    ProviderAuthenticationError,
+    ProviderNotFoundError,
+    ProviderResponseError,
+)
+from creatoros.domain import AssetType, GeneratedAsset, HostedAsset
+from creatoros.orchestrator import VideoSmokeRequest, VideoSmokeResult
 from creatoros.parsing import GamingCTAOutput
 from creatoros.prompts import (
     PromptAssetDiscovery,
@@ -21,8 +28,14 @@ from creatoros.prompts import (
     PromptManifestLoader,
     create_builtin_prompt_registry,
 )
-from creatoros.providers import LLMUsage, create_provider_registry
-from creatoros.services import LLMExecutionRequest, LLMExecutionResult
+from creatoros.providers import GeneratedVideo, LLMUsage, create_provider_registry
+from creatoros.services import (
+    ArtifactMaterializationService,
+    GeneratedMediaPackage,
+    LLMExecutionRequest,
+    LLMExecutionResult,
+    MediaProviderSelection,
+)
 
 
 @dataclass
@@ -63,6 +76,199 @@ class StubSettings:
     prompts_dir: str = "C:/GamingAIFactory/prompts"
 
 
+MINIMAL_PNG_BYTES = (
+    b"\x89PNG\r\n\x1a\n"
+    b"\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15\xc4\x89"
+    b"\x00\x00\x00\x0bIDATx\x9cc``\x00\x00\x00\x02\x00\x01H\xaf\xa4q"
+    b"\x00\x00\x00\x00IEND\xaeB`\x82"
+)
+MINIMAL_MP4_BYTES = (
+    b"\x00\x00\x00\x18ftypmp42"
+    b"\x00\x00\x00\x00mp42isom"
+)
+
+
+def build_runtime_settings(tmp_path: Path) -> Settings:
+    """Create one real Settings object for offline CLI smoke tests."""
+
+    return Settings.model_construct(
+        app_name="CreatorOS",
+        app_env="testing",
+        debug=False,
+        log_level="INFO",
+        database_url="sqlite:///./database/creatoros.db",
+        default_llm_provider="mock",
+        default_llm_model="mock-model",
+        default_image_provider="mock",
+        default_image_model=None,
+        default_tts_provider="mock",
+        default_tts_model=None,
+        default_tts_voice="alloy",
+        default_video_provider="mock",
+        default_video_model="mock-model",
+        default_render_provider="mock",
+        default_asset_hosting_provider="mock",
+        openai_api_key="openai-secret",
+        cloudinary_cloud_name="demo-cloud",
+        cloudinary_api_key="cloudinary-key",
+        cloudinary_api_secret="cloudinary-secret",
+        cloudinary_asset_folder="creatoros",
+        kling_api_key="kling-test-key",
+        kling_api_base_url="https://api.kling.example",
+        kling_video_timeout_seconds=900.0,
+        kling_video_poll_interval_seconds=0.01,
+        openai_image_timeout_seconds=300.0,
+        anthropic_api_key="anthropic-secret",
+        youtube_client_id="youtube-client",
+        youtube_client_secret="youtube-secret",
+        provider_timeout_seconds=30.0,
+        provider_max_retries=0,
+        artifact_root=tmp_path / "artifacts",
+        assets_dir=tmp_path / "assets",
+        logs_dir=tmp_path / "logs",
+        prompts_dir=tmp_path / "prompts",
+    )
+
+
+def create_test_image(tmp_path: Path, *, filename: str = "scene.png", payload: bytes = MINIMAL_PNG_BYTES) -> Path:
+    """Create one local image file for CLI smoke tests."""
+
+    image_path = tmp_path / filename
+    image_path.write_bytes(payload)
+    return image_path
+
+
+def build_video_smoke_request(
+    image_path: Path,
+    *,
+    hosting_provider: str = "mock",
+    video_provider: str = "mock",
+    confirm_live_media_calls: bool = False,
+    prompt: str = "slow cinematic camera push-in",
+    duration_seconds: float = 5.0,
+    run_id: str = "video_smoke_test",
+) -> VideoSmokeRequest:
+    """Create one reusable single-scene smoke request for direct helper tests."""
+
+    return VideoSmokeRequest(
+        image_path=image_path,
+        prompt=prompt,
+        duration_seconds=duration_seconds,
+        run_id=run_id,
+        provider_selection=MediaProviderSelection(
+            hosting_provider_name=hosting_provider,
+            video_provider_name=video_provider,
+        ),
+        confirm_live_media_calls=confirm_live_media_calls,
+    )
+
+
+class VideoSmokeHostingSpy:
+    """Record hosted-asset calls for single-scene smoke tests."""
+
+    def __init__(self) -> None:
+        self.host_calls = 0
+        self.delete_calls = 0
+        self.last_asset: GeneratedAsset | None = None
+        self.hosted_assets: list[HostedAsset] = []
+
+    async def host_asset(self, asset: GeneratedAsset, *, provider_name: str | None = None, context=None) -> HostedAsset:
+        """Return one deterministic hosted asset without network access."""
+
+        del context
+        self.host_calls += 1
+        self.last_asset = asset.model_copy(deep=True)
+        hosted_asset = HostedAsset(
+            source_asset=asset,
+            public_url="https://example.invalid/creatoros/scene.png",
+            provider_name=provider_name or "mock",
+            provider_asset_id="creatoros/scene",
+            mime_type="image/png",
+        )
+        self.hosted_assets.append(hosted_asset)
+        return hosted_asset
+
+    async def delete_hosted_asset(self, hosted_asset: HostedAsset, *, provider_name: str | None = None, context=None) -> bool:
+        """Record one cleanup call and report success."""
+
+        del hosted_asset, provider_name, context
+        self.delete_calls += 1
+        return True
+
+
+class VideoSmokeFailingDeleteHostingSpy(VideoSmokeHostingSpy):
+    """Simulate hosted-asset cleanup failure after a successful generation."""
+
+    async def delete_hosted_asset(self, hosted_asset: HostedAsset, *, provider_name: str | None = None, context=None) -> bool:
+        """Raise one cleanup failure without affecting the main result path."""
+
+        del hosted_asset, provider_name, context
+        self.delete_calls += 1
+        raise ProviderResponseError("cleanup failed", code="provider_response_invalid")
+
+
+class VideoSmokeFailingHostSpy(VideoSmokeHostingSpy):
+    """Simulate a hosting failure before video generation begins."""
+
+    async def host_asset(self, asset: GeneratedAsset, *, provider_name: str | None = None, context=None) -> HostedAsset:
+        """Raise one provider-style hosting failure."""
+
+        del asset, provider_name, context
+        self.host_calls += 1
+        raise ProviderResponseError("hosting failed", code="provider_response_invalid")
+
+
+class VideoSmokeGenerationSpy:
+    """Record generated video calls for single-scene smoke tests."""
+
+    def __init__(self) -> None:
+        self.video_calls = 0
+        self.requests = []
+
+    async def generate_video(self, request, *, provider_name: str | None = None, context=None) -> GeneratedVideo:
+        """Return one deterministic video payload for materialization."""
+
+        del context
+        self.video_calls += 1
+        self.requests.append(request.model_copy(deep=True))
+        return GeneratedVideo(
+            artifact=GeneratedAsset(asset_type=AssetType.VIDEO, uri="mock://generated/video/scene.mp4"),
+            provider_name=provider_name or "mock",
+            model="mock-video-model",
+            mime_type="video/mp4",
+            duration_seconds=request.duration_seconds,
+            request_id="video-smoke-request",
+            payload_bytes=MINIMAL_MP4_BYTES,
+        )
+
+
+class VideoSmokeFailingGenerationSpy(VideoSmokeGenerationSpy):
+    """Simulate a provider-side generation failure with no retry."""
+
+    async def generate_video(self, request, *, provider_name: str | None = None, context=None) -> GeneratedVideo:
+        """Raise one provider-style generation failure."""
+
+        del request, provider_name, context
+        self.video_calls += 1
+        raise ProviderResponseError("video failed", code="provider_response_invalid")
+
+
+class VideoSmokeMaterializerSpy(ArtifactMaterializationService):
+    """Count materialization calls while using the real file-writing implementation."""
+
+    def __init__(self, settings: Settings) -> None:
+        super().__init__(settings)
+        self.calls = 0
+        self.last_package: GeneratedMediaPackage | None = None
+
+    def materialize_package(self, package: GeneratedMediaPackage, *, run_id: str):
+        """Count one call and then perform real local materialization."""
+
+        self.calls += 1
+        self.last_package = package.model_copy(deep=True)
+        return super().materialize_package(package, run_id=run_id)
+
+
 class FakeLogger:
     """Capture CLI lifecycle logs for assertions."""
 
@@ -83,6 +289,11 @@ class FakeLogger:
         """Record an exception log event."""
 
         self.events.append({"level": "error", "event": event, "kwargs": kwargs})
+
+    def warning(self, event: str, **kwargs: object) -> None:
+        """Record a warning log event."""
+
+        self.events.append({"level": "warning", "event": event, "kwargs": kwargs})
 
 
 @pytest.fixture(autouse=True)
@@ -1247,6 +1458,522 @@ def test_openai_smoke_provider_errors_return_safe_resource_exit_code(
     assert exit_code == 4
     assert stdout == ""
     assert "Error: OpenAI authentication failed" in stderr
+
+
+def test_run_help_displays_video_smoke_command(cli_module) -> None:
+    """Run help should include the single-scene video smoke command."""
+
+    exit_code, stdout, stderr = run_cli(cli_module, ["run", "--help"])
+
+    assert exit_code == 0
+    assert "video-smoke" in stdout
+    assert stderr == ""
+
+
+def test_run_video_smoke_help_documents_required_inputs(cli_module) -> None:
+    """Video smoke help should document the local image and planning inputs."""
+
+    exit_code, stdout, stderr = run_cli(cli_module, ["run", "video-smoke", "--help"])
+
+    assert exit_code == 0
+    assert "--image-path" in stdout
+    assert "--prompt" in stdout
+    assert "--plan" in stdout
+    assert "--confirm-live-calls" in stdout
+    assert stderr == ""
+
+
+def test_run_video_smoke_missing_image_is_rejected(cli_module, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """A missing local source image should fail before any provider work."""
+
+    monkeypatch.setattr(cli_module, "get_settings", lambda: build_runtime_settings(tmp_path))
+
+    exit_code, stdout, stderr = run_cli(
+        cli_module,
+        [
+            "run",
+            "video-smoke",
+            "--image-path",
+            str(tmp_path / "missing.png"),
+            "--prompt",
+            "slow cinematic camera push-in",
+        ],
+    )
+
+    assert exit_code == 3
+    assert stdout == ""
+    assert "image_path must point to an existing local file" in stderr
+
+
+def test_run_video_smoke_unsupported_extension_is_rejected(
+    cli_module,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Only PNG and JPEG inputs should be accepted for the smoke command."""
+
+    image_path = create_test_image(tmp_path, filename="scene.gif")
+    monkeypatch.setattr(cli_module, "get_settings", lambda: build_runtime_settings(tmp_path))
+
+    exit_code, stdout, stderr = run_cli(
+        cli_module,
+        [
+            "run",
+            "video-smoke",
+            "--image-path",
+            str(image_path),
+            "--prompt",
+            "slow cinematic camera push-in",
+        ],
+    )
+
+    assert exit_code == 3
+    assert stdout == ""
+    assert "supported PNG or JPEG extension" in stderr
+
+
+def test_run_video_smoke_blank_prompt_is_rejected(cli_module, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """Blank motion prompts should fail at the CLI validation boundary."""
+
+    image_path = create_test_image(tmp_path)
+    monkeypatch.setattr(cli_module, "get_settings", lambda: build_runtime_settings(tmp_path))
+
+    exit_code, stdout, stderr = run_cli(
+        cli_module,
+        ["run", "video-smoke", "--image-path", str(image_path), "--prompt", "   "],
+    )
+
+    assert exit_code == 3
+    assert stdout == ""
+    assert "prompt must not be blank" in stderr
+
+
+def test_run_video_smoke_rejects_kling_duration_below_minimum(
+    cli_module,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Kling-selected smoke durations must respect the lower provider bound."""
+
+    image_path = create_test_image(tmp_path)
+    monkeypatch.setattr(cli_module, "get_settings", lambda: build_runtime_settings(tmp_path))
+
+    exit_code, _, stderr = run_cli(
+        cli_module,
+        [
+            "run",
+            "video-smoke",
+            "--image-path",
+            str(image_path),
+            "--prompt",
+            "smooth motion",
+            "--duration",
+            "2",
+            "--video-provider",
+            "kling",
+        ],
+    )
+
+    assert exit_code == 3
+    assert "at least 3 seconds" in stderr
+
+
+def test_run_video_smoke_rejects_kling_duration_above_maximum(
+    cli_module,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Kling-selected smoke durations must respect the upper provider bound."""
+
+    image_path = create_test_image(tmp_path)
+    monkeypatch.setattr(cli_module, "get_settings", lambda: build_runtime_settings(tmp_path))
+
+    exit_code, _, stderr = run_cli(
+        cli_module,
+        [
+            "run",
+            "video-smoke",
+            "--image-path",
+            str(image_path),
+            "--prompt",
+            "smooth motion",
+            "--duration",
+            "16",
+            "--video-provider",
+            "kling",
+        ],
+    )
+
+    assert exit_code == 3
+    assert "not exceed 15 seconds" in stderr
+
+
+def test_run_video_smoke_plan_never_builds_execution_services(
+    cli_module,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Plan mode should stay offline even when live providers are selected."""
+
+    image_path = create_test_image(tmp_path)
+    monkeypatch.setattr(cli_module, "get_settings", lambda: build_runtime_settings(tmp_path))
+    monkeypatch.setattr(
+        cli_module,
+        "_create_video_smoke_services",
+        lambda **kwargs: (_ for _ in ()).throw(AssertionError("plan must not build services")),
+    )
+
+    exit_code, stdout, stderr = run_cli(
+        cli_module,
+        [
+            "run",
+            "video-smoke",
+            "--image-path",
+            str(image_path),
+            "--prompt",
+            "smooth motion",
+            "--hosting-provider",
+            "cloudinary",
+            "--video-provider",
+            "kling",
+            "--plan",
+        ],
+    )
+
+    assert exit_code == 0
+    assert "image_input: local" in stdout
+    assert "hosting_calls: 1" in stdout
+    assert "video_generation_calls: 1" in stdout
+    assert "will_use_live_media: true" in stdout
+    assert "execution_started: false" in stdout
+    assert stderr == ""
+
+
+def test_video_smoke_execution_hosts_once_generates_once_materializes_once_and_cleans_up(
+    cli_module,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """The direct execution helper should use one host, one video call, and one cleanup."""
+
+    settings = build_runtime_settings(tmp_path)
+    image_path = create_test_image(tmp_path)
+    request = build_video_smoke_request(image_path)
+    hosting_spy = VideoSmokeHostingSpy()
+    generation_spy = VideoSmokeGenerationSpy()
+    materializer_spy = VideoSmokeMaterializerSpy(settings)
+
+    monkeypatch.setattr(
+        cli_module,
+        "_create_video_smoke_services",
+        lambda **kwargs: (
+        hosting_spy,
+        generation_spy,
+        materializer_spy,
+        ),
+    )
+
+    result = cli.asyncio.run(
+        cli_module._execute_video_smoke_workflow(
+            request=request,
+            settings=settings,
+            provider_registry=object(),
+            logger=FakeLogger(),
+        )
+    )
+
+    assert isinstance(result, VideoSmokeResult)
+    assert hosting_spy.host_calls == 1
+    assert hosting_spy.delete_calls == 1
+    assert generation_spy.video_calls == 1
+    assert materializer_spy.calls == 1
+    assert generation_spy.requests[0].reference_image is not None
+    assert generation_spy.requests[0].reference_image.uri.startswith("https://")
+    assert result.final_video_path.name == "clip_001.mp4"
+    assert result.final_video_path.is_file()
+
+
+def test_video_smoke_cleanup_failure_does_not_fail_successful_execution(
+    cli_module,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Best-effort cleanup failures should not erase a successful local video result."""
+
+    settings = build_runtime_settings(tmp_path)
+    image_path = create_test_image(tmp_path)
+    request = build_video_smoke_request(image_path, run_id="video_smoke_cleanup")
+    hosting_spy = VideoSmokeFailingDeleteHostingSpy()
+    generation_spy = VideoSmokeGenerationSpy()
+    materializer_spy = VideoSmokeMaterializerSpy(settings)
+
+    monkeypatch.setattr(
+        cli_module,
+        "_create_video_smoke_services",
+        lambda **kwargs: (
+        hosting_spy,
+        generation_spy,
+        materializer_spy,
+        ),
+    )
+
+    result = cli.asyncio.run(
+        cli_module._execute_video_smoke_workflow(
+            request=request,
+            settings=settings,
+            provider_registry=object(),
+            logger=FakeLogger(),
+        )
+    )
+
+    assert result.run_id == "video_smoke_cleanup"
+    assert hosting_spy.host_calls == 1
+    assert hosting_spy.delete_calls == 1
+    assert generation_spy.video_calls == 1
+    assert materializer_spy.calls == 1
+    assert result.final_video_path.is_file()
+
+
+def test_video_smoke_hosting_failure_prevents_video_generation(
+    cli_module,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """A hosting failure should stop the workflow before any video request is made."""
+
+    settings = build_runtime_settings(tmp_path)
+    image_path = create_test_image(tmp_path)
+    request = build_video_smoke_request(image_path)
+    hosting_spy = VideoSmokeFailingHostSpy()
+    generation_spy = VideoSmokeGenerationSpy()
+    materializer_spy = VideoSmokeMaterializerSpy(settings)
+
+    monkeypatch.setattr(
+        cli_module,
+        "_create_video_smoke_services",
+        lambda **kwargs: (
+        hosting_spy,
+        generation_spy,
+        materializer_spy,
+        ),
+    )
+
+    with pytest.raises(ProviderResponseError, match="hosting failed"):
+        cli.asyncio.run(
+            cli_module._execute_video_smoke_workflow(
+                request=request,
+                settings=settings,
+                provider_registry=object(),
+                logger=FakeLogger(),
+            )
+        )
+
+    assert hosting_spy.host_calls == 1
+    assert generation_spy.video_calls == 0
+    assert materializer_spy.calls == 0
+
+
+def test_video_smoke_generation_failure_propagates_without_retry(
+    cli_module,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """A video-generation failure should surface cleanly after one attempted task only."""
+
+    settings = build_runtime_settings(tmp_path)
+    image_path = create_test_image(tmp_path)
+    request = build_video_smoke_request(image_path)
+    hosting_spy = VideoSmokeHostingSpy()
+    generation_spy = VideoSmokeFailingGenerationSpy()
+    materializer_spy = VideoSmokeMaterializerSpy(settings)
+
+    monkeypatch.setattr(
+        cli_module,
+        "_create_video_smoke_services",
+        lambda **kwargs: (
+        hosting_spy,
+        generation_spy,
+        materializer_spy,
+        ),
+    )
+
+    with pytest.raises(ProviderResponseError, match="video failed"):
+        cli.asyncio.run(
+            cli_module._execute_video_smoke_workflow(
+                request=request,
+                settings=settings,
+                provider_registry=object(),
+                logger=FakeLogger(),
+            )
+        )
+
+    assert hosting_spy.host_calls == 1
+    assert hosting_spy.delete_calls == 1
+    assert generation_spy.video_calls == 1
+    assert materializer_spy.calls == 0
+
+
+def test_run_video_smoke_live_execution_requires_confirmation(
+    cli_module,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Live hosting or video providers must still require explicit confirmation."""
+
+    image_path = create_test_image(tmp_path)
+    monkeypatch.setattr(cli_module, "get_settings", lambda: build_runtime_settings(tmp_path))
+    monkeypatch.setattr(
+        cli_module,
+        "_build_video_smoke_provider_registry",
+        lambda args: (_ for _ in ()).throw(AssertionError("execution should not start")),
+    )
+
+    exit_code, stdout, stderr = run_cli(
+        cli_module,
+        [
+            "run",
+            "video-smoke",
+            "--image-path",
+            str(image_path),
+            "--prompt",
+            "smooth motion",
+            "--hosting-provider",
+            "cloudinary",
+            "--video-provider",
+            "kling",
+        ],
+    )
+
+    assert exit_code == 3
+    assert stdout == ""
+    assert "--confirm-live-calls" in stderr
+
+
+def test_run_video_smoke_api_key_presence_alone_does_not_authorize_live_execution(
+    cli_module,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Configured credentials alone must not bypass the explicit live-call gate."""
+
+    image_path = create_test_image(tmp_path)
+    monkeypatch.setattr(cli_module, "get_settings", lambda: build_runtime_settings(tmp_path))
+
+    exit_code, stdout, stderr = run_cli(
+        cli_module,
+        [
+            "run",
+            "video-smoke",
+            "--image-path",
+            str(image_path),
+            "--prompt",
+            "smooth motion",
+            "--hosting-provider",
+            "cloudinary",
+            "--video-provider",
+            "kling",
+        ],
+    )
+
+    assert exit_code == 3
+    assert stdout == ""
+    assert "--confirm-live-calls" in stderr
+
+
+def test_run_video_smoke_live_execution_with_confirmation_is_allowed_through_policy(
+    cli_module,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Explicit confirmation should allow the live-provider path to proceed to execution."""
+
+    image_path = create_test_image(tmp_path)
+    settings = build_runtime_settings(tmp_path)
+    monkeypatch.setattr(cli_module, "get_settings", lambda: settings)
+    monkeypatch.setattr(
+        cli_module,
+        "_build_video_smoke_provider_registry",
+        lambda args, allowed_image_path: object(),
+    )
+
+    captured: dict[str, object] = {}
+
+    async def fake_execute_video_smoke_workflow(*, request, settings, provider_registry, logger):
+        captured["request"] = request
+        captured["settings"] = settings
+        captured["provider_registry"] = provider_registry
+        del logger
+        return VideoSmokeResult(
+            run_id=request.run_id,
+            provider_selection=request.provider_selection,
+            duration_seconds=request.duration_seconds,
+            materialized_workspace=settings.artifact_root / request.run_id,
+            final_video_path=settings.artifact_root / request.run_id / "video" / "clip_001.mp4",
+        )
+
+    monkeypatch.setattr(cli_module, "_execute_video_smoke_workflow", fake_execute_video_smoke_workflow)
+
+    exit_code, stdout, stderr = run_cli(
+        cli_module,
+        [
+            "run",
+            "video-smoke",
+            "--image-path",
+            str(image_path),
+            "--prompt",
+            "smooth motion",
+            "--hosting-provider",
+            "cloudinary",
+            "--video-provider",
+            "kling",
+            "--confirm-live-calls",
+        ],
+    )
+
+    request = cast(VideoSmokeRequest, captured["request"])
+    assert exit_code == 0
+    assert request.confirm_live_media_calls is True
+    assert "workflow: video smoke" in stdout
+    assert "hosting_provider: cloudinary" in stdout
+    assert "video_provider: kling" in stdout
+    assert "success: true" in stdout
+    assert stderr == ""
+
+
+def test_run_video_smoke_mock_execution_reports_summary_without_prompt_or_secret_leaks(
+    cli_module,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """The mock CLI path should succeed offline and keep output high-level only."""
+
+    image_path = create_test_image(tmp_path)
+    monkeypatch.setattr(cli_module, "get_settings", lambda: build_runtime_settings(tmp_path))
+
+    exit_code, stdout, stderr = run_cli(
+        cli_module,
+        [
+            "run",
+            "video-smoke",
+            "--image-path",
+            str(image_path),
+            "--prompt",
+            "do not print this prompt",
+        ],
+    )
+
+    assert exit_code == 0
+    assert "workflow: video smoke" in stdout
+    assert "hosting_provider: mock" in stdout
+    assert "video_provider: mock" in stdout
+    assert "final_video:" in stdout
+    assert "clip_001.mp4" in stdout
+    assert "https://example.invalid/" not in stdout
+    assert "do not print this prompt" not in stdout
+    assert "cloudinary-key" not in stdout
+    assert "kling-test-key" not in stdout
+    assert "youtube" not in stdout.casefold()
+    assert stderr == ""
 
 
 def test_prompts_manifest_show_reports_schema_version_and_zero_entries(
